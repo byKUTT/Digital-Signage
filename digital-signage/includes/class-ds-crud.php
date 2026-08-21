@@ -31,6 +31,9 @@ class DS_CRUD {
 		update_post_meta( $post_id, 'ds_layout_template', sanitize_key( $data['layout_template'] ?? 'fullscreen' ) );
 		update_post_meta( $post_id, 'ds_is_priority', empty( $data['is_priority'] ) ? 0 : 1 );
 
+		$zone_bg = sanitize_hex_color( $data['zone_bg_color'] ?? '' );
+		update_post_meta( $post_id, 'ds_zone_bg_color', $zone_bg ? $zone_bg : '' );
+
 		return $post_id;
 	}
 
@@ -106,6 +109,7 @@ class DS_CRUD {
 			'channel_id'        => array( 'ds_channel_id', 'absint' ),
 			'zone'              => array( 'ds_zone', 'sanitize_key' ),
 			'order'             => array( 'ds_order', 'absint' ),
+			'fit'               => array( 'ds_fit', 'sanitize_key' ),
 		);
 
 		foreach ( $fields as $input_key => $meta ) {
@@ -123,6 +127,39 @@ class DS_CRUD {
 
 	public static function delete_slide( $id ) {
 		wp_delete_post( $id, true );
+	}
+
+	public static function duplicate_slide( $id ) {
+		$source = get_post( $id );
+		if ( ! $source || 'ds_slide' !== $source->post_type ) {
+			return 0;
+		}
+
+		$channel_id = absint( get_post_meta( $id, 'ds_channel_id', true ) );
+		$new_id     = self::upsert_post( 0, 'ds_slide', $source->post_title . ' ' . __( '(Copy)', 'digital-signage' ) );
+
+		foreach ( get_post_meta( $id ) as $key => $values ) {
+			if ( 0 === strpos( $key, 'ds_' ) ) {
+				update_post_meta( $new_id, $key, maybe_unserialize( $values[0] ) );
+			}
+		}
+
+		// Append to the end of the playlist rather than duplicating the order number.
+		$last = get_posts(
+			array(
+				'post_type'      => 'ds_slide',
+				'posts_per_page' => 1,
+				'meta_key'       => 'ds_channel_id',
+				'meta_value'     => $channel_id,
+				'orderby'        => 'meta_value_num',
+				'meta_key2'      => 'ds_order',
+				'order'          => 'DESC',
+				'fields'         => 'ids',
+			)
+		);
+		update_post_meta( $new_id, 'ds_order', $last ? absint( get_post_meta( $last[0], 'ds_order', true ) ) + 10 : 10 );
+
+		return $new_id;
 	}
 
 	public static function save_slide_order( array $order_map ) {

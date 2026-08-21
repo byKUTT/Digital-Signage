@@ -33,11 +33,29 @@ foreach ( $screens as $s ) {
 
 	<?php if ( ! $screens && ! $channel_count ) : ?>
 		<div class="ds-quickstart">
-			<h2><?php esc_html_e( 'Get started in 3 steps', 'digital-signage' ); ?></h2>
+			<h2><?php esc_html_e( 'How it works', 'digital-signage' ); ?></h2>
+			<div class="ds-flow-diagram">
+				<div class="ds-flow-step">
+					<span class="ds-flow-icon"><?php echo DS_Icons::icon( 'channel' ); // phpcs:ignore ?></span>
+					<strong><?php esc_html_e( '1. Build a Channel', 'digital-signage' ); ?></strong>
+					<span><?php esc_html_e( 'A named playlist of slides — images, videos, webpages, widgets.', 'digital-signage' ); ?></span>
+				</div>
+				<span class="ds-flow-arrow"><?php echo DS_Icons::icon( 'arrow' ); // phpcs:ignore ?></span>
+				<div class="ds-flow-step">
+					<span class="ds-flow-icon"><?php echo DS_Icons::icon( 'screen' ); // phpcs:ignore ?></span>
+					<strong><?php esc_html_e( '2. Pair a Screen', 'digital-signage' ); ?></strong>
+					<span><?php esc_html_e( 'Any TV/tablet browser — scan a QR code or enter a short code.', 'digital-signage' ); ?></span>
+				</div>
+				<span class="ds-flow-arrow"><?php echo DS_Icons::icon( 'arrow' ); // phpcs:ignore ?></span>
+				<div class="ds-flow-step">
+					<span class="ds-flow-icon"><?php echo DS_Icons::icon( 'schedule' ); // phpcs:ignore ?></span>
+					<strong><?php esc_html_e( '3. Schedule (optional)', 'digital-signage' ); ?></strong>
+					<span><?php esc_html_e( 'Assign a channel directly, or set day/time rules and holiday overrides.', 'digital-signage' ); ?></span>
+				</div>
+			</div>
 			<ol>
-				<li><strong><?php esc_html_e( 'Create a Channel', 'digital-signage' ); ?></strong> — <?php esc_html_e( 'a named playlist, e.g. "Lobby Menu".', 'digital-signage' ); ?> <a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-channel-edit' ) ); ?>"><?php esc_html_e( 'Add a Channel →', 'digital-signage' ); ?></a></li>
-				<li><strong><?php esc_html_e( 'Add Slides to it', 'digital-signage' ); ?></strong> — <?php esc_html_e( 'images, videos, webpages, or widgets, right from the channel\'s page.', 'digital-signage' ); ?></li>
-				<li><strong><?php esc_html_e( 'Pair a Screen', 'digital-signage' ); ?></strong> — <?php esc_html_e( 'open the player URL on the TV/tablet, then confirm its code here.', 'digital-signage' ); ?> <a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-pairing' ) ); ?>"><?php esc_html_e( 'Pair a Screen →', 'digital-signage' ); ?></a></li>
+				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-channel-edit' ) ); ?>"><?php esc_html_e( 'Add a Channel →', 'digital-signage' ); ?></a></li>
+				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-pairing' ) ); ?>"><?php esc_html_e( 'Pair a Screen →', 'digital-signage' ); ?></a></li>
 			</ol>
 		</div>
 	<?php endif; ?>
@@ -94,5 +112,5 @@ foreach ( $screens as $s ) {
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-import-export' ) ); ?>" class="ds-btn"><?php esc_html_e( 'Import / Export', 'digital-signage' ); ?></a>
 	</div>
 
-	<p class="ds-app-footer"><?php esc_html_e( 'Digital Signage CMS', 'digital-signage' ); ?> v<?php echo esc_html( DS_VERSION ); ?> &middot; <?php esc_html_e( 'by', 'digital-signage' ); ?> <a href="https://github.com/byKUTT" target="_blank" rel="noopener">byKUTT</a></p>
+	<p class="ds-app-footer"><img class="ds-footer-logo" src="<?php echo esc_url( DS_PLUGIN_URL . 'public/images/bykutt-logo.svg' ); ?>" alt="" /> <?php esc_html_e( 'Digital Signage CMS', 'digital-signage' ); ?> v<?php echo esc_html( DS_VERSION ); ?> &middot; <?php esc_html_e( 'by', 'digital-signage' ); ?> <a href="https://github.com/byKUTT" target="_blank" rel="noopener">byKUTT</a></p>
 </div>

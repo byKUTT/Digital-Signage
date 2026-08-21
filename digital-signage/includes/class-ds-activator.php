@@ -30,6 +30,13 @@ class DS_Activator {
 			self::create_tables();
 			update_option( 'ds_db_version', DS_DB_VERSION );
 		}
+
+		// Re-flush rewrite rules on every version bump — new routes (e.g. the
+		// /signage/preview/ URL) need this even for an in-place plugin upgrade.
+		if ( get_option( 'ds_rewrite_version' ) !== DS_VERSION ) {
+			update_option( 'ds_flush_rewrite_rules', 1 );
+			update_option( 'ds_rewrite_version', DS_VERSION );
+		}
 	}
 
 	public static function default_settings() {

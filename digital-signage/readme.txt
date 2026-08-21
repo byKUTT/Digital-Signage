@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -29,7 +29,7 @@ Digital Signage CMS gives you:
 1. Upload the `digital-signage` folder to `/wp-content/plugins/`.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
 3. Go to **Digital Signage → Settings** to set global slide durations, transitions, poll/heartbeat intervals and time zone.
-4. Go to **Digital Signage → Pair a Screen**, open the generated player URL on the target TV/tablet/browser, and enter the code it displays to link the device.
+4. Go to **Digital Signage → Pair a Screen**, open the generated player URL on the target TV/tablet/browser, then either scan the QR code it displays with your phone or enter the code manually to link the device.
 5. Create a **Channel**, add **Slides** to it, then assign the channel to a **Screen** (or schedule it via **Schedules**).
 
 == Architecture notes ==
@@ -41,6 +41,15 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.1.0 =
+* Raspberry Pi and Windows kiosk installers now generate and persist the device's own pairing token, so the pairing code/identity survives every reboot without re-pairing.
+* The unpaired-screen setup display now shows step-by-step instructions, a scan-to-pair QR code, and animated byKUTT branding.
+* Images/video now fill the screen edge-to-edge by default (cropped to fit), with a per-slide "Fit: contain" option to letterbox instead, plus a per-channel background/letterbox color.
+* Channel playlists show a thumbnail preview per slide instead of just a text row.
+* Clock widget and admin timestamps now use 24-hour time and dd.mm.yyyy (Estonian) date formatting everywhere.
+* Added a live "Preview" button on each channel (wp-admin-only, no screen/pairing required) and a Duplicate action for individual slides.
+* Refined the admin visual design with slide-type icon illustrations and an onboarding "how it works" diagram.
 
 = 2.0.0 =
 * Replaced the WordPress native post-editor screens with a fully custom admin UI (dashboard, channel/screen/schedule list + edit pages, slide editor) — no more post.php/meta boxes.

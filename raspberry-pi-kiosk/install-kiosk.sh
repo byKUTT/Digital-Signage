@@ -4,30 +4,44 @@
 #
 # Turns a Raspberry Pi (running Raspberry Pi OS, Lite or Desktop, Bullseye or
 # Bookworm) into a dedicated signage player: boots straight to a console
-# autologin, starts a minimal X session, and opens the given player URL
+# autologin, starts a minimal X session, and opens this device's player URL
 # full-screen in Chromium with no browser chrome. If Chromium ever crashes
 # or the URL is unreachable at boot, a watchdog loop relaunches it.
 #
+# The device generates its own pairing token ONCE and stores it in
+# /etc/digital-signage-kiosk.conf — every reboot reuses that same token, so
+# the pairing code shown on screen (and the screen's identity once paired)
+# never changes just because the Pi restarted. Re-running this installer is
+# safe and keeps the existing token; pass --regenerate to force a new one
+# (e.g. you're re-purposing this SD card for a different physical screen).
+#
 # Usage:
-#   sudo bash install-kiosk.sh https://yourdomain.com/signage/play/TOKEN/ [kiosk-user]
+#   sudo bash install-kiosk.sh https://yourdomain.com [kiosk-user] [--regenerate]
 #
 # Run this ON the Raspberry Pi itself (SSH in, or use a keyboard/monitor).
 
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
-	echo "Please run as root: sudo bash install-kiosk.sh <player-url> [user]" >&2
+	echo "Please run as root: sudo bash install-kiosk.sh <site-url> [user] [--regenerate]" >&2
 	exit 1
 fi
 
-URL="${1:-}"
+SITE_URL="${1:-}"
 KIOSK_USER="${2:-${SUDO_USER:-pi}}"
+REGENERATE=0
+for arg in "$@"; do
+	[ "$arg" = "--regenerate" ] && REGENERATE=1
+done
+# A second positional arg that's actually the flag shouldn't be treated as a username.
+[ "$KIOSK_USER" = "--regenerate" ] && KIOSK_USER="${SUDO_USER:-pi}"
 
-if [ -z "$URL" ]; then
-	echo "Usage: sudo bash install-kiosk.sh <player-url> [kiosk-user]" >&2
-	echo "Example: sudo bash install-kiosk.sh https://example.com/signage/play/abc123/ pi" >&2
+if [ -z "$SITE_URL" ]; then
+	echo "Usage: sudo bash install-kiosk.sh <site-url> [kiosk-user] [--regenerate]" >&2
+	echo "Example: sudo bash install-kiosk.sh https://example.com pi" >&2
 	exit 1
 fi
+SITE_URL="${SITE_URL%/}"
 
 if ! id "$KIOSK_USER" &>/dev/null; then
 	echo "User '$KIOSK_USER' does not exist on this system." >&2
@@ -55,10 +69,30 @@ if [ -z "$CHROMIUM_BIN" ]; then
 	exit 1
 fi
 
+# --- Persistent device token: generate once, reuse forever (until --regenerate). ---
+TOKEN=""
+if [ -f "$CONF_FILE" ] && [ "$REGENERATE" -eq 0 ]; then
+	# shellcheck disable=SC1090
+	source "$CONF_FILE"
+	TOKEN="${DS_KIOSK_TOKEN:-}"
+fi
+if [ -z "$TOKEN" ]; then
+	TOKEN=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 40)
+	echo "==> Generated a new device token (this screen's permanent identity)."
+else
+	echo "==> Reusing existing device token from ${CONF_FILE}."
+fi
+
+URL="${SITE_URL}/signage/play/${TOKEN}/"
+
 echo "==> Writing config to ${CONF_FILE}"
 cat > "$CONF_FILE" <<EOF
-# Digital Signage kiosk configuration. Edit and reboot to apply,
-# or re-run install-kiosk.sh with a new URL.
+# Digital Signage kiosk configuration.
+# DS_KIOSK_TOKEN is this device's permanent identity — do not edit unless you
+# intend to re-pair this device as a different screen. Change DS_KIOSK_SITE
+# and reboot if the WordPress site moves to a new domain.
+DS_KIOSK_TOKEN="${TOKEN}"
+DS_KIOSK_SITE="${SITE_URL}"
 DS_KIOSK_URL="${URL}"
 DS_KIOSK_CHROMIUM="${CHROMIUM_BIN}"
 EOF
@@ -145,10 +179,15 @@ EOF
 fi
 
 echo ""
-echo "✅ Installed. Player URL: ${URL}"
+echo "✅ Installed. Player URL (permanent for this device): ${URL}"
 echo "   Kiosk user:            ${KIOSK_USER}"
-echo "   Config file:           ${CONF_FILE} (edit + reboot to change the URL)"
+echo "   Config file:           ${CONF_FILE}"
 echo "   Watchdog script:       ${WATCHDOG}"
 echo ""
+echo "On first boot this screen will show a pairing code + QR code full-screen —"
+echo "scan it or open wp-admin > Digital Signage > Pair a Screen to link it."
+echo "The same code/token stays valid across every reboot."
+echo ""
 echo "Reboot now to start the kiosk: sudo reboot"
+echo "To re-pair this device as a different screen: sudo bash install-kiosk.sh ${SITE_URL} ${KIOSK_USER} --regenerate"
 echo "To remove: sudo bash uninstall-kiosk.sh ${KIOSK_USER}"

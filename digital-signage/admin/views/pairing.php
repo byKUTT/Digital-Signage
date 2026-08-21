@@ -2,6 +2,7 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+$prefilled_code = isset( $_GET['code'] ) ? strtoupper( sanitize_text_field( wp_unslash( $_GET['code'] ) ) ) : '';
 ?>
 <div class="ds-app-wrap">
 	<div class="ds-app-header">
@@ -13,6 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<?php if ( isset( $_GET['ds_error'] ) ) : ?>
 		<div class="ds-notice ds-notice-error"><?php esc_html_e( 'That pairing code is invalid, already used, or has expired.', 'digital-signage' ); ?></div>
+	<?php elseif ( $prefilled_code ) : ?>
+		<div class="ds-notice"><?php esc_html_e( 'Code scanned from a screen — just name it and confirm below.', 'digital-signage' ); ?></div>
 	<?php endif; ?>
 
 	<div class="ds-two-col">
@@ -32,11 +35,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<?php wp_nonce_field( 'ds_pair_screen' ); ?>
 				<div class="ds-field">
 					<label for="ds_screen_name"><?php esc_html_e( 'Screen name', 'digital-signage' ); ?></label>
-					<input type="text" id="ds_screen_name" name="screen_name" class="ds-input" placeholder="<?php esc_attr_e( 'e.g. Lobby TV', 'digital-signage' ); ?>" required />
+					<input type="text" id="ds_screen_name" name="screen_name" class="ds-input" placeholder="<?php esc_attr_e( 'e.g. Lobby TV', 'digital-signage' ); ?>" required <?php echo $prefilled_code ? 'autofocus' : ''; ?> />
 				</div>
 				<div class="ds-field">
 					<label for="ds_code"><?php esc_html_e( 'Pairing code', 'digital-signage' ); ?></label>
-					<input type="text" id="ds_code" name="code" class="ds-input ds-code-input" maxlength="6" style="text-transform:uppercase" required />
+					<input type="text" id="ds_code" name="code" class="ds-input ds-code-input" maxlength="6" style="text-transform:uppercase" value="<?php echo esc_attr( $prefilled_code ); ?>" required />
 				</div>
 				<button type="submit" class="ds-btn ds-btn-primary"><?php esc_html_e( 'Pair Screen', 'digital-signage' ); ?></button>
 			</form>

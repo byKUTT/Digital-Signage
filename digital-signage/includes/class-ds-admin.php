@@ -33,6 +33,7 @@ class DS_Admin {
 
 		add_action( 'admin_post_ds_save_slide', array( $this, 'handle_save_slide' ) );
 		add_action( 'admin_post_ds_delete_slide', array( $this, 'handle_delete_slide' ) );
+		add_action( 'admin_post_ds_duplicate_slide', array( $this, 'handle_duplicate_slide' ) );
 		add_action( 'admin_post_ds_save_slide_order', array( $this, 'handle_save_slide_order' ) );
 
 		add_action( 'admin_post_ds_save_screen', array( $this, 'handle_save_screen' ) );
@@ -312,6 +313,15 @@ class DS_Admin {
 		$channel_id = absint( $_POST['channel_id'] ?? 0 );
 		DS_CRUD::delete_slide( absint( $_POST['id'] ?? 0 ) );
 		wp_safe_redirect( admin_url( 'admin.php?page=ds-channel-edit&id=' . $channel_id . '&ds_deleted=1#ds-playlist' ) );
+		exit;
+	}
+
+	public function handle_duplicate_slide() {
+		$this->require_cap();
+		check_admin_referer( 'ds_duplicate_slide' );
+		$channel_id = absint( $_POST['channel_id'] ?? 0 );
+		DS_CRUD::duplicate_slide( absint( $_POST['id'] ?? 0 ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=ds-channel-edit&id=' . $channel_id . '&ds_saved=1#ds-playlist' ) );
 		exit;
 	}
 

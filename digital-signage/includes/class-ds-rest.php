@@ -14,6 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   POST /screen/{token}/proof      Proof-of-play log entry
  *   POST /pair/request              Generates a pairing code for an unpaired player
  *   GET  /pair/status/{token}       Poll: has this pairing token been claimed yet?
+ *   GET  /preview/{channel_id}      wp-admin-only live preview of a channel (cookie+nonce auth)
  */
 class DS_REST {
 
@@ -80,6 +81,48 @@ class DS_REST {
 				'permission_callback' => '__return_true',
 			)
 		);
+
+		register_rest_route(
+			'ds/v1',
+			'/preview/(?P<channel_id>\d+)',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_preview' ),
+				'permission_callback' => function () {
+					return current_user_can( DS_Roles::CAP );
+				},
+			)
+		);
+	}
+
+	/**
+	 * Same shape as get_playlist(), but resolves a specific channel directly
+	 * (no screen/schedule involved) — used by the "Preview" button in wp-admin.
+	 */
+	public function get_preview( WP_REST_Request $request ) {
+		$channel_id = absint( $request['channel_id'] );
+		if ( ! $channel_id || 'ds_channel' !== get_post_type( $channel_id ) ) {
+			return new WP_Error( 'ds_unknown_channel', __( 'Channel not found.', 'digital-signage' ), array( 'status' => 404 ) );
+		}
+
+		$zones    = DS_Schedule_Resolver::get_active_playlist( $channel_id );
+		$layout   = get_post_meta( $channel_id, 'ds_layout_template', true ) ?: 'fullscreen';
+		$zone_bg  = get_post_meta( $channel_id, 'ds_zone_bg_color', true );
+		$settings = DS_Settings::get_all();
+
+		return rest_ensure_response(
+			array(
+				'channel_id'    => $channel_id,
+				'channel_name'  => get_the_title( $channel_id ),
+				'orientation'   => 'auto',
+				'layout'        => $layout,
+				'zone_bg'       => $zone_bg ?: '',
+				'zones'         => (object) $zones,
+				'defaults'      => $settings,
+				'poll_interval' => 5, // Fast refresh while an editor is actively previewing.
+				'generated_at'  => current_time( 'timestamp' ),
+			)
+		);
 	}
 
 	private function get_screen_by_token( $token ) {
@@ -104,6 +147,7 @@ class DS_REST {
 		$channel_id = DS_Schedule_Resolver::resolve_channel_id_for_screen( $screen->ID );
 		$zones      = $channel_id ? DS_Schedule_Resolver::get_active_playlist( $channel_id ) : array();
 		$layout     = $channel_id ? ( get_post_meta( $channel_id, 'ds_layout_template', true ) ?: 'fullscreen' ) : 'fullscreen';
+		$zone_bg    = $channel_id ? get_post_meta( $channel_id, 'ds_zone_bg_color', true ) : '';
 		$settings   = DS_Settings::get_all();
 
 		$remote_command = get_post_meta( $screen->ID, 'ds_remote_command', true );
@@ -120,6 +164,7 @@ class DS_REST {
 				'channel_id'     => $channel_id,
 				'channel_name'   => $channel_id ? get_the_title( $channel_id ) : '',
 				'layout'         => $layout,
+				'zone_bg'        => $zone_bg ?: '',
 				'zones'          => (object) $zones,
 				'defaults'       => $settings,
 				'poll_interval'  => (int) $settings['poll_interval'],
@@ -276,6 +321,7 @@ class DS_REST {
 			'type'        => $type,
 			'duration'    => $duration,
 			'transition'  => $transition,
+			'fit'         => get_post_meta( $slide->ID, 'ds_fit', true ) ?: 'cover',
 			'order'       => absint( get_post_meta( $slide->ID, 'ds_order', true ) ),
 		);
 

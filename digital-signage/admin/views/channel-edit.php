@@ -17,6 +17,7 @@ $layouts = array(
 	'split_screen' => __( 'Split Screen', 'digital-signage' ),
 	'grid'         => __( 'Grid', 'digital-signage' ),
 );
+$zone_bg = $id ? ( get_post_meta( $id, 'ds_zone_bg_color', true ) ?: '#000000' ) : '#000000';
 ?>
 <div class="ds-app-wrap">
 	<div class="ds-app-header">
@@ -26,6 +27,7 @@ $layouts = array(
 		</div>
 		<?php if ( $id ) : ?>
 			<div class="ds-app-header-actions">
+				<a class="ds-btn ds-btn-primary" href="<?php echo esc_url( home_url( '/signage/preview/' . $id . '/' ) ); ?>" target="_blank" rel="noopener">▶ <?php esc_html_e( 'Preview', 'digital-signage' ); ?></a>
 				<a class="ds-btn" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ds_duplicate_channel&id=' . $id ), 'ds_duplicate_channel' ) ); ?>"><?php esc_html_e( 'Duplicate', 'digital-signage' ); ?></a>
 				<a class="ds-btn" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ds_export_channel&channel_id=' . $id ), 'ds_export_channel' ) ); ?>"><?php esc_html_e( 'Export JSON', 'digital-signage' ); ?></a>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="ds-inline-form" onsubmit="return confirm('<?php echo esc_js( __( 'Delete this channel and all its slides?', 'digital-signage' ) ); ?>');">
@@ -69,6 +71,12 @@ $layouts = array(
 			</div>
 
 			<div class="ds-field">
+				<label for="zone_bg_color"><?php esc_html_e( 'Letterbox / background color', 'digital-signage' ); ?></label>
+				<input type="color" id="zone_bg_color" name="zone_bg_color" value="<?php echo esc_attr( $zone_bg ); ?>" class="ds-color-input" />
+				<span class="ds-hint"><?php esc_html_e( 'Shown behind slides and in any empty space around them (e.g. a slide set to "Fit: Contain").', 'digital-signage' ); ?></span>
+			</div>
+
+			<div class="ds-field">
 				<label class="ds-checkbox-label">
 					<input type="checkbox" name="is_priority" value="1" <?php checked( $is_priority ); ?> />
 					<?php esc_html_e( 'Emergency / priority channel — takes over ALL screens immediately, ignoring schedules', 'digital-signage' ); ?>
@@ -96,15 +104,25 @@ $layouts = array(
 					<ul id="ds-sortable-playlist" class="ds-sortable-playlist">
 						<?php foreach ( $slides as $i => $slide ) : ?>
 							<?php
-							$type = get_post_meta( $slide->ID, 'ds_slide_type', true ) ?: 'image';
-							$zone = get_post_meta( $slide->ID, 'ds_zone', true ) ?: 'main';
-							$dur  = get_post_meta( $slide->ID, 'ds_duration_override', true );
+							$type  = get_post_meta( $slide->ID, 'ds_slide_type', true ) ?: 'image';
+							$zone  = get_post_meta( $slide->ID, 'ds_zone', true ) ?: 'main';
+							$dur   = get_post_meta( $slide->ID, 'ds_duration_override', true );
+							$media = absint( get_post_meta( $slide->ID, 'ds_media_id', true ) );
+							$edit_url = admin_url( 'admin.php?page=ds-slide-edit&id=' . $slide->ID . '&channel_id=' . $id );
 							?>
 							<li class="ds-sortable-item" data-slide-id="<?php echo esc_attr( $slide->ID ); ?>">
 								<span class="dashicons dashicons-menu ds-drag-handle"></span>
-								<span class="ds-slide-icon ds-slide-icon-<?php echo esc_attr( $type ); ?>"></span>
-								<a class="ds-slide-title" href="<?php echo esc_url( admin_url( 'admin.php?page=ds-slide-edit&id=' . $slide->ID . '&channel_id=' . $id ) ); ?>"><?php echo esc_html( $slide->post_title ); ?></a>
-								<span class="ds-slide-meta"><?php echo esc_html( ucfirst( $type ) ); ?> &middot; <?php echo esc_html( ucfirst( $zone ) ); ?><?php echo $dur ? ' · ' . esc_html( $dur . 's' ) : ''; ?></span>
+								<a class="ds-slide-thumb ds-slide-thumb-<?php echo esc_attr( $type ); ?>" href="<?php echo esc_url( $edit_url ); ?>">
+									<?php if ( $media && in_array( $type, array( 'image', 'video', 'pdf' ), true ) && wp_get_attachment_image_url( $media, 'thumbnail' ) ) : ?>
+										<img src="<?php echo esc_url( wp_get_attachment_image_url( $media, 'thumbnail' ) ); ?>" alt="" />
+									<?php else : ?>
+										<?php echo DS_Icons::icon( $type ); // phpcs:ignore -- trusted static SVG. ?>
+									<?php endif; ?>
+								</a>
+								<div class="ds-slide-info">
+									<a class="ds-slide-title" href="<?php echo esc_url( $edit_url ); ?>"><?php echo esc_html( $slide->post_title ); ?></a>
+									<span class="ds-slide-meta"><?php echo esc_html( DS_Icons::type_label( $type ) ); ?> &middot; <?php echo esc_html( ucfirst( $zone ) ); ?><?php echo $dur ? ' · ' . esc_html( $dur . 's' ) : ''; ?></span>
+								</div>
 								<input type="hidden" name="order[<?php echo esc_attr( $slide->ID ); ?>]" value="<?php echo esc_attr( $i * 10 ); ?>" class="ds-order-input" />
 							</li>
 						<?php endforeach; ?>

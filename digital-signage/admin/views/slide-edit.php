@@ -23,6 +23,7 @@ $api_key  = $id ? get_post_meta( $id, 'ds_weather_api_key', true ) : '';
 $playmode = $id ? ( get_post_meta( $id, 'ds_video_play_mode', true ) ?: 'fixed_duration' ) : 'fixed_duration';
 $duration = $id ? get_post_meta( $id, 'ds_duration_override', true ) : '';
 $transition = $id ? ( get_post_meta( $id, 'ds_transition_override', true ) ?: 'default' ) : 'default';
+$fit      = $id ? ( get_post_meta( $id, 'ds_fit', true ) ?: 'cover' ) : 'cover';
 $zone     = $id ? ( get_post_meta( $id, 'ds_zone', true ) ?: 'main' ) : 'main';
 $order    = $id ? get_post_meta( $id, 'ds_order', true ) : '';
 if ( ! $id && '' === $order ) {
@@ -55,13 +56,22 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 			<h1><?php echo $id ? esc_html( $slide->post_title ) : esc_html__( 'New Slide', 'digital-signage' ); ?></h1>
 		</div>
 		<?php if ( $id ) : ?>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('<?php echo esc_js( __( 'Delete this slide?', 'digital-signage' ) ); ?>');">
-				<input type="hidden" name="action" value="ds_delete_slide" />
-				<input type="hidden" name="id" value="<?php echo esc_attr( $id ); ?>" />
-				<input type="hidden" name="channel_id" value="<?php echo esc_attr( $channel_id ); ?>" />
-				<?php wp_nonce_field( 'ds_delete_slide' ); ?>
-				<button type="submit" class="ds-btn ds-btn-danger"><?php esc_html_e( 'Delete', 'digital-signage' ); ?></button>
-			</form>
+			<div class="ds-app-header-actions">
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<input type="hidden" name="action" value="ds_duplicate_slide" />
+					<input type="hidden" name="id" value="<?php echo esc_attr( $id ); ?>" />
+					<input type="hidden" name="channel_id" value="<?php echo esc_attr( $channel_id ); ?>" />
+					<?php wp_nonce_field( 'ds_duplicate_slide' ); ?>
+					<button type="submit" class="ds-btn"><?php esc_html_e( 'Duplicate', 'digital-signage' ); ?></button>
+				</form>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('<?php echo esc_js( __( 'Delete this slide?', 'digital-signage' ) ); ?>');">
+					<input type="hidden" name="action" value="ds_delete_slide" />
+					<input type="hidden" name="id" value="<?php echo esc_attr( $id ); ?>" />
+					<input type="hidden" name="channel_id" value="<?php echo esc_attr( $channel_id ); ?>" />
+					<?php wp_nonce_field( 'ds_delete_slide' ); ?>
+					<button type="submit" class="ds-btn ds-btn-danger"><?php esc_html_e( 'Delete', 'digital-signage' ); ?></button>
+				</form>
+			</div>
 		<?php endif; ?>
 	</div>
 
@@ -177,6 +187,16 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 				<div class="ds-field">
 					<label for="order"><?php esc_html_e( 'Order', 'digital-signage' ); ?></label>
 					<input type="number" id="order" name="order" value="<?php echo esc_attr( $order ); ?>" class="ds-input ds-input-small" />
+				</div>
+
+				<div class="ds-type-field" data-type="image,video">
+					<div class="ds-field">
+						<label for="fit"><?php esc_html_e( 'Fit', 'digital-signage' ); ?></label>
+						<select id="fit" name="fit" class="ds-input">
+							<option value="cover" <?php selected( $fit, 'cover' ); ?>><?php esc_html_e( 'Fill screen (crop to fit)', 'digital-signage' ); ?></option>
+							<option value="contain" <?php selected( $fit, 'contain' ); ?>><?php esc_html_e( 'Fit inside (letterbox, no cropping)', 'digital-signage' ); ?></option>
+						</select>
+					</div>
 				</div>
 
 				<h3><?php esc_html_e( 'Show only during (optional)', 'digital-signage' ); ?></h3>

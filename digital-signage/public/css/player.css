@@ -40,7 +40,7 @@ html, body {
 /* ---- Stage & zones ---- */
 .ds-stage { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-.ds-zone { position: absolute; overflow: hidden; background: #000; }
+.ds-zone { position: absolute; overflow: hidden; background: var(--ds-zone-bg, #000); }
 .ds-zone-main { inset: 0; }
 .ds-zone-secondary, .ds-zone-ticker, .ds-zone-corner { display: none; }
 
@@ -86,8 +86,13 @@ html[data-ds-orientation="portrait"] .ds-stage,
 .ds-slide.ds-active { opacity: 1; z-index: 2; }
 .ds-slide.ds-prev { z-index: 1; }
 
+/* Images/video always fill the screen edge-to-edge by default (cropping to fit);
+   a slide can opt back into letterboxing via the "Fit" option (.ds-fit-contain). */
 .ds-slide img, .ds-slide video {
-	width: 100%; height: 100%; object-fit: contain; background: #000;
+	width: 100%; height: 100%; object-fit: cover; background: var(--ds-zone-bg, #000);
+}
+.ds-slide.ds-fit-contain img, .ds-slide.ds-fit-contain video {
+	object-fit: contain;
 }
 .ds-slide iframe { width: 100%; height: 100%; border: 0; }
 .ds-slide .ds-html-block { width: 100%; height: 100%; overflow: auto; }

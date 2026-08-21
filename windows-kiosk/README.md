@@ -10,35 +10,37 @@ suppressed by kiosk mode), a **global keyboard shortcut** (default
 Works with **Microsoft Edge** (built into Windows 10/11, default) or
 **Google Chrome**. No installer/build step — it's PowerShell, run directly.
 
-## 1. Get your player URL
+## 1. Install
 
-In wp-admin, go to **Digital Signage → Pair a Screen** and follow the
-pairing flow to get:
-
-```
-https://yourdomain.com/signage/play/<token>/
-```
-
-## 2. Install
-
-Copy this `windows-kiosk` folder to the PC, open **PowerShell as
-Administrator is NOT required** (it installs for the current user only),
-and run:
+This device generates and remembers **its own pairing identity** — no need
+to pre-create a screen in wp-admin first. Copy this `windows-kiosk` folder
+to the PC (**Administrator is NOT required** — it installs for the current
+user only) and run:
 
 ```powershell
 cd path\to\windows-kiosk
-powershell -ExecutionPolicy Bypass -File .\install-kiosk.ps1 -Url "https://yourdomain.com/signage/play/<token>/"
+powershell -ExecutionPolicy Bypass -File .\install-kiosk.ps1 -Site "https://yourdomain.com"
 ```
 
 That's it — sign out and back in (or reboot) and the kiosk starts
-automatically, hidden, with no console window.
+automatically, hidden, with no console window. On first launch it shows a
+pairing code and QR code full-screen; scan the QR (or enter the code
+manually in **Digital Signage → Pair a Screen**) and it links up. The same
+identity persists across every reboot.
+
+Already paired a screen in wp-admin and have its exact player URL? Use
+`-Url` instead of `-Site` and no local token is generated:
+
+```powershell
+.\install-kiosk.ps1 -Url "https://yourdomain.com/signage/play/<token>/"
+```
 
 ### Custom close hotkey
 
 Default is `Ctrl+Alt+Shift+Q`. To use something else:
 
 ```powershell
-.\install-kiosk.ps1 -Url "https://yourdomain.com/signage/play/<token>/" -CloseModifiers Ctrl,Alt -CloseKey X
+.\install-kiosk.ps1 -Site "https://yourdomain.com" -CloseModifiers Ctrl,Alt -CloseKey X
 ```
 
 `CloseModifiers` accepts any combination of `Ctrl`, `Alt`, `Shift`, `Win`.
@@ -47,10 +49,19 @@ Default is `Ctrl+Alt+Shift+Q`. To use something else:
 ### Use Chrome instead of Edge
 
 ```powershell
-.\install-kiosk.ps1 -Url "https://yourdomain.com/signage/play/<token>/" -Browser chrome
+.\install-kiosk.ps1 -Site "https://yourdomain.com" -Browser chrome
 ```
 
-## 3. (Optional) True "boots straight to signage" kiosk PC
+### Re-pairing this PC as a different screen
+
+Re-running the installer keeps the existing device token. To force a new
+one (e.g. this PC is being re-purposed for a different physical screen):
+
+```powershell
+.\install-kiosk.ps1 -Site "https://yourdomain.com" -Regenerate
+```
+
+## 2. (Optional) True "boots straight to signage" kiosk PC
 
 Windows has no built-in equivalent of a Linux console autologin — a user
 account still has to sign in before anything in their Startup/Run entries
@@ -73,8 +84,12 @@ kiosk browser.
   has focus), and watches the browser process — if it ever exits on its
   own (crash/update), it's relaunched automatically after 2 seconds.
 - `install-kiosk.ps1` — copies `kiosk-player.ps1` to
-  `%ProgramData%\DigitalSignageKiosk\` and adds a `HKCU...\Run` registry
-  entry so it launches hidden on every sign-in for the current user.
+  `%ProgramData%\DigitalSignageKiosk\`, generates and saves a permanent
+  device token to `device-token.txt` (when using `-Site`), and adds a
+  `HKCU...\Run` registry entry so the kiosk launches hidden on every
+  sign-in for the current user — the URL is baked into that registry
+  command, so it stays fixed across reboots without re-running the
+  installer.
 - `uninstall-kiosk.ps1` — stops any running kiosk session, removes the
   registry entry and the installed files.
 

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" role="img" aria-label="byKUTT">
+	<title>byKUTT</title>
+	<defs>
+		<radialGradient id="bykuttGradient" cx="50%" cy="50%" r="75%" gradientUnits="objectBoundingBox">
+			<stop offset="0%" stop-color="#ffe14d">
+				<animate attributeName="stop-color" values="#ffe14d;#ff9a3c;#f24957;#fbdff0;#ffe14d" dur="10s" repeatCount="indefinite" calcMode="linear" />
+			</stop>
+			<stop offset="35%" stop-color="#ff9a3c">
+				<animate attributeName="stop-color" values="#ff9a3c;#f24957;#fbdff0;#ffe14d;#ff9a3c" dur="10s" repeatCount="indefinite" calcMode="linear" />
+			</stop>
+			<stop offset="70%" stop-color="#f24957">
+				<animate attributeName="stop-color" values="#f24957;#fbdff0;#ffe14d;#ff9a3c;#f24957" dur="10s" repeatCount="indefinite" calcMode="linear" />
+			</stop>
+			<stop offset="100%" stop-color="#fbdff0">
+				<animate attributeName="stop-color" values="#fbdff0;#ffe14d;#ff9a3c;#f24957;#fbdff0" dur="10s" repeatCount="indefinite" calcMode="linear" />
+			</stop>
+			<animateTransform attributeName="gradientTransform" type="rotate" from="0 0.5 0.5" to="360 0.5 0.5" dur="18s" repeatCount="indefinite" />
+		</radialGradient>
+		<clipPath id="bykuttClip">
+			<rect width="400" height="400" rx="40" />
+		</clipPath>
+	</defs>
+
+	<g clip-path="url(#bykuttClip)">
+		<rect width="400" height="400" fill="url(#bykuttGradient)" />
+		<text x="200" y="222" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="52" font-weight="700" fill="#ffffff" letter-spacing="1" style="paint-order: stroke; text-shadow: 0 2px 12px rgba(0,0,0,.18);">byKUTT</text>
+		<text x="200" y="252" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" letter-spacing="4" fill="rgba(255,255,255,0.85)">DIGITAL SIGNAGE</text>
+	</g>
+</svg>

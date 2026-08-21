@@ -79,7 +79,11 @@
 	/* ---------------------------------------------------------------- */
 
 	function apiGet( path ) {
-		return fetch( CONFIG.restUrl + path, { cache: 'no-store' } ).then( function ( r ) {
+		var headers = {};
+		if ( CONFIG.nonce ) {
+			headers['X-WP-Nonce'] = CONFIG.nonce; // Only needed for the cookie-authenticated preview endpoint.
+		}
+		return fetch( CONFIG.restUrl + path, { cache: 'no-store', credentials: 'same-origin', headers: headers } ).then( function ( r ) {
 			if ( ! r.ok ) {
 				throw new Error( 'HTTP ' + r.status );
 			}
@@ -88,6 +92,9 @@
 	}
 
 	function apiPost( path, body ) {
+		if ( CONFIG.isPreview ) {
+			return Promise.resolve(); // Previewing in wp-admin never writes heartbeats/proof-of-play.
+		}
 		return fetch( CONFIG.restUrl + path, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -125,10 +132,13 @@
 	}
 
 	function fetchPlaylist() {
-		apiGet( '/playlist' )
+		var path = CONFIG.isPreview ? ( '/preview/' + CONFIG.previewChannelId ) : '/playlist';
+		apiGet( path )
 			.then( function ( data ) {
 				setOffline( false );
-				cachePlaylist( data );
+				if ( ! CONFIG.isPreview ) {
+					cachePlaylist( data );
+				}
 				applyPlaylist( data );
 				handleRemoteCommand( data );
 			} )
@@ -160,6 +170,9 @@
 
 		var stage = document.getElementById( 'ds-stage' );
 		stage.className = 'ds-stage ds-layout-' + ( data.layout || 'fullscreen' );
+		if ( data.zone_bg ) {
+			stage.style.setProperty( '--ds-zone-bg', data.zone_bg );
+		}
 
 		document.documentElement.setAttribute(
 			'data-ds-orientation',
@@ -248,7 +261,7 @@
 
 	function buildSlideEl( item ) {
 		var el = document.createElement( 'div' );
-		el.className = 'ds-slide';
+		el.className = 'ds-slide' + ( 'contain' === item.fit ? ' ds-fit-contain' : '' );
 		el.dataset.slideId = item.id;
 
 		switch ( item.type ) {
@@ -316,6 +329,15 @@
 		return el;
 	}
 
+	// Estonian weekday/month names, used instead of relying on the kiosk browser's
+	// system locale (which varies per device) — every screen shows the same format:
+	// 24-hour time and dd.mm.yyyy dates, per house style.
+	var ET_WEEKDAYS = [ 'Pühapäev', 'Esmaspäev', 'Teisipäev', 'Kolmapäev', 'Neljapäev', 'Reede', 'Laupäev' ];
+
+	function pad2( n ) {
+		return ( n < 10 ? '0' : '' ) + n;
+	}
+
 	function buildClockEl() {
 		var wrap = document.createElement( 'div' );
 		wrap.className = 'ds-clock';
@@ -328,8 +350,8 @@
 
 		function tick() {
 			var now = new Date();
-			time.textContent = now.toLocaleTimeString( undefined, { hour: '2-digit', minute: '2-digit' } );
-			date.textContent = now.toLocaleDateString( undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' } );
+			time.textContent = pad2( now.getHours() ) + ':' + pad2( now.getMinutes() );
+			date.textContent = ET_WEEKDAYS[ now.getDay() ] + ', ' + pad2( now.getDate() ) + '.' + pad2( now.getMonth() + 1 ) + '.' + now.getFullYear();
 		}
 		tick();
 		var interval = setInterval( tick, 1000 );
@@ -490,22 +512,26 @@
 	/* ---------------------------------------------------------------- */
 
 	function boot() {
-		initFullscreen();
+		if ( ! CONFIG.isPreview ) {
+			initFullscreen();
+		}
 
 		// Show cached content immediately if we have it, then fetch fresh in the background.
-		var cached = loadCachedPlaylist();
+		var cached = ! CONFIG.isPreview ? loadCachedPlaylist() : null;
 		if ( cached ) {
 			applyPlaylist( cached );
 		}
 
 		fetchPlaylist();
-		sendHeartbeat();
 
 		var pollMs = Math.max( 10, CONFIG.pollInterval || 60 ) * 1000;
-		var hbMs   = Math.max( 10, CONFIG.heartbeatInterval || 30 ) * 1000;
-
 		setInterval( fetchPlaylist, pollMs );
-		setInterval( sendHeartbeat, hbMs );
+
+		if ( ! CONFIG.isPreview ) {
+			sendHeartbeat();
+			var hbMs = Math.max( 10, CONFIG.heartbeatInterval || 30 ) * 1000;
+			setInterval( sendHeartbeat, hbMs );
+		}
 
 		window.addEventListener( 'online', function () { setOffline( false ); fetchPlaylist(); } );
 		window.addEventListener( 'offline', function () { setOffline( true ); } );

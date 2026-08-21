@@ -4,9 +4,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Renders the chrome-less fullscreen frontend player at /signage/play/{token}/.
- * Bypasses the active theme entirely (no header/footer/sidebar/admin bar) and
- * loads a minimal, dependency-light HTML/CSS/JS shell that talks to the REST API.
+ * Renders the chrome-less fullscreen frontend player at /signage/play/{token}/,
+ * and the equivalent wp-admin-only live preview at /signage/preview/{channel_id}/.
+ * Both bypass the active theme entirely (no header/footer/sidebar/admin bar) and
+ * load a minimal, dependency-light HTML/CSS/JS shell that talks to the REST API.
  */
 class DS_Player {
 
@@ -25,13 +26,19 @@ class DS_Player {
 	}
 
 	public function hide_admin_bar( $show ) {
-		if ( get_query_var( 'ds_screen_token' ) ) {
+		if ( get_query_var( 'ds_screen_token' ) || get_query_var( 'ds_preview_channel' ) ) {
 			return false;
 		}
 		return $show;
 	}
 
 	public function maybe_render_player() {
+		$preview_channel = get_query_var( 'ds_preview_channel' );
+		if ( $preview_channel ) {
+			$this->maybe_render_preview( absint( $preview_channel ) );
+			return;
+		}
+
 		$token = get_query_var( 'ds_screen_token' );
 		if ( ! $token ) {
 			return;
@@ -85,11 +92,47 @@ class DS_Player {
 			$code = $row->code;
 		}
 
+		$pairing_url = admin_url( 'admin.php?page=ds-pairing&code=' . rawurlencode( $code ) );
+
 		include DS_PLUGIN_DIR . 'public/templates/pairing-screen.php';
 	}
 
 	private function render_player( $screen, $token ) {
-		$rest_url = esc_url_raw( rest_url( 'ds/v1/screen/' . $token ) );
+		$rest_url    = esc_url_raw( rest_url( 'ds/v1/screen/' . $token ) );
+		$is_preview  = false;
+		$preview_id  = 0;
+		$preview_nonce = '';
 		include DS_PLUGIN_DIR . 'public/templates/player-template.php';
+	}
+
+	/**
+	 * /signage/preview/{channel_id}/ — same chrome-less renderer as the real player,
+	 * but requires a logged-in wp-admin user with the signage capability, and reads
+	 * straight from the /preview/{id} REST route instead of a paired screen.
+	 */
+	private function maybe_render_preview( $channel_id ) {
+		nocache_headers();
+
+		if ( ! is_user_logged_in() ) {
+			auth_redirect(); // Sends them to wp-login.php, then back here.
+			exit;
+		}
+		if ( ! current_user_can( DS_Roles::CAP ) ) {
+			wp_die( esc_html__( 'You do not have permission to preview this channel.', 'digital-signage' ) );
+		}
+
+		if ( ! $channel_id || 'ds_channel' !== get_post_type( $channel_id ) ) {
+			wp_die( esc_html__( 'Channel not found.', 'digital-signage' ) );
+		}
+
+		$screen        = (object) array( 'ID' => 0, 'post_title' => get_the_title( $channel_id ) );
+		$token         = '';
+		$rest_url      = esc_url_raw( rest_url( 'ds/v1' ) );
+		$is_preview    = true;
+		$preview_id    = $channel_id;
+		$preview_nonce = wp_create_nonce( 'wp_rest' );
+
+		include DS_PLUGIN_DIR . 'public/templates/player-template.php';
+		exit;
 	}
 }

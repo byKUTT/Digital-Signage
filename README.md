@@ -12,9 +12,10 @@ The plugin source lives in [`digital-signage/`](digital-signage/) and is also pa
 - **Custom DB tables** (`ds_heartbeats`, `ds_proof_of_play`, `ds_pairing_codes`) for high-write, append-only data.
 - **Scheduling**: recurring day-of-week/time rules, one-off date overrides, per-slide time windows, and priority/emergency channels that interrupt rotation on all screens instantly.
 - **Slide types**: image, video (full-length or fixed-duration), webpage/iframe, custom HTML/CSS, RSS/Atom ticker, weather widget, live clock, PDF/Google Slides embed, social embed — each with per-slide duration and transition overrides on top of global defaults.
-- **Frontend player** (`/signage/play/{token}/`): unguessable per-screen token, auto-fullscreen with a click-to-start fallback, landscape/portrait/auto orientation, multi-zone layouts (fullscreen, main+ticker, split-screen, grid), REST polling for live updates, next-slide preloading, offline-safe local caching, and periodic heartbeat reporting.
-- **Admin**: Screens dashboard with live online/offline status (via the WP Heartbeat API), pairing flow (code generated on the unpaired screen, confirmed in wp-admin), bulk channel assignment, drag-and-drop playlist reordering, weekly calendar view, proof-of-play analytics with CSV export, JSON channel import/export, remote refresh/reload commands, and a **Signage Manager** role for non-technical staff.
+- **Frontend player** (`/signage/play/{token}/`): unguessable per-screen token, auto-fullscreen with a click-to-start fallback, landscape/portrait/auto orientation, multi-zone layouts (fullscreen, main+ticker, split-screen, grid), images/video filling the screen edge-to-edge by default (with a per-slide "fit inside" option), REST polling for live updates, next-slide preloading, offline-safe local caching, and periodic heartbeat reporting.
+- **Admin**: Screens dashboard with live online/offline status (via the WP Heartbeat API), a pairing screen with step-by-step instructions, a scan-to-pair QR code and animated byKUTT branding, thumbnail previews in every channel's playlist, a live no-screen-required channel Preview, bulk channel assignment, drag-and-drop playlist reordering, weekly calendar view, proof-of-play analytics with CSV export, JSON channel import/export, remote refresh/reload commands, and a **Signage Manager** role for non-technical staff.
 - **REST API** under `/wp-json/ds/v1/` for the player and for external kiosk hardware (e.g. a Raspberry Pi running a browser in kiosk mode).
+- **24-hour time and dd.mm.yyyy (Estonian) date formatting** throughout the player's clock widget and admin timestamps.
 
 See [`digital-signage/readme.txt`](digital-signage/readme.txt) for the standard WordPress.org-style plugin readme, and the PHPDoc block at the top of each class in `digital-signage/includes/` for how each subsystem fits together.
 
@@ -38,10 +39,14 @@ Once a screen is paired in wp-admin, point the display's browser at its
 player URL (`/signage/play/{token}/`) in kiosk/full-screen mode. Two
 ready-made installers are included for the common cases:
 
+Both installers now generate and remember **the device's own pairing
+identity** — point them at your site URL (not a pre-paired player URL) and
+the same pairing code/token stays valid across every reboot:
+
 - **[`raspberry-pi-kiosk/`](raspberry-pi-kiosk/)** — one script
   (`install-kiosk.sh`) that turns a Raspberry Pi into a dedicated player:
-  boots straight to a full-screen Chromium kiosk showing your player URL, no
-  desktop needed, with a watchdog that relaunches it if it ever crashes.
+  boots straight to a full-screen Chromium kiosk, no desktop needed, with a
+  watchdog that relaunches it if it ever crashes.
 - **[`windows-kiosk/`](windows-kiosk/)** — a PowerShell player
   (`install-kiosk.ps1`) that auto-starts a chrome-less kiosk browser window
   on Windows sign-in, with a configurable global hotkey (default

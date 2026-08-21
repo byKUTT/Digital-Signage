@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<table class="ds-table">
 					<thead>
 						<tr>
-							<th><?php esc_html_e( 'Played At (UTC)', 'digital-signage' ); ?></th>
+							<th><?php esc_html_e( 'Played At', 'digital-signage' ); ?></th>
 							<th><?php esc_html_e( 'Screen', 'digital-signage' ); ?></th>
 							<th><?php esc_html_e( 'Channel', 'digital-signage' ); ?></th>
 							<th><?php esc_html_e( 'Slide', 'digital-signage' ); ?></th>
@@ -40,7 +40,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<tbody>
 						<?php foreach ( $rows as $row ) : ?>
 							<tr>
-								<td><?php echo esc_html( $row->played_at ); ?></td>
+								<td><?php echo esc_html( date_i18n( 'd.m.Y H:i', strtotime( $row->played_at . ' UTC' ) ) ); ?></td>
 								<td><?php echo esc_html( get_the_title( $row->screen_id ) ); ?></td>
 								<td><?php echo esc_html( get_the_title( $row->channel_id ) ); ?></td>
 								<td><?php echo esc_html( get_the_title( $row->slide_id ) ); ?></td>
