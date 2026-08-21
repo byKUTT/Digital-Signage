@@ -390,6 +390,15 @@ class DS_Admin {
 		$table = $wpdb->prefix . 'ds_pairing_codes';
 		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE code = %s", $code ) );
 
+		// The code may have rotated while the user was scanning or submitting it.
+		// Accept the immediately previous code for the API's 30-second grace window.
+		if ( ! $row ) {
+			$grace_row_id = (int) get_transient( DS_REST::pairing_grace_key( $code ) );
+			if ( $grace_row_id ) {
+				$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $grace_row_id ) );
+			}
+		}
+
 		if ( ! $row || strtotime( $row->expires_at . ' UTC' ) < time() || $row->paired_at ) {
 			wp_safe_redirect( add_query_arg( 'ds_error', 'invalid_code', admin_url( 'admin.php?page=ds-pairing' ) ) );
 			exit;
