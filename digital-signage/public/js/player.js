@@ -475,6 +475,7 @@
 				horizontalSpacing: settings.slider_horizontal_spacing,
 				speed: settings.slider_speed,
 				borderRadius: settings.slider_border_radius,
+				orientation: settings.slider_orientation || 'auto',
 			}
 		);
 	}
@@ -489,6 +490,7 @@
 				horizontalSpacing: item.spacing,
 				speed: item.speed,
 				borderRadius: 0,
+				orientation: 'auto',
 			}
 		);
 	}
@@ -515,6 +517,8 @@
 
 		var speed = Math.max( 5, Number( options.speed ) || 60 ); // px/second
 		var borderRadius = Math.max( 0, Number( options.borderRadius ) || 0 );
+		var orientation = [ 'vertical', 'horizontal' ].indexOf( options.orientation ) >= 0 ? options.orientation : 'auto';
+		var reduceMotion = 'matchMedia' in window && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
 		var position = 0;
 		var loopLength = 0;
 		var lastFrame = null;
@@ -536,17 +540,24 @@
 		}
 
 		function measure() {
-			var measuredPortrait = wrap.clientHeight > wrap.clientWidth;
-			if ( ! wrap.clientHeight || ! wrap.clientWidth ) {
-				measuredPortrait = 'portrait' === document.documentElement.getAttribute( 'data-ds-orientation' );
+			var previousLoopLength = loopLength;
+			var progress = previousLoopLength > 0 ? ( ( ( -position % previousLoopLength ) + previousLoopLength ) % previousLoopLength ) / previousLoopLength : 0;
+			var measuredPortrait;
+			if ( 'vertical' === orientation ) {
+				measuredPortrait = true;
+			} else if ( 'horizontal' === orientation ) {
+				measuredPortrait = false;
+			} else {
+				measuredPortrait = wrap.clientHeight > wrap.clientWidth;
+				if ( ! wrap.clientHeight || ! wrap.clientWidth ) {
+					measuredPortrait = 'portrait' === document.documentElement.getAttribute( 'data-ds-orientation' );
+				}
 			}
-			if ( portrait !== measuredPortrait ) {
-				portrait = measuredPortrait;
-				position = 0;
-				track.style.transform = 'translate3d(0,0,0)';
-			}
+			portrait = measuredPortrait;
 
 			track.className = 'ds-continuous-slider-track ' + ( portrait ? 'ds-continuous-vertical' : 'ds-continuous-horizontal' );
+			wrap.classList.toggle( 'ds-slider-vertical', portrait );
+			wrap.classList.toggle( 'ds-slider-horizontal', ! portrait );
 			var spacing = portrait
 				? options.verticalSpacing
 				: options.horizontalSpacing;
@@ -563,11 +574,16 @@
 			}
 
 			loopLength = contentLength + ( spacing * images.length );
+			position = -progress * loopLength;
+			track.style.transform = portrait
+				? 'translate3d(0,' + position + 'px,0)'
+				: 'translate3d(' + position + 'px,0,0)';
 			var viewportLength = portrait ? wrap.clientHeight : wrap.clientWidth;
 			var requiredCopies = Math.max( 2, Math.ceil( ( viewportLength + loopLength ) / loopLength ) + 1 );
 			while ( renderedCopies < requiredCopies ) {
 				appendCopy();
 			}
+			wrap.classList.add( 'ds-slider-ready' );
 		}
 
 		appendCopy();
@@ -592,16 +608,22 @@
 		measure();
 
 		function frame( now ) {
+			if ( loopLength <= 0 ) {
+				lastFrame = null;
+				var waitingId = requestAnimationFrame( frame );
+				wrap.dataset.dsTimerId = String( waitingId );
+				return;
+			}
 			if ( null === lastFrame ) {
 				lastFrame = now;
 			}
-			var dt = ( now - lastFrame ) / 1000;
+			var dt = Math.min( ( now - lastFrame ) / 1000, 0.05 );
 			lastFrame = now;
 
 			if ( loopLength > 0 ) {
 				position -= speed * dt;
 				if ( position <= -loopLength ) {
-					position += loopLength;
+					position = -( ( -position ) % loopLength );
 				}
 				track.style.transform = portrait
 					? 'translate3d(0,' + position + 'px,0)'
@@ -611,8 +633,12 @@
 			var id = requestAnimationFrame( frame );
 			wrap.dataset.dsTimerId = String( id );
 		}
-		wrap.dataset.dsTimerKind = 'raf';
-		wrap.dataset.dsTimerId = String( requestAnimationFrame( frame ) );
+		if ( reduceMotion ) {
+			wrap.classList.add( 'ds-reduced-motion' );
+		} else {
+			wrap.dataset.dsTimerKind = 'raf';
+			wrap.dataset.dsTimerId = String( requestAnimationFrame( frame ) );
+		}
 
 		return wrap;
 	}

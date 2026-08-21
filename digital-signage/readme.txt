@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.9.1
+Stable tag: 2.9.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,12 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.9.2 =
+* Infinite Slider orientation can now be set to Auto, Vertical or Horizontal per channel. Forced Vertical always uses one full-width column; forced Horizontal always uses one full-height row.
+* Polished the signage-facing slider with restrained edge fading, stable image presentation and smoother continuous motion while keeping the screen free of controls or interface chrome.
+* Slider progress is preserved across resize/orientation changes, delayed frames are clamped to prevent visible jumps, and reduced-motion preferences disable repetitive automatic movement.
+* Reworked the channel's Infinite Slider settings into an accessible segmented orientation control and a cohesive settings card.
 
 = 2.9.1 =
 * Added **Infinite Slider** as a channel-level Slide transition for image-only zones. It continuously loops ordinary image slides in one vertical portrait column or one horizontal landscape row, with multiple images visible at once.

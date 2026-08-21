@@ -28,12 +28,14 @@ $slider_vertical_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_vertical_s
 $slider_horizontal_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_horizontal_spacing', true ) : '';
 $slider_speed_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_speed', true ) : '';
 $slider_radius_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_border_radius', true ) : '';
+$slider_orientation_meta = $id ? sanitize_key( get_post_meta( $id, 'ds_infinite_slider_orientation', true ) ) : 'auto';
 $slider_vertical_fallback = $id ? get_post_meta( $id, 'ds_scroll_vertical_spacing', true ) : '';
 $slider_horizontal_fallback = $id ? get_post_meta( $id, 'ds_scroll_horizontal_spacing', true ) : '';
 $slider_vertical_spacing = '' !== $slider_vertical_meta ? absint( $slider_vertical_meta ) : ( '' !== $slider_vertical_fallback ? absint( $slider_vertical_fallback ) : 20 );
 $slider_horizontal_spacing = '' !== $slider_horizontal_meta ? absint( $slider_horizontal_meta ) : ( '' !== $slider_horizontal_fallback ? absint( $slider_horizontal_fallback ) : 20 );
 $slider_speed = '' !== $slider_speed_meta ? max( 5, absint( $slider_speed_meta ) ) : $scroll_speed;
 $slider_border_radius = '' !== $slider_radius_meta ? absint( $slider_radius_meta ) : 0;
+$slider_orientation = in_array( $slider_orientation_meta, array( 'auto', 'vertical', 'horizontal' ), true ) ? $slider_orientation_meta : 'auto';
 $transition_options = array(
 	'none'            => __( 'None', 'digital-signage' ),
 	'fade'            => __( 'Fade', 'digital-signage' ),
@@ -117,9 +119,29 @@ $transition_options = array(
 				</label>
 			</div>
 
-			<h3><?php esc_html_e( 'Infinite Slider settings', 'digital-signage' ); ?></h3>
-			<p class="ds-hint"><?php esc_html_e( 'Used when Slide transition is Infinite Slider. Portrait zones show one vertical column of full-width images; landscape zones show one horizontal row of full-height images.', 'digital-signage' ); ?></p>
-			<div class="ds-settings-grid">
+			<div class="ds-feature-settings ds-infinite-slider-settings">
+				<div class="ds-feature-settings-header">
+					<div>
+						<h3><?php esc_html_e( 'Infinite Slider', 'digital-signage' ); ?></h3>
+						<p class="ds-hint"><?php esc_html_e( 'A continuous, content-first image stream with no controls shown on the signage screen.', 'digital-signage' ); ?></p>
+					</div>
+					<span class="ds-feature-badge"><?php esc_html_e( 'Channel transition', 'digital-signage' ); ?></span>
+				</div>
+
+				<div class="ds-field ds-orientation-field">
+					<span class="ds-control-label" id="ds-slider-orientation-label"><?php esc_html_e( 'Scrolling orientation', 'digital-signage' ); ?></span>
+					<div class="ds-segmented-control" role="radiogroup" aria-labelledby="ds-slider-orientation-label">
+						<?php foreach ( array( 'auto' => __( 'Auto', 'digital-signage' ), 'vertical' => __( 'Vertical', 'digital-signage' ), 'horizontal' => __( 'Horizontal', 'digital-signage' ) ) as $orientation_key => $orientation_label ) : ?>
+							<label class="ds-segmented-option">
+								<input type="radio" name="infinite_slider_orientation" value="<?php echo esc_attr( $orientation_key ); ?>" <?php checked( $slider_orientation, $orientation_key ); ?> />
+								<span><?php echo esc_html( $orientation_label ); ?></span>
+							</label>
+						<?php endforeach; ?>
+					</div>
+					<span class="ds-hint"><?php esc_html_e( 'Auto follows the zone proportions. Vertical always uses one full-width column; Horizontal always uses one full-height row.', 'digital-signage' ); ?></span>
+				</div>
+
+				<div class="ds-settings-grid ds-slider-settings-grid">
 				<div class="ds-field">
 					<label for="infinite_slider_vertical_spacing"><?php esc_html_e( 'Portrait vertical spacing (px)', 'digital-signage' ); ?></label>
 					<input type="number" min="0" id="infinite_slider_vertical_spacing" name="infinite_slider_vertical_spacing" value="<?php echo esc_attr( $slider_vertical_spacing ); ?>" class="ds-input ds-input-small" />
@@ -135,6 +157,7 @@ $transition_options = array(
 				<div class="ds-field">
 					<label for="infinite_slider_border_radius"><?php esc_html_e( 'Image border radius (px)', 'digital-signage' ); ?></label>
 					<input type="number" min="0" id="infinite_slider_border_radius" name="infinite_slider_border_radius" value="<?php echo esc_attr( $slider_border_radius ); ?>" class="ds-input ds-input-small" />
+				</div>
 				</div>
 			</div>
 

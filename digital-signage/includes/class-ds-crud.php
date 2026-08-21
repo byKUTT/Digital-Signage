@@ -39,6 +39,11 @@ class DS_CRUD {
 		update_post_meta( $post_id, 'ds_infinite_slider_horizontal_spacing', absint( $data['infinite_slider_horizontal_spacing'] ?? 20 ) );
 		update_post_meta( $post_id, 'ds_infinite_slider_speed', max( 5, absint( $data['infinite_slider_speed'] ?? 60 ) ) );
 		update_post_meta( $post_id, 'ds_infinite_slider_border_radius', absint( $data['infinite_slider_border_radius'] ?? 0 ) );
+		$slider_orientation = sanitize_key( $data['infinite_slider_orientation'] ?? 'auto' );
+		if ( ! in_array( $slider_orientation, array( 'auto', 'vertical', 'horizontal' ), true ) ) {
+			$slider_orientation = 'auto';
+		}
+		update_post_meta( $post_id, 'ds_infinite_slider_orientation', $slider_orientation );
 
 		$zone_bg = sanitize_hex_color( $data['zone_bg_color'] ?? '' );
 		update_post_meta( $post_id, 'ds_zone_bg_color', $zone_bg ? $zone_bg : '' );

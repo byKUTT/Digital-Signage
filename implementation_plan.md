@@ -1,4 +1,83 @@
-# Digital Signage Infinite Slider correction — implementation plan
+# Digital Signage Infinite Slider orientation and frontend polish — implementation plan
+
+## 2.9.2 scope
+
+Add an explicit Infinite Slider direction setting with three choices:
+
+- **Auto** — use the rendered zone proportions, preserving current behaviour.
+- **Vertical** — always render one vertical column with full-width images.
+- **Horizontal** — always render one horizontal row with full-height images.
+
+The Apple-inspired work targets the actual signage screen. The player remains chrome-free and content-led, but gains restrained visual depth, orientation-aware edge treatment, stable continuous movement, and accessibility-aware motion behaviour.
+
+## Files for this update
+
+### [MODIFY] `digital-signage/admin/views/channel-edit.php`
+
+- Read the saved Infinite Slider orientation, defaulting existing channels to `auto`.
+- Add an Auto / Vertical / Horizontal segmented choice inside the Infinite Slider settings card.
+- Keep spacing, speed, and border radius together as one clearly grouped configuration surface.
+
+### [MODIFY] `digital-signage/admin/css/admin.css`
+
+- Style the orientation choice as a compact, accessible segmented control with a clear selected state, keyboard focus ring, comfortable targets, and no decorative clutter.
+- Give the Infinite Slider settings a contained hierarchy so it reads as one feature rather than unrelated number inputs.
+
+### [MODIFY] `digital-signage/includes/class-ds-crud.php`
+
+- Validate `auto`, `vertical`, or `horizontal` and save it as `ds_infinite_slider_orientation`.
+
+### [MODIFY] `digital-signage/includes/class-ds-rest.php`
+
+- Add the resolved `slider_orientation` to Infinite Slider item payloads, with `auto` as the compatibility fallback.
+
+### [MODIFY] `digital-signage/public/js/player.js`
+
+- Resolve the slider axis from the saved setting before falling back to the actual zone proportions.
+- Start motion only after a valid first measurement so images do not visibly jump into place.
+- Preserve normalized loop progress when the zone resizes or orientation changes instead of restarting from zero.
+- Clamp unusually large frame deltas after browser stalls so the track never leaps forward.
+- Continue using one `requestAnimationFrame` loop and GPU transforms, with cleanup on every replacement/removal.
+- Respect `prefers-reduced-motion: reduce` by presenting the arranged images without repetitive automatic movement.
+
+### [MODIFY] `digital-signage/public/css/player.css`
+
+- Polish the signage-facing Infinite Slider with orientation-aware soft entry/exit masks, consistent corner rendering, subtle image separation, and clean use of the channel background.
+- Keep the effect restrained: no visible controls, labels, glass panels, or interface chrome on the signage output.
+- Apply forced vertical/horizontal sizing correctly at every zone aspect ratio.
+- Disable nonessential motion treatment when reduced motion is requested.
+
+### [MODIFY] `digital-signage/digital-signage.php`
+
+- Bump the plugin version to `2.9.2`.
+
+### [MODIFY] `digital-signage/readme.txt`
+
+- Document selectable orientation and the smoother/accessibility-aware frontend behaviour.
+
+### [MODIFY] `digital-signage.zip`
+
+- Rebuild the installable archive and verify every archived file against the source.
+
+### [MODIFY] `system_architecture.md`
+
+- Record orientation ownership and the player rules for progress-preserving measurement, frame-delta clamping, and reduced motion.
+
+## Verification
+
+- Auto, Vertical, and Horizontal save and round-trip through REST.
+- Forced Vertical uses one full-width column even on a landscape display.
+- Forced Horizontal uses one full-height row even on a portrait display.
+- Auto continues to follow rendered zone proportions.
+- Resizing does not restart the track or create a visible seam.
+- A stalled frame does not cause a large jump.
+- Reduced-motion mode shows content without continuous automatic motion.
+- Existing Infinite Slider spacing, speed, radius, mixed-content fallback, Infinite Scroll Gallery, and generated slide names remain intact.
+- JavaScript syntax, diff checks, source invariants, ZIP integrity, and ZIP/source equality pass before publication.
+
+---
+
+## 2.9.1 correction history
 
 ## Corrected interpretation
 

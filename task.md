@@ -1,11 +1,11 @@
-# Infinite Slider correction
+# Infinite Slider orientation and frontend polish
 
-- [x] Add Infinite Slider channel transition and settings.
-- [x] Restore Infinite Scroll Gallery as a separate slide type.
-- [x] Add Infinite Slider metadata to CRUD and REST payloads.
-- [x] Render image-only zones as one continuous orientation-aware track.
-- [x] Add spacing, speed, and border-radius behaviour.
-- [x] Preserve mixed-content zones with normal fade rotation.
+- [x] Add Auto / Vertical / Horizontal channel orientation.
+- [x] Build the accessible segmented orientation control.
+- [x] Pass orientation through CRUD and REST.
+- [x] Preserve loop progress across resize and direction changes.
+- [x] Clamp stalled frames and support reduced motion.
+- [x] Add restrained signage-facing edge and image polish.
 - [x] Update version, readme, and architecture notes.
 - [x] Run verification and rebuild `digital-signage.zip`.
 - [x] Commit and push the approved branch.

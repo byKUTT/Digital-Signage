@@ -204,6 +204,67 @@
 .ds-checkbox-row { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .ds-checkbox-list { max-height: 220px; overflow-y: auto; border: 1px solid #dcdcde; border-radius: 4px; padding: 10px 14px; background: #f9f9f9; max-width: 480px; }
 .ds-settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 24px; }
+.ds-feature-settings {
+	margin: 22px 0;
+	padding: 18px;
+	border: 1px solid #d9dadd;
+	border-radius: 14px;
+	background: linear-gradient(180deg, #fbfbfc 0%, #f5f5f7 100%);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+.ds-feature-settings-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.ds-feature-settings-header h3 { margin: 0 0 3px; font-size: 17px; letter-spacing: -0.01em; }
+.ds-feature-settings-header .ds-hint { margin: 0; max-width: 620px; }
+.ds-feature-badge {
+	display: inline-flex;
+	align-items: center;
+	min-height: 24px;
+	padding: 2px 9px;
+	border-radius: 999px;
+	background: #e8f2ff;
+	color: #135e96;
+	font-size: 11px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+.ds-control-label { display: block; margin-bottom: 7px; font-weight: 600; }
+.ds-orientation-field { margin-bottom: 18px; }
+.ds-segmented-control {
+	display: inline-grid;
+	grid-template-columns: repeat(3, minmax(88px, 1fr));
+	gap: 2px;
+	padding: 3px;
+	border: 1px solid rgba(0, 0, 0, 0.08);
+	border-radius: 11px;
+	background: #e9e9eb;
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.ds-segmented-option { position: relative; margin: 0 !important; cursor: pointer; font-weight: 500 !important; }
+.ds-segmented-option input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ds-segmented-option span {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 34px;
+	padding: 0 13px;
+	border-radius: 8px;
+	color: #3c434a;
+	font-size: 13px;
+	line-height: 1;
+	transition: color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+.ds-segmented-option input:checked + span {
+	background: #fff;
+	color: #101517;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+}
+.ds-segmented-option input:focus-visible + span { outline: 2px solid #2271b1; outline-offset: 2px; }
+.ds-segmented-option:active span { transform: scale(0.98); }
+.ds-slider-settings-grid { padding-top: 16px; border-top: 1px solid rgba(0, 0, 0, 0.08); }
+@media (max-width: 600px) {
+	.ds-feature-settings-header { flex-direction: column; }
+	.ds-segmented-control { display: grid; width: 100%; grid-template-columns: repeat(3, 1fr); }
+}
 .ds-code-input { text-align: center; font-size: 22px; letter-spacing: 4px; max-width: 200px; }
 .ds-code-block { display: inline-block; background: #f6f7f7; border-radius: 4px; padding: 6px 10px; font-size: 13px; }
 
