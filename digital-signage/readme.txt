@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.6.0
+Stable tag: 2.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,13 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.7.0 =
+* Fixed pairing-code rotation not actually being visible: the polling endpoint now sends `nocache_headers()`, and the pairing screen's poll request uses `cache: 'no-store'` plus a cache-busting query param — without these, a host page cache or the browser's own HTTP cache could keep serving the exact same response on every poll, which looked exactly like rotation wasn't happening even though the server-side logic was correct.
+* Rotation interval changed from 15s to 30s, and the pairing screen now shows a live "New code in Xs" countdown.
+* Pairing screen text now sizes off viewport **width** by default (right for a normal TV and for a tall/narrow portrait screen), with a dedicated height-based override only for a short/wide bar display (e.g. 1920x440) where width-based sizing would overflow.
+* `delete_screen()`'s pairing-code cleanup is now more robust — matches on both `screen_id` and the screen's pairing token, so a screen paired before this cleanup existed (or with an unset `screen_id`) still gets its code freed for reuse.
+* New: **Scan QR Code** button on the "Pair a Screen" admin page — opens the camera and auto-fills the code once it reads the QR shown on the display, no typing needed. Uses the browser's built-in barcode detector (no external library), so the button only appears in browsers that support it (Chrome/Edge); everywhere else, typing the code in still works exactly as before.
 
 = 2.6.0 =
 * Fixed: deleting a screen now also frees its pairing code/token — previously the device's own persistent token stayed locked to an already-used code forever, so re-pairing the same physical device after deleting its screen was impossible ("invalid code") without manually clearing the database.

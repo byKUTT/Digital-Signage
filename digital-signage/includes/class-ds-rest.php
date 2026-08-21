@@ -356,10 +356,17 @@ class DS_REST {
 	 * showing on an unattended screen can't be found/used by someone later —
 	 * only a code currently on-screen (within the last ROTATE_SECONDS) works.
 	 */
-	const PAIRING_CODE_ROTATE_SECONDS = 15;
+	const PAIRING_CODE_ROTATE_SECONDS = 30;
 
 	public function pair_status( WP_REST_Request $request ) {
 		global $wpdb;
+		// This is polled every 15s by an unattended screen expecting a fresh
+		// answer each time. Without this, a caching layer (host-level page
+		// cache, a caching plugin, even the browser's own HTTP cache) can serve
+		// the exact same response for every poll since the URL never changes —
+		// which looks exactly like "rotation isn't happening" even though the
+		// server-side logic below is working correctly.
+		nocache_headers();
 		$table = $wpdb->prefix . 'ds_pairing_codes';
 		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE token = %s", $request['token'] ) );
 

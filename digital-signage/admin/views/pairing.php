@@ -39,10 +39,25 @@ $prefilled_code = isset( $_GET['code'] ) ? strtoupper( sanitize_text_field( wp_u
 				</div>
 				<div class="ds-field">
 					<label for="ds_code"><?php esc_html_e( 'Pairing code', 'digital-signage' ); ?></label>
-					<input type="text" id="ds_code" name="code" class="ds-input ds-code-input" maxlength="6" style="text-transform:uppercase" value="<?php echo esc_attr( $prefilled_code ); ?>" required />
+					<div class="ds-code-scan-row">
+						<input type="text" id="ds_code" name="code" class="ds-input ds-code-input" maxlength="6" style="text-transform:uppercase" value="<?php echo esc_attr( $prefilled_code ); ?>" required />
+						<button type="button" class="ds-btn" id="ds-scan-qr" hidden>📷 <?php esc_html_e( 'Scan QR Code', 'digital-signage' ); ?></button>
+					</div>
+					<span class="ds-hint" id="ds-scan-hint"></span>
 				</div>
 				<button type="submit" class="ds-btn ds-btn-primary"><?php esc_html_e( 'Pair Screen', 'digital-signage' ); ?></button>
 			</form>
+		</div>
+	</div>
+
+	<div class="ds-scan-modal" id="ds-scan-modal" hidden>
+		<div class="ds-scan-modal-inner">
+			<div class="ds-scan-modal-header">
+				<h2><?php esc_html_e( 'Scan the QR code shown on the screen', 'digital-signage' ); ?></h2>
+				<button type="button" class="ds-btn" id="ds-scan-close">✕</button>
+			</div>
+			<video id="ds-scan-video" autoplay playsinline muted></video>
+			<p class="ds-hint" id="ds-scan-status"><?php esc_html_e( 'Point the camera at the QR code on the display.', 'digital-signage' ); ?></p>
 		</div>
 	</div>
 </div>

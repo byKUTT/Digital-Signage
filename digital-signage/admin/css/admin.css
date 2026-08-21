@@ -227,6 +227,23 @@
 	white-space: pre-wrap; word-break: break-word; margin: 8px 0 0;
 }
 
+.ds-code-scan-row { display: flex; gap: 8px; align-items: center; }
+.ds-code-scan-row .ds-code-input { flex: 1; }
+
+.ds-scan-modal {
+	position: fixed; inset: 0; z-index: 100000;
+	background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center;
+}
+.ds-scan-modal[hidden] { display: none; }
+.ds-scan-modal-inner {
+	background: #1d2327; color: #fff; border-radius: 10px; padding: 20px;
+	width: min(480px, 92vw); box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+.ds-scan-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.ds-scan-modal-header h2 { margin: 0; font-size: 16px; font-weight: 500; color: #fff; }
+#ds-scan-video { width: 100%; border-radius: 6px; background: #000; aspect-ratio: 4 / 3; object-fit: cover; }
+.ds-scan-modal .ds-hint { color: #c3c4c7; margin-top: 10px; }
+
 .ds-chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .ds-chip {
 	background: #f0f6fc;

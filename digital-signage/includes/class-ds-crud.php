@@ -206,7 +206,16 @@ class DS_CRUD {
 		// "Pair a Screen" form rejects as invalid, permanently locking the device
 		// out. Deleting the row here means the device's next visit mints a fresh,
 		// reusable code, same as a brand-new device.
+		//
+		// Matched on both screen_id AND token (belt-and-suspenders): screen_id is
+		// the normal path, but token is the actual link render_unpaired_screen()
+		// looks up by, so matching on it too covers any row that ended up without
+		// screen_id set for some reason (e.g. a pre-2.6.0 pairing).
+		$token = get_post_meta( $id, 'ds_pairing_token', true );
 		$wpdb->delete( $wpdb->prefix . 'ds_pairing_codes', array( 'screen_id' => $id ), array( '%d' ) );
+		if ( $token ) {
+			$wpdb->delete( $wpdb->prefix . 'ds_pairing_codes', array( 'token' => $token ), array( '%s' ) );
+		}
 		wp_delete_post( $id, true );
 	}
 
