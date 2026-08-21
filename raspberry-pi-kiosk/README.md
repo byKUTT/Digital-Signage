@@ -17,24 +17,6 @@ persists across every reboot, power cut, or SD card re-insert.
 Works on Raspberry Pi OS **Lite** or **Desktop** (Bullseye or Bookworm, 32-
 or 64-bit), Pi 3/4/5/Zero 2 W.
 
-### Raspberry Pi 3 performance profile
-
-When a Pi 3 is detected, the installer automatically runs `optimize-pi.sh`.
-It preserves Raspberry Pi OS's existing graphics-driver configuration, turns
-off WiFi power saving, prioritizes kiosk rendering, bounds journal writes, and
-disables only unrelated services such as Bluetooth, printing and ModemManager.
-The changes are idempotent and are reversed by `uninstall-kiosk.sh`. Re-running
-version 2.9.6 also removes the installer-owned KMS override written by 2.9.5,
-which could produce a black screen with uncommon HDMI modes.
-
-Firefox ESR is recommended on this installation. Firefox chooses its own safe
-compositor backend while the kiosk profile keeps hardware H.264 decoding
-enabled. Encode signage video as **H.264 at 30 fps or less**; avoid AV1, VP9,
-HEVC and 60 fps on a Pi 3.
-For a 1920×440 display, encoding at the display's actual dimensions and a
-moderate bitrate avoids decoding pixels that can never be shown. Use a proper
-5 V / 2.5 A supply and cooling so thermal throttling does not cause stutter.
-
 ---
 
 ## Complete install guide, start to finish
@@ -78,7 +60,7 @@ Every step, in order, from a blank SD card:
    `1920x440`, for example) that doesn't auto-detect correctly? Add
    `--resolution WIDTHxHEIGHT`:
    ```bash
-   sudo bash install-kiosk.sh "https://yourdomain.com" robin --resolution 1920x440
+   sudo bash install-kiosk.sh "https://yourdomain.com" pi --resolution 1920x440
    ```
    This can also be set later from wp-admin (Screen edit page > Device >
    Custom resolution) without touching the Pi again.
@@ -87,7 +69,7 @@ Every step, in order, from a blank SD card:
    everything this installer already does to suppress it? Switch this
    device to Firefox ESR instead with `--browser firefox`:
    ```bash
-   sudo bash install-kiosk.sh "https://yourdomain.com" robin --browser firefox
+   sudo bash install-kiosk.sh "https://yourdomain.com" pi --browser firefox
    ```
    Firefox has no equivalent auto-popping "translate this page?" prompt.
    Re-run without `--browser` (or with `--browser chromium`) to switch back.
@@ -120,11 +102,9 @@ cd Digital-Signage/raspberry-pi-kiosk
 
 **Already cloned it before, want the latest fixes:**
 ```bash
-cd ~/Digital-Signage
-git pull origin claude/wordpress-digital-signage-plugin-mbfbdt
+cd Digital-Signage
+git pull
 cd raspberry-pi-kiosk
-sudo bash install-kiosk.sh "https://test.kutt.ee" robin --browser firefox --resolution 1920x440
-sudo reboot
 ```
 
 **No `git` installed** (rare on Raspberry Pi OS, but just in case):
@@ -246,10 +226,6 @@ ever required, so it works behind NAT/firewalls with no port forwarding.
   it ever exits.
 - `ds-agent.service` — the remote-management agent (`ds-agent/ds-agent.py`),
   reporting device telemetry and applying queued commands every 30s.
-- `optimize-pi.sh` / `ds-performance.service` — automatically enabled on a
-  Raspberry Pi 3 to keep graphics/video responsive without overriding the
-  OS graphics driver; `uninstall-kiosk.sh` reverses its sysctl, journal, WiFi
-  and service changes.
 - `ds-setup.service` — the WiFi-hotspot re-provisioning portal
   (`setup-portal/`), which only ever runs while the device is unconfigured
   (see "Re-provisioning" above) — inert and harmless otherwise.

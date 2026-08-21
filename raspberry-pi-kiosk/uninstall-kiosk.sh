@@ -31,16 +31,12 @@ echo "==> Removing ~/.xinitrc, watchdog script and config"
 rm -f "${USER_HOME}/.xinitrc"
 rm -f /usr/local/bin/ds-kiosk-loop.sh /etc/digital-signage-kiosk.conf
 rm -f /tmp/ds-kiosk-chromium.log
-rm -f /tmp/ds-kiosk-firefox.log
 rm -rf /var/lib/digital-signage-kiosk-profile
-rm -rf /var/lib/digital-signage-kiosk-chromium-profile
-rm -rf /var/lib/digital-signage-kiosk-firefox-profile
 
 echo "==> Removing Chromium/Firefox kiosk policy"
 rm -f /etc/chromium/policies/managed/digital-signage-kiosk.json
 rm -f /etc/chromium-browser/policies/managed/digital-signage-kiosk.json
 rm -f /etc/firefox/policies/policies.json
-rm -f /usr/lib/firefox-esr/distribution/policies.json
 
 echo "==> Unblocking Google Translate in /etc/hosts"
 sed -i '/# digital-signage-kiosk: block translate/d' /etc/hosts
@@ -53,12 +49,6 @@ rm -f /usr/local/bin/ds-agent.py /usr/local/bin/ds-setup-portal.py
 rm -f /usr/local/bin/ds-setup-ap-up.sh /usr/local/bin/ds-setup-ap-down.sh
 rm -f /usr/local/bin/install-kiosk.sh
 nmcli connection delete ds-setup-ap >/dev/null 2>&1 || true
-
-echo "==> Restoring Raspberry Pi performance settings"
-if [ -x /usr/local/bin/ds-optimize-pi.sh ]; then
-	/usr/local/bin/ds-optimize-pi.sh --restore || true
-fi
-rm -f /usr/local/bin/ds-optimize-pi.sh
 
 echo "==> Restoring normal console login on tty1"
 rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf

@@ -10,9 +10,6 @@ Restart=always
 RestartSec=5
 # Applies WiFi changes (nmcli), rotation, and reboots the device — needs root.
 User=root
-Nice=10
-IOSchedulingClass=idle
-OOMScoreAdjust=500
 
 [Install]
 WantedBy=multi-user.target
