@@ -75,6 +75,15 @@
 			}
 		}, 400 );
 
+		// Signage screens are almost always unattended with no mouse/touch/keyboard —
+		// a screen that never gets clicked must still start playing. If nothing
+		// dismissed the overlay shortly after load (fullscreen was blocked and this
+		// isn't a recognized kiosk browser either), start playback behind it anyway
+		// instead of waiting forever for a click that will never come.
+		setTimeout( function () {
+			overlay.classList.add( 'ds-hidden' );
+		}, 4000 );
+
 		button.addEventListener( 'click', function () {
 			requestFullscreen();
 			overlay.classList.add( 'ds-hidden' );

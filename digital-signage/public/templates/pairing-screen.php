@@ -131,6 +131,10 @@ $status_url = esc_url_raw( rest_url( 'ds/v1/pair/status/' . $token ) );
 			document.addEventListener( 'fullscreenchange', function () {
 				if ( isFullscreen() ) { hint.classList.remove( 'ds-visible' ); }
 			} );
+			// This screen is normally unattended, with no way to tap the hint away —
+			// don't leave it dimming the pairing code/QR forever if nobody's there
+			// to click it (e.g. an older installer without ?kiosk=1 yet).
+			setTimeout( function () { hint.classList.remove( 'ds-visible' ); }, 4000 );
 			hint.addEventListener( 'click', function () {
 				requestFs();
 				hint.classList.remove( 'ds-visible' );
