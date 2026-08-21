@@ -1,22 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="320" height="90" role="img" aria-label="byKUTT">
-	<title>byKUTT</title>
-	<defs>
-		<radialGradient id="bykuttGradient" cx="50%" cy="50%" r="75%" gradientUnits="objectBoundingBox">
-			<stop offset="0%" stop-color="#ffe14d">
-				<animate attributeName="stop-color" values="#ffe14d;#ff9a3c;#f24957;#fbdff0;#ffe14d" dur="10s" repeatCount="indefinite" calcMode="linear" />
-			</stop>
-			<stop offset="35%" stop-color="#ff9a3c">
-				<animate attributeName="stop-color" values="#ff9a3c;#f24957;#fbdff0;#ffe14d;#ff9a3c" dur="10s" repeatCount="indefinite" calcMode="linear" />
-			</stop>
-			<stop offset="70%" stop-color="#f24957">
-				<animate attributeName="stop-color" values="#f24957;#fbdff0;#ffe14d;#ff9a3c;#f24957" dur="10s" repeatCount="indefinite" calcMode="linear" />
-			</stop>
-			<stop offset="100%" stop-color="#fbdff0">
-				<animate attributeName="stop-color" values="#fbdff0;#ffe14d;#ff9a3c;#f24957;#fbdff0" dur="10s" repeatCount="indefinite" calcMode="linear" />
-			</stop>
-			<animateTransform attributeName="gradientTransform" type="rotate" from="0 0.5 0.5" to="360 0.5 0.5" dur="18s" repeatCount="indefinite" />
-		</radialGradient>
-	</defs>
-
-	<text x="50%" y="62" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="56" font-weight="800" letter-spacing="1" fill="url(#bykuttGradient)">byKUTT</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="320" height="90" role="img" aria-label="byKUTT — Digital Signage">
+	<title>byKUTT — Digital Signage</title>
+	<text x="50%" y="52" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="44" font-weight="800" letter-spacing="1" fill="#ffffff">byKUTT</text>
+	<text x="50%" y="74" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="4" fill="#ffffff">DIGITAL SIGNAGE</text>
 </svg>

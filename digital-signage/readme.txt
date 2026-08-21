@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.1.1
+Stable tag: 2.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,9 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.1.2 =
+* byKUTT logo is now plain white text (no gradient fill, no background), matching the pairing screen's dark backdrop; admin footers wrap it in a small dark chip so it stays visible there too.
 
 = 2.1.1 =
 * byKUTT logo is now just the animated-gradient wordmark (no background card), matching how it's used everywhere it appears.

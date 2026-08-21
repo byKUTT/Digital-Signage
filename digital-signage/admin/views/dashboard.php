@@ -112,5 +112,5 @@ foreach ( $screens as $s ) {
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-import-export' ) ); ?>" class="ds-btn"><?php esc_html_e( 'Import / Export', 'digital-signage' ); ?></a>
 	</div>
 
-	<p class="ds-app-footer"><img class="ds-footer-logo" src="<?php echo esc_url( DS_PLUGIN_URL . 'public/images/bykutt-logo.svg' ); ?>" alt="" /> <?php esc_html_e( 'Digital Signage CMS', 'digital-signage' ); ?> v<?php echo esc_html( DS_VERSION ); ?> &middot; <?php esc_html_e( 'by', 'digital-signage' ); ?> <a href="https://github.com/byKUTT" target="_blank" rel="noopener">byKUTT</a></p>
+	<p class="ds-app-footer"><span class="ds-footer-logo-chip"><img class="ds-footer-logo" src="<?php echo esc_url( DS_PLUGIN_URL . 'public/images/bykutt-logo.svg' ); ?>" alt="byKUTT" /></span> <?php esc_html_e( 'Digital Signage CMS', 'digital-signage' ); ?> v<?php echo esc_html( DS_VERSION ); ?></p>
 </div>
