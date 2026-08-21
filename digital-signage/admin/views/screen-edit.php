@@ -43,6 +43,8 @@ $status        = ( $heartbeat && ( time() - strtotime( $heartbeat->last_seen . '
 		<div class="ds-notice ds-notice-success"><?php esc_html_e( 'Command queued — it will be applied the next time this device checks in.', 'digital-signage' ); ?></div>
 	<?php elseif ( isset( $_GET['ds_error'] ) && 'wifi_ssid' === $_GET['ds_error'] ) : ?>
 		<div class="ds-notice ds-notice-error"><?php esc_html_e( 'Enter a network name (SSID) to connect to.', 'digital-signage' ); ?></div>
+	<?php elseif ( isset( $_GET['ds_error'] ) && 'resolution' === $_GET['ds_error'] ) : ?>
+		<div class="ds-notice ds-notice-error"><?php esc_html_e( 'Enter a resolution as WIDTHxHEIGHT (e.g. 1920x440), or leave it blank to auto-detect.', 'digital-signage' ); ?></div>
 	<?php endif; ?>
 
 	<div class="ds-two-col">
@@ -150,6 +152,9 @@ $status        = ( $heartbeat && ( time() - strtotime( $heartbeat->last_seen . '
 				<?php if ( ! empty( $device['rotation'] ) ) : ?>
 					<tr><th><?php esc_html_e( 'Screen rotation', 'digital-signage' ); ?></th><td><?php echo esc_html( ucfirst( $device['rotation'] ) ); ?></td></tr>
 				<?php endif; ?>
+				<?php if ( ! empty( $device['resolution'] ) ) : ?>
+					<tr><th><?php esc_html_e( 'Custom resolution', 'digital-signage' ); ?></th><td><?php echo esc_html( $device['resolution'] ); ?></td></tr>
+				<?php endif; ?>
 				<?php if ( ! empty( $device['agent_version'] ) ) : ?>
 					<tr><th><?php esc_html_e( 'Agent version', 'digital-signage' ); ?></th><td><?php echo esc_html( $device['agent_version'] ); ?></td></tr>
 				<?php endif; ?>
@@ -194,6 +199,20 @@ $status        = ( $heartbeat && ( time() - strtotime( $heartbeat->last_seen . '
 						<button type="submit" class="ds-btn"><?php esc_html_e( 'Apply Rotation', 'digital-signage' ); ?></button>
 					</form>
 
+					<h3><?php esc_html_e( 'Custom resolution', 'digital-signage' ); ?></h3>
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<input type="hidden" name="action" value="ds_device_command" />
+						<input type="hidden" name="command_type" value="resolution" />
+						<input type="hidden" name="screen_id" value="<?php echo esc_attr( $id ); ?>" />
+						<?php wp_nonce_field( 'ds_device_command' ); ?>
+						<div class="ds-field">
+							<label for="resolution"><?php esc_html_e( 'Resolution (WIDTHxHEIGHT)', 'digital-signage' ); ?></label>
+							<input type="text" id="resolution" name="resolution" class="ds-input" placeholder="1920x440" pattern="[0-9]{2,5}x[0-9]{2,5}" value="<?php echo esc_attr( $device['resolution'] ?? '' ); ?>" />
+							<span class="ds-hint"><?php esc_html_e( 'Only needed for an uncommon/stretched display the Pi doesn’t auto-detect correctly, e.g. a bar-shaped screen. Leave blank and save to go back to auto-detect.', 'digital-signage' ); ?></span>
+						</div>
+						<button type="submit" class="ds-btn"><?php esc_html_e( 'Apply Resolution', 'digital-signage' ); ?></button>
+					</form>
+
 					<h3><?php esc_html_e( 'Device control', 'digital-signage' ); ?></h3>
 					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="ds-remote-actions">
 						<input type="hidden" name="action" value="ds_device_command" />
@@ -205,6 +224,12 @@ $status        = ( $heartbeat && ( time() - strtotime( $heartbeat->last_seen . '
 					</form>
 				</div>
 			</div>
+
+			<?php if ( ! empty( $device['recent_log'] ) && is_array( $device['recent_log'] ) ) : ?>
+				<h3><?php esc_html_e( 'Recent activity', 'digital-signage' ); ?></h3>
+				<p class="ds-hint"><?php esc_html_e( 'The device agent’s own log — commands it applied, WiFi/rotation/resolution changes, errors. Newest first.', 'digital-signage' ); ?></p>
+				<pre class="ds-device-log"><?php echo esc_html( implode( "\n", array_reverse( $device['recent_log'] ) ) ); ?></pre>
+			<?php endif; ?>
 		</div>
 	<?php endif; ?>
 </div>

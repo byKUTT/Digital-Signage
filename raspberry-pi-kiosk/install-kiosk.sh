@@ -22,32 +22,54 @@
 # (e.g. you're re-purposing this SD card for a different physical screen).
 #
 # Usage:
-#   sudo bash install-kiosk.sh https://yourdomain.com [kiosk-user] [--regenerate]
+#   sudo bash install-kiosk.sh https://yourdomain.com [kiosk-user] [--regenerate] [--resolution WIDTHxHEIGHT]
+#
+# --resolution is only needed for an uncommon/stretched display (e.g. a bar-
+# shaped screen like 1920x440) that the Pi's EDID auto-detection gets wrong
+# or that isn't a standard mode at all. Leave it out for normal displays —
+# they auto-detect correctly. It can also be set later, per-device, from
+# wp-admin (Screen edit page > Device > Custom resolution), no SSH needed.
 #
 # Run this ON the Raspberry Pi itself (SSH in, or use a keyboard/monitor).
 
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
-	echo "Please run as root: sudo bash install-kiosk.sh <site-url> [user] [--regenerate]" >&2
+	echo "Please run as root: sudo bash install-kiosk.sh <site-url> [user] [--regenerate] [--resolution WxH]" >&2
 	exit 1
 fi
 
 SITE_URL="${1:-}"
 KIOSK_USER="${2:-${SUDO_USER:-pi}}"
 REGENERATE=0
+RESOLUTION_ARG=""
+prev_was_res_flag=0
 for arg in "$@"; do
+	if [ "$prev_was_res_flag" -eq 1 ]; then
+		RESOLUTION_ARG="$arg"
+		prev_was_res_flag=0
+		continue
+	fi
 	[ "$arg" = "--regenerate" ] && REGENERATE=1
+	[ "$arg" = "--resolution" ] && prev_was_res_flag=1
 done
-# A second positional arg that's actually the flag shouldn't be treated as a username.
-[ "$KIOSK_USER" = "--regenerate" ] && KIOSK_USER="${SUDO_USER:-pi}"
+# A second positional arg that's actually a flag shouldn't be treated as a username.
+case "$KIOSK_USER" in
+	--regenerate|--resolution) KIOSK_USER="${SUDO_USER:-pi}" ;;
+esac
 
 if [ -z "$SITE_URL" ]; then
-	echo "Usage: sudo bash install-kiosk.sh <site-url> [kiosk-user] [--regenerate]" >&2
+	echo "Usage: sudo bash install-kiosk.sh <site-url> [kiosk-user] [--regenerate] [--resolution WxH]" >&2
 	echo "Example: sudo bash install-kiosk.sh https://example.com pi" >&2
+	echo "Example with a custom/uncommon resolution: sudo bash install-kiosk.sh https://example.com pi --resolution 1920x440" >&2
 	exit 1
 fi
 SITE_URL="${SITE_URL%/}"
+
+if [ -n "$RESOLUTION_ARG" ] && ! echo "$RESOLUTION_ARG" | grep -qE '^[0-9]{2,5}x[0-9]{2,5}$'; then
+	echo "Invalid --resolution '${RESOLUTION_ARG}' — expected WIDTHxHEIGHT, e.g. 1920x440." >&2
+	exit 1
+fi
 
 if ! id "$KIOSK_USER" &>/dev/null; then
 	echo "User '$KIOSK_USER' does not exist on this system." >&2
@@ -79,11 +101,20 @@ fi
 # --- Persistent device token: generate once, reuse forever (until --regenerate). ---
 TOKEN=""
 ROTATION="normal"
+RESOLUTION=""
 if [ -f "$CONF_FILE" ] && [ "$REGENERATE" -eq 0 ]; then
 	# shellcheck disable=SC1090
 	source "$CONF_FILE"
 	TOKEN="${DS_KIOSK_TOKEN:-}"
 	ROTATION="${DS_KIOSK_ROTATION:-normal}"
+	RESOLUTION="${DS_KIOSK_RESOLUTION:-}"
+fi
+# An explicit --resolution on the command line always wins over whatever was
+# already in the config (that's how you change it later by re-running this
+# script; wp-admin's "Custom resolution" field is the other way to change it
+# without SSH at all).
+if [ -n "$RESOLUTION_ARG" ]; then
+	RESOLUTION="$RESOLUTION_ARG"
 fi
 if [ -z "$TOKEN" ]; then
 	# pipefail note: `head -c 40` closes the pipe as soon as it has enough
@@ -111,12 +142,15 @@ cat > "$CONF_FILE" <<EOF
 # DS_KIOSK_TOKEN is this device's permanent identity — do not edit unless you
 # intend to re-pair this device as a different screen. Change DS_KIOSK_SITE
 # and reboot if the WordPress site moves to a new domain. DS_KIOSK_ROTATION
-# is normally managed remotely from wp-admin (Screen edit page > Device).
+# and DS_KIOSK_RESOLUTION are normally managed remotely from wp-admin
+# (Screen edit page > Device) — DS_KIOSK_RESOLUTION is only needed for an
+# uncommon/stretched display; leave it blank for normal auto-detected ones.
 DS_KIOSK_TOKEN="${TOKEN}"
 DS_KIOSK_SITE="${SITE_URL}"
 DS_KIOSK_URL="${URL}"
 DS_KIOSK_CHROMIUM="${CHROMIUM_BIN}"
 DS_KIOSK_ROTATION="${ROTATION}"
+DS_KIOSK_RESOLUTION="${RESOLUTION}"
 EOF
 
 echo "==> Writing watchdog launcher to ${WATCHDOG}"
@@ -132,6 +166,30 @@ source /etc/digital-signage-kiosk.conf
 
 # Give the network a moment on cold boot before the first load.
 sleep 5
+
+# Apply a custom/uncommon resolution set via install-kiosk.sh --resolution or
+# remotely from wp-admin (Screen edit page > Device > Custom resolution) —
+# e.g. a bar-shaped display like 1920x440 that EDID auto-detection gets
+# wrong or that isn't a standard mode the GPU already knows about. cvt
+# computes a fitting modeline for the exact size and xrandr adds it as a new
+# mode before selecting it. Skipped entirely for normal displays (blank
+# DS_KIOSK_RESOLUTION), which keep auto-detecting as before.
+if [ -n "${DS_KIOSK_RESOLUTION:-}" ]; then
+	res_w="${DS_KIOSK_RESOLUTION%%x*}"
+	res_h="${DS_KIOSK_RESOLUTION##*x}"
+	# Strip the double quotes cvt wraps the mode name in — left in place, they'd
+	# end up as literal characters in the mode name --newmode registers, which
+	# then wouldn't match the unquoted $mode_name used below for --addmode/--mode.
+	modeline=$(cvt "$res_w" "$res_h" 60 2>/dev/null | grep -o 'Modeline.*' | sed 's/^Modeline //' | tr -d '"')
+	mode_name=$(echo "$modeline" | awk '{print $1}')
+	if [ -n "$modeline" ]; then
+		for output in $(xrandr --listmonitors 2>/dev/null | awk '/ /{print $NF}'); do
+			xrandr --newmode $modeline 2>/dev/null || true
+			xrandr --addmode "$output" "$mode_name" 2>/dev/null || true
+			xrandr --output "$output" --mode "$mode_name" 2>/dev/null || true
+		done
+	fi
+fi
 
 # Apply any rotation set remotely from wp-admin (Screen edit page > Device)
 # before the browser starts, so it opens already in the right orientation.

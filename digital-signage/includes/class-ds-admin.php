@@ -480,6 +480,24 @@ class DS_Admin {
 				);
 				break;
 
+			case 'resolution':
+				$resolution = trim( sanitize_text_field( wp_unslash( $_POST['resolution'] ?? '' ) ) );
+				// Blank clears it — the device goes back to auto-detecting its
+				// display. Otherwise it must be WIDTHxHEIGHT, e.g. 1920x440 for an
+				// uncommon/stretched screen the Pi wouldn't detect correctly.
+				if ( '' !== $resolution && ! preg_match( '/^[0-9]{2,5}x[0-9]{2,5}$/', $resolution ) ) {
+					wp_safe_redirect( admin_url( 'admin.php?page=ds-screen-edit&id=' . $screen_id . '&ds_error=resolution' ) );
+					exit;
+				}
+				DS_CRUD::queue_device_command(
+					$screen_id,
+					array(
+						'type'       => 'resolution',
+						'resolution' => $resolution,
+					)
+				);
+				break;
+
 			case 'reboot':
 			case 'restart_browser':
 			case 'check_updates':

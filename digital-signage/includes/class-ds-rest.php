@@ -264,7 +264,7 @@ class DS_REST {
 	 */
 	private static function sanitize_device_info( array $device ) {
 		$out = array();
-		foreach ( array( 'wifi_ssid', 'hostname', 'os_version', 'agent_version', 'rotation' ) as $key ) {
+		foreach ( array( 'wifi_ssid', 'hostname', 'os_version', 'agent_version', 'rotation', 'resolution' ) as $key ) {
 			if ( isset( $device[ $key ] ) ) {
 				$out[ $key ] = sanitize_text_field( mb_substr( (string) $device[ $key ], 0, 100 ) );
 			}
@@ -273,6 +273,16 @@ class DS_REST {
 			if ( isset( $device[ $key ] ) ) {
 				$out[ $key ] = is_numeric( $device[ $key ] ) ? $device[ $key ] + 0 : null;
 			}
+		}
+		// Recent agent activity (last commands applied, errors, etc.) — a short
+		// list of plain-text lines shown as-is on the Screen edit page so you can
+		// see what a device has been doing without SSHing into it.
+		if ( isset( $device['recent_log'] ) && is_array( $device['recent_log'] ) ) {
+			$lines = array();
+			foreach ( array_slice( $device['recent_log'], -20 ) as $line ) {
+				$lines[] = sanitize_text_field( mb_substr( (string) $line, 0, 300 ) );
+			}
+			$out['recent_log'] = $lines;
 		}
 		return $out;
 	}

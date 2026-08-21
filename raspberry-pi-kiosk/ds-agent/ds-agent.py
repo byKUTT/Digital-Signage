@@ -4,13 +4,14 @@ ds-agent — Digital Signage on-device management agent (Raspberry Pi).
 
 Runs as a systemd service (see ds-agent.service). On an interval, it:
   1. Collects device telemetry (WiFi network/signal, CPU temperature, free
-     disk space, current screen rotation, agent/OS version).
+     disk space, current screen rotation/resolution, agent/OS version, and
+     its own recent activity log).
   2. POSTs it to the plugin's existing heartbeat REST endpoint, piggybacking
      on the same call the browser-based player already makes — no separate
      "device" endpoint needed.
   3. Applies any pending command the response carries: change WiFi network,
-     rotate the screen, reboot, restart just the kiosk browser, or check for
-     OS/package updates.
+     rotate or resize the screen, reboot, restart just the kiosk browser, or
+     check for OS/package updates.
 
 Standard library only — no pip install needed, so it runs unmodified on any
 Raspberry Pi OS install without extra setup.
@@ -19,6 +20,7 @@ Raspberry Pi OS install without extra setup.
 import json
 import os
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -29,12 +31,23 @@ import urllib.request
 
 AGENT_VERSION = "1.0.0"
 CONFIG_FILE = "/etc/digital-signage-kiosk.conf"
-HEARTBEAT_INTERVAL_SECONDS = 30
+# How often the agent phones home. Kept short so a command queued in wp-admin
+# (rotation, resolution, WiFi, reboot, ...) gets picked up quickly rather than
+# sitting for up to half a minute — the request itself is a small JSON POST,
+# cheap enough to send this often even on a Pi Zero.
+HEARTBEAT_INTERVAL_SECONDS = 10
 REQUEST_TIMEOUT_SECONDS = 15
+# Rolling buffer of this agent's own recent activity (commands applied,
+# errors, ...), reported with telemetry so it shows up on the Screen edit
+# page in wp-admin without needing to SSH in and read the journal.
+RECENT_LOG = []
+RECENT_LOG_MAX = 40
 
 
 def log(message):
 	print("[ds-agent] %s" % message, flush=True)
+	RECENT_LOG.append( "%s  %s" % ( time.strftime( "%Y-%m-%d %H:%M:%S" ), message ) )
+	del RECENT_LOG[ : -RECENT_LOG_MAX ]
 
 
 def read_config():
@@ -131,7 +144,10 @@ def collect_telemetry(config):
 		"os_version": collect_os_version(),
 		"agent_version": AGENT_VERSION,
 		"rotation": config.get("DS_KIOSK_ROTATION", "normal"),
+		"recent_log": list(RECENT_LOG),
 	}
+	if config.get("DS_KIOSK_RESOLUTION"):
+		telemetry["resolution"] = config["DS_KIOSK_RESOLUTION"]
 	if ssid:
 		telemetry["wifi_ssid"] = ssid
 	if signal:
@@ -203,6 +219,26 @@ def apply_rotation(command):
 		log("Failed to restart ds-kiosk.service to apply rotation: %s" % out)
 
 
+def apply_resolution(command):
+	resolution = str(command.get("resolution", "")).strip()
+	if resolution and not re.match(r"^[0-9]{2,5}x[0-9]{2,5}$", resolution):
+		log("Ignoring invalid resolution: %r" % resolution)
+		return
+	log(
+		"Applying custom resolution: %s" % resolution
+		if resolution
+		else "Clearing custom resolution (back to auto-detect)."
+	)
+	write_config_value("DS_KIOSK_RESOLUTION", resolution)
+	# Same reasoning as apply_rotation: restart the whole kiosk service so the
+	# resolution is applied by ds-kiosk-loop.sh's own cvt/xrandr logic, which
+	# runs inside the actual kiosk X session rather than this separate agent
+	# process (which has no authenticated access to that display).
+	code, out = run(["systemctl", "restart", "ds-kiosk.service"], timeout=15)
+	if code != 0:
+		log("Failed to restart ds-kiosk.service to apply resolution: %s" % out)
+
+
 def apply_reboot():
 	log("Rebooting device on request from wp-admin…")
 	time.sleep(1)  # Give the heartbeat response time to be logged before we go down.
@@ -229,6 +265,8 @@ def apply_command(command):
 			apply_wifi(command)
 		elif command_type == "rotation":
 			apply_rotation(command)
+		elif command_type == "resolution":
+			apply_resolution(command)
 		elif command_type == "reboot":
 			apply_reboot()
 		elif command_type == "restart_browser":

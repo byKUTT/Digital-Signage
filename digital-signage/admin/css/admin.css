@@ -221,6 +221,12 @@
 .ds-url-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ds-remote-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
 
+.ds-device-log {
+	background: #1d2327; color: #c3c4c7; font: 12px/1.6 Consolas, Monaco, monospace;
+	padding: 12px 14px; border-radius: 6px; max-height: 260px; overflow-y: auto;
+	white-space: pre-wrap; word-break: break-word; margin: 8px 0 0;
+}
+
 .ds-chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .ds-chip {
 	background: #f0f6fc;

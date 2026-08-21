@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.4.6
+Stable tag: 2.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,11 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.5.0 =
+* New: **Custom resolution** for Raspberry Pi kiosks with an uncommon or stretched display (e.g. a bar-shaped screen like 1920x440) that EDID auto-detection gets wrong. Set it up-front with `install-kiosk.sh --resolution WIDTHxHEIGHT`, or remotely from wp-admin (Screen edit page > Device > Custom resolution) — no SSH needed. Uses `cvt` to generate a matching display mode and applies it the same reliable way rotation does (restarting the kiosk service).
+* New: **Recent activity log** on the Screen edit page's Device panel — `ds-agent`'s own log (commands applied, WiFi/rotation/resolution changes, errors) is now visible right in wp-admin, no SSH needed to see what a device has been doing.
+* `ds-agent`'s heartbeat interval dropped from 30s to 10s, so WiFi/rotation/resolution/reboot/etc. commands queued in wp-admin get picked up faster.
 
 = 2.4.6 =
 * Fixed remote screen rotation (Screen edit page > Device > Screen rotation) not actually doing anything. Two bugs: (1) `ds-agent`'s own heartbeat call was overwriting the same database row the browser-based player heartbeats write to, including reporting its rotation setting into the column meant for the player's landscape/portrait viewport orientation — the two sources now only update the fields they actually own. (2) rotation was applied by asking the running X session to re-render live via a bare `xrandr` call from a separate systemd service with no X authentication context, which could silently fail; `ds-agent` now restarts `ds-kiosk.service` instead, reusing the exact rotation-apply code that already runs correctly on every normal boot. Update the plugin and re-run `install-kiosk.sh` (or just replace `ds-agent.py` and restart `ds-agent.service`) on each device to get the fix.

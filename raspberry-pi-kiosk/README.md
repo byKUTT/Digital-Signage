@@ -55,6 +55,15 @@ Every step, in order, from a blank SD card:
    This takes a few minutes (mostly `apt-get install`). It installs
    Chromium and the kiosk session, generates this device's permanent
    pairing token, and deploys `ds-agent` for remote management.
+
+   Got an uncommon or stretched display (a bar-shaped screen like
+   `1920x440`, for example) that doesn't auto-detect correctly? Add
+   `--resolution WIDTHxHEIGHT`:
+   ```bash
+   sudo bash install-kiosk.sh "https://yourdomain.com" pi --resolution 1920x440
+   ```
+   This can also be set later from wp-admin (Screen edit page > Device >
+   Custom resolution) without touching the Pi again.
 7. **Reboot:**
    ```bash
    sudo reboot
@@ -160,20 +169,29 @@ edit page in wp-admin:
 - **WiFi** — enter a network name + password; the device switches to it
   within seconds. The password is sent once, applied via `nmcli`, and never
   stored on the device or in WordPress afterward.
-- **Screen rotation** — Normal / Left / Right / Upside-down, applied live if
-  the kiosk is running, or on its next start otherwise.
+- **Screen rotation** — Normal / Left / Right / Upside-down, applied by
+  restarting the kiosk service so it always takes effect reliably (a brief
+  black screen, then back up rotated).
+- **Custom resolution** — for an uncommon or stretched display the Pi's
+  EDID auto-detection gets wrong (a bar-shaped screen like `1920x440`, for
+  example), enter it as `WIDTHxHEIGHT` and apply. Uses `cvt` to generate a
+  matching mode and restarts the kiosk service, same as rotation. Leave
+  blank and apply to go back to auto-detect. Can also be set up-front at
+  install time with `--resolution WIDTHxHEIGHT` (see below).
 - **Restart Browser** — kills just Chromium; the watchdog relaunches it
   (~3s), useful if a page gets stuck without a full reboot.
 - **Reboot Device** — restarts the whole Pi.
 - **Check for Updates** — runs `apt-get update && apt-get upgrade` in the
   background.
 - **Live status** — WiFi network + signal, CPU temperature, free disk
-  space, current rotation, agent version — refreshed every 30 seconds
-  (`ds-agent`'s heartbeat interval), the same cadence the player already
-  uses to check for content updates.
+  space, current rotation/resolution, agent version — refreshed every 10
+  seconds (`ds-agent`'s heartbeat interval).
+- **Recent activity** — the agent's own log (commands it applied, errors),
+  right there on the Screen edit page — no SSH needed to see what a device
+  has been doing.
 
 Commands are queued in WordPress and delivered the next time the device's
-heartbeat is answered (≤30s later) — no inbound connection to the Pi is
+heartbeat is answered (≤10s later) — no inbound connection to the Pi is
 ever required, so it works behind NAT/firewalls with no port forwarding.
 
 ## What it sets up
