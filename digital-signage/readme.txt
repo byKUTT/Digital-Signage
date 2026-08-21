@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.7.2
+Stable tag: 2.7.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,9 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.7.3 =
+* Raspberry Pi installer: fixed the pairing/player page appearing to "refresh every few seconds" on the Pi specifically (worked fine on other devices) — a classic constrained-device Chromium issue where the renderer exhausts the default `/dev/shm` shared-memory pool, crashes, and `--kiosk` mode auto-reloads the page a few seconds later (the main browser process itself never restarts, which is why it wasn't visible as a crash in `journalctl`/the process list). Added `--disable-dev-shm-usage` so Chromium falls back to disk-backed temp storage instead. Also switched from `--incognito` (whole profile including cache held in RAM) to a small disk-backed profile at `/var/lib/digital-signage-kiosk-profile`, reducing memory pressure further. Re-run `install-kiosk.sh` to pick this up; `uninstall-kiosk.sh` now also cleans up that profile directory.
 
 = 2.7.2 =
 * An unpaired screen now generates a brand-new pairing code on every full page load (i.e. every boot/browser restart), instead of reusing whatever code was already on file for that device's token. Between full loads, the pairing screen's own JS still rotates it further every 30s as before (2.7.0). This also means that if a device's browser is reloading repeatedly for some other reason, the code shown at least always reflects the current one rather than looking stuck.

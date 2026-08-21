@@ -230,6 +230,19 @@ if [ "${DS_KIOSK_ROTATION:-normal}" != "normal" ]; then
 	done
 fi
 
+# --disable-dev-shm-usage: on a resource-constrained Pi, Chromium's renderer
+# can exhaust the default (often small) /dev/shm shared-memory pool and
+# crash; --kiosk mode auto-reloads the page a few seconds after that, which
+# looks exactly like an unexplained periodic refresh even though the main
+# browser process (and its PID in this log) never actually restarted. This
+# flag makes Chromium fall back to disk-backed temp files instead of
+# /dev/shm, avoiding that crash entirely.
+#
+# --user-data-dir instead of --incognito: incognito keeps its whole profile
+# (cache included) in RAM, adding to the same memory pressure. A small
+# disk-backed profile — fine here, this is a single-purpose kiosk showing
+# one fixed URL, not a shared/general-purpose browser — reduces RAM use.
+mkdir -p /var/lib/digital-signage-kiosk-profile
 while true; do
 	"$DS_KIOSK_CHROMIUM" \
 		--kiosk \
@@ -244,7 +257,9 @@ while true; do
 		--fast --fast-start \
 		--check-for-update-interval=31536000 \
 		--autoplay-policy=no-user-gesture-required \
-		--incognito \
+		--user-data-dir=/var/lib/digital-signage-kiosk-profile \
+		--disable-dev-shm-usage \
+		--disable-gpu-shader-disk-cache \
 		--no-sandbox \
 		"$DS_KIOSK_URL" \
 		>/tmp/ds-kiosk-chromium.log 2>&1 || true

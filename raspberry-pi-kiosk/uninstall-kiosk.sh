@@ -31,6 +31,7 @@ echo "==> Removing ~/.xinitrc, watchdog script and config"
 rm -f "${USER_HOME}/.xinitrc"
 rm -f /usr/local/bin/ds-kiosk-loop.sh /etc/digital-signage-kiosk.conf
 rm -f /tmp/ds-kiosk-chromium.log
+rm -rf /var/lib/digital-signage-kiosk-profile
 
 echo "==> Removing Chromium kiosk policy"
 rm -f /etc/chromium/policies/managed/digital-signage-kiosk.json
