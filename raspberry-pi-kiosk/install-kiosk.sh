@@ -242,7 +242,38 @@ fi
 # (cache included) in RAM, adding to the same memory pressure. A small
 # disk-backed profile — fine here, this is a single-purpose kiosk showing
 # one fixed URL, not a shared/general-purpose browser — reduces RAM use.
-mkdir -p /var/lib/digital-signage-kiosk-profile
+#
+# Force translate off directly in that profile's own Preferences file, as a
+# THIRD, independent layer alongside the --disable-features flag and the
+# enterprise policy JSON: this is the same underlying pref those other two
+# are ultimately trying to set, written directly so it takes effect
+# regardless of whether policy file discovery or this exact flag are being
+# honored by this particular Chromium build. Runs on every start (not just
+# once) and merges into whatever Preferences already exists — including one
+# Chromium already created for this profile on an earlier run — rather than
+# only writing a fresh file, since a pre-existing file would otherwise never
+# get this override retrofitted onto it.
+PROFILE_DIR="/var/lib/digital-signage-kiosk-profile"
+mkdir -p "${PROFILE_DIR}/Default"
+python3 - "${PROFILE_DIR}/Default/Preferences" <<'PYEOF' || true
+import json, os, sys
+
+path = sys.argv[1]
+data = {}
+if os.path.exists( path ):
+	try:
+		with open( path ) as f:
+			data = json.load( f )
+	except Exception:
+		data = {}
+
+data.setdefault( "translate", {} )[ "enabled" ] = False
+data[ "translate_blocked_languages" ] = []
+
+with open( path, "w" ) as f:
+	json.dump( data, f )
+PYEOF
+
 while true; do
 	"$DS_KIOSK_CHROMIUM" \
 		--kiosk \
@@ -257,9 +288,10 @@ while true; do
 		--fast --fast-start \
 		--check-for-update-interval=31536000 \
 		--autoplay-policy=no-user-gesture-required \
-		--user-data-dir=/var/lib/digital-signage-kiosk-profile \
+		--user-data-dir="$PROFILE_DIR" \
 		--disable-dev-shm-usage \
 		--disable-gpu-shader-disk-cache \
+		--lang=en-US \
 		--no-sandbox \
 		"$DS_KIOSK_URL" \
 		>/tmp/ds-kiosk-chromium.log 2>&1 || true

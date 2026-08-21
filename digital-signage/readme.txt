@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.7.3
+Stable tag: 2.7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,10 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.7.4 =
+* Raspberry Pi installer: added a third, independent layer against the Chromium translate popup — the kiosk profile's own `Preferences` file now gets `translate.enabled: false` merged in directly on every service start (not just once), so it applies even if the enterprise policy file or the `--disable-features` flag aren't being honored for some reason on a given Chromium build. Also added `--lang=en-US` to reduce the page/browser-language mismatches that trigger a translate offer in the first place.
+* Audited the plugin's own JavaScript for anything that could cause an unexpected reload: confirmed there are only two conditional `window.location.reload()` calls in the entire codebase (the pairing screen reloading once a device is actually paired, and the player reloading on an explicit "Reload Browser Session" command from wp-admin) — nothing that could fire repeatedly on its own. A page that keeps reloading with neither of those happening is a Chromium-level issue (see 2.7.3's `/dev/shm` fix), not a plugin bug.
 
 = 2.7.3 =
 * Raspberry Pi installer: fixed the pairing/player page appearing to "refresh every few seconds" on the Pi specifically (worked fine on other devices) — a classic constrained-device Chromium issue where the renderer exhausts the default `/dev/shm` shared-memory pool, crashes, and `--kiosk` mode auto-reloads the page a few seconds later (the main browser process itself never restarts, which is why it wasn't visible as a crash in `journalctl`/the process list). Added `--disable-dev-shm-usage` so Chromium falls back to disk-backed temp storage instead. Also switched from `--incognito` (whole profile including cache held in RAM) to a small disk-backed profile at `/var/lib/digital-signage-kiosk-profile`, reducing memory pressure further. Re-run `install-kiosk.sh` to pick this up; `uninstall-kiosk.sh` now also cleans up that profile directory.
