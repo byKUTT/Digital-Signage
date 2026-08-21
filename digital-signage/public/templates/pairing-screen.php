@@ -138,6 +138,31 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 			var pairedRedirectKey = 'ds-paired-redirect:' + statusUrl;
 
 			var countdownTimer = null;
+			var refreshInProgress = false;
+
+			function refreshForNextCode() {
+				if ( refreshInProgress ) { return; }
+				refreshInProgress = true;
+				clearInterval( countdownTimer );
+
+				var reloaded = false;
+				function reloadOnce() {
+					if ( reloaded ) { return; }
+					reloaded = true;
+					var nextUrl = new URL( window.location.href );
+					nextUrl.searchParams.set( '_ds_rotate', String( Date.now() ) );
+					window.location.replace( nextUrl.toString() );
+				}
+
+				// Call status first so the server rotates the expired code before
+				// the page asks for fresh HTML. Always reload, even if the request
+				// fails or hangs, because zero must never remain on screen.
+				fetch( statusUrl + '?_=' + Date.now(), { cache: 'no-store' } )
+					.then( reloadOnce )
+					.catch( reloadOnce );
+				setTimeout( reloadOnce, 3000 );
+			}
+
 			function startCountdown( seconds ) {
 				clearInterval( countdownTimer );
 				var remaining = seconds;
@@ -145,7 +170,10 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 				countdownTimer = setInterval( function () {
 					remaining = Math.max( 0, remaining - 1 );
 					countdownEl.textContent = remaining;
-					if ( remaining <= 0 ) { clearInterval( countdownTimer ); }
+					if ( remaining <= 0 ) {
+						clearInterval( countdownTimer );
+						refreshForNextCode();
+					}
 				}, 1000 );
 			}
 
@@ -159,10 +187,10 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 				}, 200 );
 			}
 
-			// Polls every 30s — matches the server's own rotation interval (see
-			// DS_REST::PAIRING_CODE_ROTATE_SECONDS), so the code shown here is
-			// always the one currently valid. Swaps it in place; only a real
-			// pairing reloads. cache: 'no-store' plus a cache-busting query
+			// Fetch once on load to synchronize the countdown with the server.
+			// When it reaches zero, refreshForNextCode() calls this endpoint to
+			// rotate the code and then reloads the whole page. cache: 'no-store'
+			// plus a cache-busting query
 			// param keep a page cache / caching plugin / the browser's own HTTP
 			// cache from serving the same stale response on every poll, which
 			// would otherwise look exactly like rotation isn't happening at all.
@@ -188,12 +216,9 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 						var rotateS = ( data && data.rotates_in ) ? data.rotates_in : defaultRotateS;
 						if ( data && data.code ) { applyCode( data.code ); }
 						startCountdown( rotateS );
-						// Poll just after the server boundary. If clock rounding leaves one
-						// second, the API returns 1 and we retry instead of resetting to 30.
-						setTimeout( poll, Math.max( 1, rotateS ) * 1000 + 250 );
 					} )
 					.catch( function () {
-						setTimeout( poll, defaultRotateS * 1000 + 250 );
+						// The existing countdown still guarantees a refresh at zero.
 					} );
 			} )();
 			startCountdown( defaultRotateS );
