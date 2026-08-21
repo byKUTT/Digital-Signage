@@ -21,6 +21,8 @@ class DS_Admin {
 
 	private function __construct() {
 		add_action( 'admin_menu', array( $this, 'menu' ) );
+		add_filter( 'parent_file', array( $this, 'highlight_slides_under_channels' ) );
+		add_filter( 'submenu_file', array( $this, 'highlight_slides_under_channels_submenu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'assets' ) );
 		add_action( 'admin_post_ds_pair_screen', array( $this, 'handle_pairing' ) );
 		add_action( 'admin_post_ds_bulk_assign_channel', array( $this, 'handle_bulk_assign' ) );
@@ -49,14 +51,41 @@ class DS_Admin {
 
 		add_submenu_page( 'digital-signage', __( 'Channels', 'digital-signage' ), __( 'Channels', 'digital-signage' ), 'edit_ds_channels', 'edit.php?post_type=ds_channel' );
 		add_submenu_page( 'digital-signage', __( 'Screens', 'digital-signage' ), __( 'Screens', 'digital-signage' ), 'edit_ds_screens', 'edit.php?post_type=ds_screen' );
-		add_submenu_page( 'digital-signage', __( 'Slides', 'digital-signage' ), __( 'Slides', 'digital-signage' ), 'edit_ds_slides', 'edit.php?post_type=ds_slide' );
 		add_submenu_page( 'digital-signage', __( 'Schedules', 'digital-signage' ), __( 'Schedules', 'digital-signage' ), 'edit_ds_schedules', 'edit.php?post_type=ds_schedule' );
-
 		add_submenu_page( 'digital-signage', __( 'Calendar', 'digital-signage' ), __( 'Calendar', 'digital-signage' ), 'manage_digital_signage', 'ds-calendar', array( $this, 'render_calendar' ) );
-		add_submenu_page( 'digital-signage', __( 'Pair a Screen', 'digital-signage' ), __( 'Pair a Screen', 'digital-signage' ), 'manage_digital_signage', 'ds-pairing', array( $this, 'render_pairing' ) );
-		add_submenu_page( 'digital-signage', __( 'Proof of Play', 'digital-signage' ), __( 'Proof of Play', 'digital-signage' ), 'manage_digital_signage', 'ds-analytics', array( 'DS_Analytics', 'render_page' ) );
-		add_submenu_page( 'digital-signage', __( 'Import / Export', 'digital-signage' ), __( 'Import / Export', 'digital-signage' ), 'manage_digital_signage', 'ds-import-export', array( 'DS_Import_Export', 'render_page' ) );
 		add_submenu_page( 'digital-signage', __( 'Settings', 'digital-signage' ), __( 'Settings', 'digital-signage' ), 'manage_options', 'ds-settings', array( $this, 'render_settings' ) );
+
+		// Secondary pages: reachable from buttons/links on the pages above (Dashboard's
+		// "Pair a New Screen", a screen row's player link, Settings' Data tools, etc.)
+		// rather than as extra top-level menu items — keeps the sidebar to 6 items.
+		// Slides have no tab of their own: they only ever belong to one channel, so
+		// they're created and reordered from that channel's edit screen (the Playlist
+		// metabox's "Add Slide to this Channel" button); this page still registers the
+		// post type/edit screens themselves, just without a sidebar entry.
+		add_submenu_page( null, __( 'Slides', 'digital-signage' ), __( 'Slides', 'digital-signage' ), 'edit_ds_slides', 'edit.php?post_type=ds_slide' );
+		add_submenu_page( null, __( 'Pair a Screen', 'digital-signage' ), __( 'Pair a Screen', 'digital-signage' ), 'manage_digital_signage', 'ds-pairing', array( $this, 'render_pairing' ) );
+		add_submenu_page( null, __( 'Proof of Play', 'digital-signage' ), __( 'Proof of Play', 'digital-signage' ), 'manage_digital_signage', 'ds-analytics', array( 'DS_Analytics', 'render_page' ) );
+		add_submenu_page( null, __( 'Import / Export', 'digital-signage' ), __( 'Import / Export', 'digital-signage' ), 'manage_digital_signage', 'ds-import-export', array( 'DS_Import_Export', 'render_page' ) );
+	}
+
+	/**
+	 * Slides have no menu tab of their own (see menu()) — while editing/listing
+	 * them, highlight "Channels" instead so the sidebar never shows nothing selected.
+	 */
+	public function highlight_slides_under_channels( $parent_file ) {
+		$screen = get_current_screen();
+		if ( $screen && 'ds_slide' === $screen->post_type ) {
+			return 'digital-signage';
+		}
+		return $parent_file;
+	}
+
+	public function highlight_slides_under_channels_submenu( $submenu_file ) {
+		$screen = get_current_screen();
+		if ( $screen && 'ds_slide' === $screen->post_type ) {
+			return 'edit.php?post_type=ds_channel';
+		}
+		return $submenu_file;
 	}
 
 	public function assets( $hook ) {

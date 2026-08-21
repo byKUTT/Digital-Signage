@@ -67,4 +67,10 @@ $s = DS_Settings::get_all();
 
 		<?php submit_button(); ?>
 	</form>
+
+	<h2><?php esc_html_e( 'Data tools', 'digital-signage' ); ?></h2>
+	<p>
+		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-import-export' ) ); ?>" class="button"><?php esc_html_e( 'Import / Export a Channel', 'digital-signage' ); ?></a>
+		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-analytics' ) ); ?>" class="button"><?php esc_html_e( 'Proof of Play Log', 'digital-signage' ); ?></a>
+	</p>
 </div>

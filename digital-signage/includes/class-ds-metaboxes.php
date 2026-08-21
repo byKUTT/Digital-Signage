@@ -77,9 +77,36 @@ class DS_Metaboxes {
 	public function render_slide_playlist( $post ) {
 		$channel_id = get_post_meta( $post->ID, 'ds_channel_id', true );
 		$zone       = get_post_meta( $post->ID, 'ds_zone', true ) ?: 'main';
-		$order      = get_post_meta( $post->ID, 'ds_order', true ) ?: 10;
-		$channels   = get_posts( array( 'post_type' => 'ds_channel', 'posts_per_page' => -1 ) );
+		$order      = get_post_meta( $post->ID, 'ds_order', true );
+
+		// Coming from a channel's "Add Slide to this Channel" button: prefill the
+		// channel and append this slide to the end of its current playlist so staff
+		// don't have to look up the right order number by hand.
+		if ( 'auto-draft' === $post->post_status && ! $channel_id && ! empty( $_GET['ds_channel'] ) ) {
+			$channel_id = absint( $_GET['ds_channel'] );
+		}
+		if ( '' === $order ) {
+			$order = $channel_id ? self::next_order_for_channel( $channel_id ) : 10;
+		}
+
+		$channels = get_posts( array( 'post_type' => 'ds_channel', 'posts_per_page' => -1 ) );
 		include DS_PLUGIN_DIR . 'admin/views/metabox-slide-playlist.php';
+	}
+
+	private static function next_order_for_channel( $channel_id ) {
+		$last = get_posts(
+			array(
+				'post_type'      => 'ds_slide',
+				'posts_per_page' => 1,
+				'meta_key'       => 'ds_channel_id',
+				'meta_value'     => $channel_id,
+				'orderby'        => 'meta_value_num',
+				'meta_key2'      => 'ds_order',
+				'order'          => 'DESC',
+				'fields'         => 'ids',
+			)
+		);
+		return $last ? absint( get_post_meta( $last[0], 'ds_order', true ) ) + 10 : 10;
 	}
 
 	public function save_slide( $post_id ) {

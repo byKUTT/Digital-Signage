@@ -26,3 +26,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<input type="number" id="ds_order" name="ds_order" value="<?php echo esc_attr( $order ); ?>" class="small-text" />
 	<span class="description"><?php esc_html_e( 'Or drag-reorder from the channel\'s edit screen.', 'digital-signage' ); ?></span>
 </p>
+<?php if ( $channel_id ) : ?>
+	<p>
+		<a href="<?php echo esc_url( get_edit_post_link( $channel_id ) ); ?>">&larr; <?php echo esc_html( sprintf( __( 'Back to "%s"', 'digital-signage' ), get_the_title( $channel_id ) ) ); ?></a>
+	</p>
+<?php endif; ?>

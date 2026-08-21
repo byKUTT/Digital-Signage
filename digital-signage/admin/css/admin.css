@@ -33,6 +33,18 @@
 
 .ds-bulk-bar { margin-top: 10px; }
 
+.ds-quickstart {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-left: 4px solid #2271b1;
+	border-radius: 4px;
+	padding: 4px 20px 16px;
+	margin: 20px 0;
+	max-width: 720px;
+}
+.ds-quickstart ol { margin-left: 18px; }
+.ds-quickstart li { margin-bottom: 8px; }
+
 .ds-pairing-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;

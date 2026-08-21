@@ -16,9 +16,33 @@ The plugin source lives in [`digital-signage/`](digital-signage/) and is also pa
 
 See [`digital-signage/readme.txt`](digital-signage/readme.txt) for the standard WordPress.org-style plugin readme, and the PHPDoc block at the top of each class in `digital-signage/includes/` for how each subsystem fits together.
 
-## Installing
+## Installing the plugin
 
 1. Download `digital-signage.zip` from this repo.
 2. In wp-admin: **Plugins → Add New → Upload Plugin**, choose the zip, and click **Install Now**, then **Activate**.
 3. Go to **Digital Signage → Settings** to set defaults (durations, transition, poll/heartbeat intervals, time zone).
-4. Go to **Digital Signage → Pair a Screen** to link your first display.
+4. From the **Digital Signage** dashboard, click **Pair a New Screen** to link your first display.
+
+The admin menu is deliberately kept to 6 items — **Dashboard, Channels,
+Screens, Schedules, Calendar, Settings**. Slides have no tab of their own:
+they only ever belong to one channel, so they're added and reordered
+directly from that channel's edit screen. Pairing, Proof of Play and
+Import/Export are one click away as buttons on the Dashboard/Settings pages
+rather than extra sidebar entries.
+
+## Setting up a physical screen
+
+Once a screen is paired in wp-admin, point the display's browser at its
+player URL (`/signage/play/{token}/`) in kiosk/full-screen mode. Two
+ready-made installers are included for the common cases:
+
+- **[`raspberry-pi-kiosk/`](raspberry-pi-kiosk/)** — one script
+  (`install-kiosk.sh`) that turns a Raspberry Pi into a dedicated player:
+  boots straight to a full-screen Chromium kiosk showing your player URL, no
+  desktop needed, with a watchdog that relaunches it if it ever crashes.
+- **[`windows-kiosk/`](windows-kiosk/)** — a PowerShell player
+  (`install-kiosk.ps1`) that auto-starts a chrome-less kiosk browser window
+  on Windows sign-in, with a configurable global hotkey (default
+  `Ctrl+Alt+Shift+Q`) to close it back to the desktop.
+
+See each folder's README for full setup steps.

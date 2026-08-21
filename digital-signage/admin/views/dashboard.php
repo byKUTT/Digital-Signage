@@ -17,7 +17,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-pairing' ) ); ?>" class="button button-primary"><?php esc_html_e( 'Pair a New Screen', 'digital-signage' ); ?></a>
 		<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=ds_channel' ) ); ?>" class="button"><?php esc_html_e( 'Manage Channels', 'digital-signage' ); ?></a>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-calendar' ) ); ?>" class="button"><?php esc_html_e( 'Calendar View', 'digital-signage' ); ?></a>
+		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-analytics' ) ); ?>" class="button"><?php esc_html_e( 'Proof of Play', 'digital-signage' ); ?></a>
 	</p>
+
+	<?php if ( ! $screens && ! get_posts( array( 'post_type' => 'ds_channel', 'posts_per_page' => 1, 'fields' => 'ids' ) ) ) : ?>
+		<div class="ds-quickstart">
+			<h2><?php esc_html_e( 'Get started in 3 steps', 'digital-signage' ); ?></h2>
+			<ol>
+				<li><strong><?php esc_html_e( 'Create a Channel', 'digital-signage' ); ?></strong> — <?php esc_html_e( 'a named playlist, e.g. "Lobby Menu".', 'digital-signage' ); ?> <a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=ds_channel' ) ); ?>"><?php esc_html_e( 'Add a Channel →', 'digital-signage' ); ?></a></li>
+				<li><strong><?php esc_html_e( 'Add Slides to it', 'digital-signage' ); ?></strong> — <?php esc_html_e( 'images, videos, webpages, or widgets, from the channel\'s edit screen.', 'digital-signage' ); ?></li>
+				<li><strong><?php esc_html_e( 'Pair a Screen', 'digital-signage' ); ?></strong> — <?php esc_html_e( 'open the player URL on the TV/tablet, then confirm its code here.', 'digital-signage' ); ?> <a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-pairing' ) ); ?>"><?php esc_html_e( 'Pair a Screen →', 'digital-signage' ); ?></a></li>
+			</ol>
+		</div>
+	<?php endif; ?>
 
 	<div class="ds-stat-cards">
 		<?php
