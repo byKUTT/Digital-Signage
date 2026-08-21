@@ -153,13 +153,19 @@ if [ "$BROWSER" = "firefox" ]; then
 }
 POLICY
 
-	FIREFOX_PROFILE_DIR="/var/lib/digital-signage-kiosk-profile"
+	# Keep Firefox separate from any Chromium profile left by an older install.
+	# Firefox is launched as the unprivileged kiosk user below, so that user must
+	# own its profile; running Firefox as root is unstable/unsupported on several
+	# Raspberry Pi OS + Firefox ESR combinations and caused a 3-second crash loop.
+	FIREFOX_PROFILE_DIR="/var/lib/digital-signage-kiosk-firefox-profile"
 	mkdir -p "$FIREFOX_PROFILE_DIR"
 	cat > "${FIREFOX_PROFILE_DIR}/user.js" <<'USERJS'
 // Digital Signage kiosk profile — belt-and-suspenders against any popup on
 // an unattended screen with no input device to dismiss one with.
 user_pref("browser.translations.enable", false);
 user_pref("browser.translations.automaticallyPopup", false);
+user_pref("browser.translations.panelShown", true);
+user_pref("intl.accept_languages", "et,en-US,en");
 user_pref("browser.shell.checkDefaultBrowser", false);
 user_pref("browser.aboutwelcome.enabled", false);
 user_pref("datareporting.policy.dataSubmissionEnabled", false);
@@ -170,7 +176,18 @@ user_pref("dom.push.enabled", false);
 user_pref("browser.sessionstore.resume_from_crash", false);
 user_pref("browser.tabs.warnOnClose", false);
 user_pref("app.update.auto", false);
+// Prefer the stable software rendering path on Raspberry Pi kiosk displays.
+user_pref("gfx.webrender.all", false);
+user_pref("gfx.webrender.enabled", false);
+user_pref("layers.acceleration.disabled", true);
+user_pref("media.hardware-video-decoding.enabled", false);
 USERJS
+	chown -R "$KIOSK_USER":"$KIOSK_USER" "$FIREFOX_PROFILE_DIR"
+
+	# Debian/Raspberry Pi Firefox ESR reads policies from its distribution
+	# directory. Keep /etc/firefox/policies too for releases that support it.
+	mkdir -p /usr/lib/firefox-esr/distribution
+	cp /etc/firefox/policies/policies.json /usr/lib/firefox-esr/distribution/policies.json
 else
 	# chromium package name differs across Raspberry Pi OS releases.
 	CHROMIUM_PKG="chromium-browser"
@@ -287,6 +304,8 @@ DS_KIOSK_SITE="${SITE_URL}"
 DS_KIOSK_URL="${URL}"
 DS_KIOSK_BROWSER="${BROWSER}"
 DS_KIOSK_BROWSER_BIN="${BROWSER_BIN}"
+DS_KIOSK_USER="${KIOSK_USER}"
+DS_KIOSK_USER_HOME="${USER_HOME}"
 DS_KIOSK_ROTATION="${ROTATION}"
 DS_KIOSK_RESOLUTION="${RESOLUTION}"
 EOF
@@ -338,24 +357,43 @@ if [ "${DS_KIOSK_ROTATION:-normal}" != "normal" ]; then
 	done
 fi
 
-PROFILE_DIR="/var/lib/digital-signage-kiosk-profile"
-
 if [ "${DS_KIOSK_BROWSER:-chromium}" = "firefox" ]; then
-	# Firefox ESR kiosk launch. -kiosk gives a chrome-less fullscreen window;
-	# -no-remote forces a genuinely fresh instance each relaunch instead of
-	# trying to hand off to a still-running one; -profile points it at the
-	# disk-backed profile install-kiosk.sh seeded with user.js (translate and
-	# other popups already turned off there and in /etc/firefox/policies).
+	PROFILE_DIR="/var/lib/digital-signage-kiosk-firefox-profile"
+	KIOSK_USER="${DS_KIOSK_USER:-pi}"
+	KIOSK_HOME="${DS_KIOSK_USER_HOME:-/home/$KIOSK_USER}"
+	KIOSK_UID=$(id -u "$KIOSK_USER")
+	KIOSK_RUNTIME_DIR="/run/user/$KIOSK_UID"
+
+	# X itself owns tty1 as root for reliability, but Firefox must not run as
+	# root. Grant only the configured local kiosk user access to this X server
+	# and provide a correctly owned runtime directory/profile.
+	install -d -m 700 -o "$KIOSK_USER" -g "$KIOSK_USER" "$KIOSK_RUNTIME_DIR"
+	chown -R "$KIOSK_USER":"$KIOSK_USER" "$PROFILE_DIR"
+	xhost +SI:localuser:"$KIOSK_USER" >/dev/null 2>&1 || true
+
+	# Firefox ESR kiosk launch. Software rendering avoids Raspberry Pi GPU
+	# content-process crashes. If Firefox genuinely exits, use a modest backoff
+	# so a persistent failure cannot look like a page refresh every 3 seconds.
 	while true; do
-		"$DS_KIOSK_BROWSER_BIN" \
+		runuser -u "$KIOSK_USER" -- env \
+			HOME="$KIOSK_HOME" \
+			USER="$KIOSK_USER" \
+			LOGNAME="$KIOSK_USER" \
+			DISPLAY="${DISPLAY:-:0}" \
+			XDG_RUNTIME_DIR="$KIOSK_RUNTIME_DIR" \
+			MOZ_ENABLE_WAYLAND=0 \
+			MOZ_WEBRENDER=0 \
+			MOZ_DISABLE_RDD_SANDBOX=1 \
+			"$DS_KIOSK_BROWSER_BIN" \
 			-kiosk \
 			-no-remote \
 			-profile "$PROFILE_DIR" \
 			"$DS_KIOSK_URL" \
-			>/tmp/ds-kiosk-chromium.log 2>&1 || true
-		sleep 3
+			>/tmp/ds-kiosk-firefox.log 2>&1 || true
+		sleep 15
 	done
 else
+	PROFILE_DIR="/var/lib/digital-signage-kiosk-chromium-profile"
 	# --disable-dev-shm-usage: on a resource-constrained Pi, Chromium's renderer
 	# can exhaust the default (often small) /dev/shm shared-memory pool and
 	# crash; --kiosk mode auto-reloads the page a few seconds after that, which
@@ -393,7 +431,8 @@ if os.path.exists( path ):
 		data = {}
 
 data.setdefault( "translate", {} )[ "enabled" ] = False
-data[ "translate_blocked_languages" ] = []
+data[ "translate_blocked_languages" ] = [ "et", "en" ]
+data.setdefault( "intl", {} )[ "accept_languages" ] = "et,en-US,en"
 
 with open( path, "w" ) as f:
 	json.dump( data, f )
@@ -416,7 +455,7 @@ PYEOF
 			--user-data-dir="$PROFILE_DIR" \
 			--disable-dev-shm-usage \
 			--disable-gpu-shader-disk-cache \
-			--lang=en-US \
+			--lang=et-EE \
 			--no-sandbox \
 			"$DS_KIOSK_URL" \
 			>/tmp/ds-kiosk-chromium.log 2>&1 || true
@@ -554,7 +593,7 @@ echo ""
 echo "If the kiosk still doesn't appear after that, gather diagnostics:"
 echo "  sudo systemctl status ds-kiosk"
 echo "  sudo journalctl -u ds-kiosk -e --no-pager"
-echo "  cat /tmp/ds-kiosk-chromium.log"
+echo "  cat /tmp/ds-kiosk-firefox.log 2>/dev/null || cat /tmp/ds-kiosk-chromium.log"
 echo "  cat /var/log/Xorg.0.log 2>/dev/null | tail -40"
 echo "To re-pair this device as a different screen: sudo bash install-kiosk.sh ${SITE_URL} ${KIOSK_USER} --regenerate"
 echo "To completely remove: sudo bash uninstall-kiosk.sh ${KIOSK_USER}"
