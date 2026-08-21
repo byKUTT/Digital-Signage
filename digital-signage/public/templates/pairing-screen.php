@@ -188,10 +188,12 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 						var rotateS = ( data && data.rotates_in ) ? data.rotates_in : defaultRotateS;
 						if ( data && data.code ) { applyCode( data.code ); }
 						startCountdown( rotateS );
-						setTimeout( poll, rotateS * 1000 );
+						// Poll just after the server boundary. If clock rounding leaves one
+						// second, the API returns 1 and we retry instead of resetting to 30.
+						setTimeout( poll, Math.max( 1, rotateS ) * 1000 + 250 );
 					} )
 					.catch( function () {
-						setTimeout( poll, defaultRotateS * 1000 );
+						setTimeout( poll, defaultRotateS * 1000 + 250 );
 					} );
 			} )();
 			startCountdown( defaultRotateS );
