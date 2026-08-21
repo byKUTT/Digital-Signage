@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $qr_data    = rawurlencode( $pairing_url );
-$qr_src     = 'https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=8&data=' . $qr_data;
+$qr_src     = 'https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&margin=16&data=' . $qr_data;
 $status_url = esc_url_raw( rest_url( 'ds/v1/pair/status/' . $token ) );
 $pair_base  = esc_url_raw( admin_url( 'admin.php?page=ds-pairing&code=' ) );
 $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
@@ -69,6 +69,22 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 			.wrap { grid-template-columns: 1fr; text-align:center; }
 			.left { align-items:center; }
 			.steps li { text-align:left; }
+		}
+		/* Tall screens need width-led sizing: keep the QR genuinely scannable
+		   while allowing every instruction to wrap inside the viewport. */
+		@media (orientation: portrait) {
+			.wrap { grid-template-columns: 1fr; align-content:center; padding: 4vh 5vw; gap: 2.5vh; text-align:center; }
+			.left { align-items:center; width:100%; }
+			.eyebrow { font-size: clamp(14px, 4vw, 22px); margin-bottom:.55em; }
+			h1 { font-size: clamp(24px, 6vw, 42px); line-height:1.15; max-width:90vw; overflow-wrap:anywhere; }
+			.code { font-size: clamp(48px, 13vw, 92px); max-width:90vw; overflow-wrap:anywhere; }
+			.countdown { font-size: clamp(14px, 3.8vw, 22px); }
+			.steps { width:100%; max-width:90vw; }
+			.steps li { gap:12px; font-size: clamp(16px, 4.3vw, 26px); line-height:1.35; text-align:left; overflow-wrap:anywhere; }
+			.right { width:100%; gap: min(2vh, 18px); }
+			.qr-card { padding:min(4vw, 18px); max-width:100%; }
+			.qr-card img { width:min(90vw, 58vh); max-width:100%; }
+			.qr-caption { font-size: clamp(14px, 3.8vw, 22px); line-height:1.35; max-width:90vw; }
 		}
 		/* Short/wide bar display (e.g. 1920x440): vw-based sizing above would
 		   badly overflow such limited height, so switch every size to a vh
@@ -119,6 +135,7 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 			var pairBase    = <?php echo wp_json_encode( $pair_base ); ?>;
 			var statusUrl   = <?php echo wp_json_encode( $status_url ); ?>;
 			var defaultRotateS = <?php echo (int) $rotate_s; ?>;
+			var pairedRedirectKey = 'ds-paired-redirect:' + statusUrl;
 
 			var countdownTimer = null;
 			function startCountdown( seconds ) {
@@ -137,7 +154,7 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 				codeEl.classList.add( 'ds-rotating' );
 				setTimeout( function () {
 					codeEl.textContent = code;
-					qrEl.src = 'https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=8&data=' + encodeURIComponent( pairBase + code );
+					qrEl.src = 'https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&margin=16&data=' + encodeURIComponent( pairBase + code );
 					codeEl.classList.remove( 'ds-rotating' );
 				}, 200 );
 			}
@@ -154,7 +171,18 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 					.then( function ( r ) { return r.json(); } )
 					.then( function ( data ) {
 						if ( data && data.paired ) {
-							window.location.reload();
+							// A full-page cache can briefly keep serving this pairing template
+							// after the screen is paired. Never reload it every poll: retry at
+							// most once per minute and use a cache-busting URL.
+							var now = Date.now();
+							var lastRedirect = 0;
+							try { lastRedirect = parseInt( sessionStorage.getItem( pairedRedirectKey ) || '0', 10 ); } catch ( e ) {}
+							if ( now - lastRedirect >= 60000 ) {
+								try { sessionStorage.setItem( pairedRedirectKey, String( now ) ); } catch ( e ) {}
+								var nextUrl = new URL( window.location.href );
+								nextUrl.searchParams.set( '_ds_paired', String( now ) );
+								window.location.replace( nextUrl.toString() );
+							}
 							return;
 						}
 						var rotateS = ( data && data.rotates_in ) ? data.rotates_in : defaultRotateS;
