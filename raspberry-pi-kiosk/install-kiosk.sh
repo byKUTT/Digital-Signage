@@ -103,13 +103,12 @@ fi
 # but an enterprise policy file always wins regardless of Chromium version
 # quirks or flag-parsing edge cases — this is the same mechanism managed
 # corporate/school Chromebooks use, just pointed at a single kiosk device.
-# The policy directory differs by package name, so write to whichever one
-# was actually installed above.
+# The policy directory differs by package name (chromium vs chromium-browser)
+# and doesn't always match the binary name cleanly across Raspberry Pi OS
+# releases, so write to both — Chromium only ever reads the one that
+# actually matches how it was packaged; the other stays inert.
 echo "==> Writing Chromium policy to disable translate/popups"
-POLICY_DIR="/etc/${CHROMIUM_PKG}/policies/managed"
-mkdir -p "$POLICY_DIR"
-cat > "${POLICY_DIR}/digital-signage-kiosk.json" <<'EOF'
-{
+POLICY_JSON='{
 	"TranslateEnabled": false,
 	"DefaultBrowserSettingEnabled": false,
 	"BrowserSignin": 0,
@@ -124,8 +123,11 @@ cat > "${POLICY_DIR}/digital-signage-kiosk.json" <<'EOF'
 	"AlternateErrorPagesEnabled": false,
 	"SearchSuggestEnabled": false,
 	"SpellcheckEnabled": false
-}
-EOF
+}'
+for policy_dir in /etc/chromium/policies/managed /etc/chromium-browser/policies/managed; do
+	mkdir -p "$policy_dir"
+	echo "$POLICY_JSON" > "${policy_dir}/digital-signage-kiosk.json"
+done
 
 # --- Persistent device token: generate once, reuse forever (until --regenerate). ---
 TOKEN=""

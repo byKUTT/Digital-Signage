@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.7.0
+Stable tag: 2.7.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,9 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.7.1 =
+* Raspberry Pi installer now writes the Chromium anti-popup policy (translate, autofill, spellcheck, etc.) to both `/etc/chromium/policies/managed/` and `/etc/chromium-browser/policies/managed/` unconditionally, instead of guessing one from the installed package name — cheap insurance against a package/binary name mismatch across Raspberry Pi OS releases silently leaving the popup enabled. Re-run `install-kiosk.sh` to pick this up.
 
 = 2.7.0 =
 * Fixed pairing-code rotation not actually being visible: the polling endpoint now sends `nocache_headers()`, and the pairing screen's poll request uses `cache: 'no-store'` plus a cache-busting query param — without these, a host page cache or the browser's own HTTP cache could keep serving the exact same response on every poll, which looked exactly like rotation wasn't happening even though the server-side logic was correct.
