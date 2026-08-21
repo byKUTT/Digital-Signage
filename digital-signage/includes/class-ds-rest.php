@@ -379,6 +379,32 @@ class DS_REST {
 			return new WP_Error( 'ds_unknown_token', __( 'Unknown pairing token.', 'digital-signage' ), array( 'status' => 404 ) );
 		}
 
+		// Recover an orphaned permanent device token. This happens when the old
+		// screen post is removed outside the normal delete flow or an old cache
+		// still opens its player URL: the pairing row remains marked as used even
+		// though no screen owns the token anymore.
+		if ( ! empty( $row->paired_at ) && ! $this->get_screen_by_token( $request['token'] ) ) {
+			$fresh_code = self::generate_unique_pairing_code( $table );
+			if ( $fresh_code ) {
+				$created_at = current_time( 'mysql', true );
+				$wpdb->update(
+					$table,
+					array(
+						'code'       => $fresh_code,
+						'screen_id'  => null,
+						'paired_at'  => null,
+						'created_at' => $created_at,
+						'expires_at' => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
+					),
+					array( 'id' => $row->id )
+				);
+				$row->code       = $fresh_code;
+				$row->screen_id  = null;
+				$row->paired_at  = null;
+				$row->created_at = $created_at;
+			}
+		}
+
 		// Return the real time remaining, not a fresh 30 seconds on every poll.
 		// Otherwise a request just before the boundary can restart the display
 		// countdown while leaving the same server-side code in place.
