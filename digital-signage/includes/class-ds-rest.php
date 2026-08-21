@@ -509,14 +509,20 @@ class DS_REST {
 			$horizontal_spacing = $channel_id ? get_post_meta( $channel_id, 'ds_infinite_slider_horizontal_spacing', true ) : '';
 			$slider_speed = $channel_id ? get_post_meta( $channel_id, 'ds_infinite_slider_speed', true ) : '';
 			$border_radius = $channel_id ? get_post_meta( $channel_id, 'ds_infinite_slider_border_radius', true ) : '';
-			$slider_orientation = $channel_id ? sanitize_key( get_post_meta( $channel_id, 'ds_infinite_slider_orientation', true ) ) : 'auto';
+			$slider_direction = $channel_id ? sanitize_key( get_post_meta( $channel_id, 'ds_infinite_slider_direction', true ) ) : '';
+			$legacy_orientation = $channel_id ? sanitize_key( get_post_meta( $channel_id, 'ds_infinite_slider_orientation', true ) ) : 'auto';
+			$width_mode = $channel_id ? sanitize_key( get_post_meta( $channel_id, 'ds_infinite_slider_width_mode', true ) ) : 'full';
+			$width_percent = $channel_id ? get_post_meta( $channel_id, 'ds_infinite_slider_width_percent', true ) : '';
 			$legacy_vertical = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_vertical_spacing', true ) : '';
 			$legacy_horizontal = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_horizontal_spacing', true ) : '';
 			$data['slider_vertical_spacing'] = '' !== $vertical_spacing ? absint( $vertical_spacing ) : ( '' !== $legacy_vertical ? absint( $legacy_vertical ) : 20 );
 			$data['slider_horizontal_spacing'] = '' !== $horizontal_spacing ? absint( $horizontal_spacing ) : ( '' !== $legacy_horizontal ? absint( $legacy_horizontal ) : 20 );
 			$data['slider_speed'] = '' !== $slider_speed ? max( 5, absint( $slider_speed ) ) : 60;
 			$data['slider_border_radius'] = '' !== $border_radius ? absint( $border_radius ) : 0;
-			$data['slider_orientation'] = in_array( $slider_orientation, array( 'auto', 'vertical', 'horizontal' ), true ) ? $slider_orientation : 'auto';
+			$legacy_direction = 'vertical' === $legacy_orientation ? 'up' : ( 'horizontal' === $legacy_orientation ? 'left' : 'auto' );
+			$data['slider_direction'] = in_array( $slider_direction, array( 'auto', 'up', 'down', 'left', 'right' ), true ) ? $slider_direction : $legacy_direction;
+			$data['slider_width_mode'] = in_array( $width_mode, array( 'full', 'custom' ), true ) ? $width_mode : 'full';
+			$data['slider_width_percent'] = '' !== $width_percent ? min( 100, max( 10, absint( $width_percent ) ) ) : 100;
 		}
 
 		switch ( $type ) {

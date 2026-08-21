@@ -475,7 +475,9 @@
 				horizontalSpacing: settings.slider_horizontal_spacing,
 				speed: settings.slider_speed,
 				borderRadius: settings.slider_border_radius,
-				orientation: settings.slider_orientation || 'auto',
+				direction: settings.slider_direction || 'auto',
+				widthMode: settings.slider_width_mode || 'full',
+				widthPercent: settings.slider_width_percent,
 			}
 		);
 	}
@@ -490,7 +492,7 @@
 				horizontalSpacing: item.spacing,
 				speed: item.speed,
 				borderRadius: 0,
-				orientation: 'auto',
+				direction: 'auto',
 			}
 		);
 	}
@@ -517,7 +519,10 @@
 
 		var speed = Math.max( 5, Number( options.speed ) || 60 ); // px/second
 		var borderRadius = Math.max( 0, Number( options.borderRadius ) || 0 );
-		var orientation = [ 'vertical', 'horizontal' ].indexOf( options.orientation ) >= 0 ? options.orientation : 'auto';
+		var direction = [ 'up', 'down', 'left', 'right' ].indexOf( options.direction ) >= 0 ? options.direction : 'auto';
+		var reverse = 'down' === direction || 'right' === direction;
+		var sizeByWidth = [ 'full', 'custom' ].indexOf( options.widthMode ) >= 0;
+		var widthPercent = 'full' === options.widthMode ? 100 : Math.min( 100, Math.max( 10, Number( options.widthPercent ) || 100 ) );
 		var reduceMotion = 'matchMedia' in window && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
 		var position = 0;
 		var loopLength = 0;
@@ -526,12 +531,20 @@
 		var portrait = null;
 		var resizeObserver = null;
 		var resizeHandler = null;
+		if ( sizeByWidth ) {
+			wrap.classList.add( 'ds-slider-width-sized' );
+		}
 
 		function appendCopy() {
 			images.forEach( function ( src ) {
 				var img = document.createElement( 'img' );
 				img.alt = '';
 				img.style.borderRadius = borderRadius + 'px';
+				if ( sizeByWidth && wrap.clientWidth ) {
+					img.style.width = ( wrap.clientWidth * widthPercent / 100 ) + 'px';
+					img.style.height = 'auto';
+					img.style.maxHeight = '100%';
+				}
 				img.addEventListener( 'load', measure, { once: true } );
 				img.src = src;
 				track.appendChild( img );
@@ -541,11 +554,16 @@
 
 		function measure() {
 			var previousLoopLength = loopLength;
-			var progress = previousLoopLength > 0 ? ( ( ( -position % previousLoopLength ) + previousLoopLength ) % previousLoopLength ) / previousLoopLength : 0;
+			var progress = 0;
+			if ( previousLoopLength > 0 ) {
+				progress = reverse
+					? ( ( ( ( position + previousLoopLength ) % previousLoopLength ) + previousLoopLength ) % previousLoopLength ) / previousLoopLength
+					: ( ( ( -position % previousLoopLength ) + previousLoopLength ) % previousLoopLength ) / previousLoopLength;
+			}
 			var measuredPortrait;
-			if ( 'vertical' === orientation ) {
+			if ( 'up' === direction || 'down' === direction ) {
 				measuredPortrait = true;
-			} else if ( 'horizontal' === orientation ) {
+			} else if ( 'left' === direction || 'right' === direction ) {
 				measuredPortrait = false;
 			} else {
 				measuredPortrait = wrap.clientHeight > wrap.clientWidth;
@@ -563,6 +581,13 @@
 				: options.horizontalSpacing;
 			spacing = Math.max( 0, Number( spacing ) || 0 );
 			track.style.gap = spacing + 'px';
+			if ( sizeByWidth ) {
+				Array.prototype.forEach.call( track.children, function ( img ) {
+					img.style.width = ( wrap.clientWidth * widthPercent / 100 ) + 'px';
+					img.style.height = 'auto';
+					img.style.maxHeight = '100%';
+				} );
+			}
 
 			var firstSequence = Array.prototype.slice.call( track.children, 0, images.length );
 			var contentLength = firstSequence.reduce( function ( total, img ) {
@@ -574,7 +599,7 @@
 			}
 
 			loopLength = contentLength + ( spacing * images.length );
-			position = -progress * loopLength;
+			position = reverse ? -loopLength + ( progress * loopLength ) : -progress * loopLength;
 			track.style.transform = portrait
 				? 'translate3d(0,' + position + 'px,0)'
 				: 'translate3d(' + position + 'px,0,0)';
@@ -621,8 +646,10 @@
 			lastFrame = now;
 
 			if ( loopLength > 0 ) {
-				position -= speed * dt;
-				if ( position <= -loopLength ) {
+				position += ( reverse ? 1 : -1 ) * speed * dt;
+				if ( reverse && position >= 0 ) {
+					position = -loopLength + ( position % loopLength );
+				} else if ( ! reverse && position <= -loopLength ) {
 					position = -( ( -position ) % loopLength );
 				}
 				track.style.transform = portrait

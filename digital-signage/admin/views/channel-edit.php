@@ -28,14 +28,20 @@ $slider_vertical_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_vertical_s
 $slider_horizontal_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_horizontal_spacing', true ) : '';
 $slider_speed_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_speed', true ) : '';
 $slider_radius_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_border_radius', true ) : '';
+$slider_direction_meta = $id ? sanitize_key( get_post_meta( $id, 'ds_infinite_slider_direction', true ) ) : '';
 $slider_orientation_meta = $id ? sanitize_key( get_post_meta( $id, 'ds_infinite_slider_orientation', true ) ) : 'auto';
+$slider_width_mode_meta = $id ? sanitize_key( get_post_meta( $id, 'ds_infinite_slider_width_mode', true ) ) : 'full';
+$slider_width_percent_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_width_percent', true ) : '';
 $slider_vertical_fallback = $id ? get_post_meta( $id, 'ds_scroll_vertical_spacing', true ) : '';
 $slider_horizontal_fallback = $id ? get_post_meta( $id, 'ds_scroll_horizontal_spacing', true ) : '';
 $slider_vertical_spacing = '' !== $slider_vertical_meta ? absint( $slider_vertical_meta ) : ( '' !== $slider_vertical_fallback ? absint( $slider_vertical_fallback ) : 20 );
 $slider_horizontal_spacing = '' !== $slider_horizontal_meta ? absint( $slider_horizontal_meta ) : ( '' !== $slider_horizontal_fallback ? absint( $slider_horizontal_fallback ) : 20 );
 $slider_speed = '' !== $slider_speed_meta ? max( 5, absint( $slider_speed_meta ) ) : $scroll_speed;
 $slider_border_radius = '' !== $slider_radius_meta ? absint( $slider_radius_meta ) : 0;
-$slider_orientation = in_array( $slider_orientation_meta, array( 'auto', 'vertical', 'horizontal' ), true ) ? $slider_orientation_meta : 'auto';
+$legacy_direction = 'vertical' === $slider_orientation_meta ? 'up' : ( 'horizontal' === $slider_orientation_meta ? 'left' : 'auto' );
+$slider_direction = in_array( $slider_direction_meta, array( 'auto', 'up', 'down', 'left', 'right' ), true ) ? $slider_direction_meta : $legacy_direction;
+$slider_width_mode = in_array( $slider_width_mode_meta, array( 'full', 'custom' ), true ) ? $slider_width_mode_meta : 'full';
+$slider_width_percent = '' !== $slider_width_percent_meta ? min( 100, max( 10, absint( $slider_width_percent_meta ) ) ) : 100;
 $transition_options = array(
 	'none'            => __( 'None', 'digital-signage' ),
 	'fade'            => __( 'Fade', 'digital-signage' ),
@@ -129,19 +135,30 @@ $transition_options = array(
 				</div>
 
 				<div class="ds-field ds-orientation-field">
-					<span class="ds-control-label" id="ds-slider-orientation-label"><?php esc_html_e( 'Scrolling orientation', 'digital-signage' ); ?></span>
-					<div class="ds-segmented-control" role="radiogroup" aria-labelledby="ds-slider-orientation-label">
-						<?php foreach ( array( 'auto' => __( 'Auto', 'digital-signage' ), 'vertical' => __( 'Vertical', 'digital-signage' ), 'horizontal' => __( 'Horizontal', 'digital-signage' ) ) as $orientation_key => $orientation_label ) : ?>
+					<span class="ds-control-label" id="ds-slider-direction-label"><?php esc_html_e( 'Movement direction', 'digital-signage' ); ?></span>
+					<div class="ds-segmented-control" role="radiogroup" aria-labelledby="ds-slider-direction-label">
+						<?php foreach ( array( 'auto' => __( 'Auto', 'digital-signage' ), 'up' => __( '↑ Up', 'digital-signage' ), 'down' => __( '↓ Down', 'digital-signage' ), 'left' => __( '← Left', 'digital-signage' ), 'right' => __( '→ Right', 'digital-signage' ) ) as $direction_key => $direction_label ) : ?>
 							<label class="ds-segmented-option">
-								<input type="radio" name="infinite_slider_orientation" value="<?php echo esc_attr( $orientation_key ); ?>" <?php checked( $slider_orientation, $orientation_key ); ?> />
-								<span><?php echo esc_html( $orientation_label ); ?></span>
+								<input type="radio" name="infinite_slider_direction" value="<?php echo esc_attr( $direction_key ); ?>" <?php checked( $slider_direction, $direction_key ); ?> />
+								<span><?php echo esc_html( $direction_label ); ?></span>
 							</label>
 						<?php endforeach; ?>
 					</div>
-					<span class="ds-hint"><?php esc_html_e( 'Auto follows the zone proportions. Vertical always uses one full-width column; Horizontal always uses one full-height row.', 'digital-signage' ); ?></span>
+					<span class="ds-hint"><?php esc_html_e( 'Up and Down use a vertical column. Left and Right use a horizontal row. Auto follows the zone proportions.', 'digital-signage' ); ?></span>
 				</div>
 
 				<div class="ds-settings-grid ds-slider-settings-grid">
+				<div class="ds-field">
+					<label for="infinite_slider_width_mode"><?php esc_html_e( 'Image width', 'digital-signage' ); ?></label>
+					<select id="infinite_slider_width_mode" name="infinite_slider_width_mode" class="ds-input">
+						<option value="full" <?php selected( $slider_width_mode, 'full' ); ?>><?php esc_html_e( 'Full screen width (100%)', 'digital-signage' ); ?></option>
+						<option value="custom" <?php selected( $slider_width_mode, 'custom' ); ?>><?php esc_html_e( 'Custom screen percentage', 'digital-signage' ); ?></option>
+					</select>
+				</div>
+				<div class="ds-field">
+					<label for="infinite_slider_width_percent"><?php esc_html_e( 'Custom width (% of screen)', 'digital-signage' ); ?></label>
+					<input type="number" min="10" max="100" id="infinite_slider_width_percent" name="infinite_slider_width_percent" value="<?php echo esc_attr( $slider_width_percent ); ?>" class="ds-input ds-input-small" />
+				</div>
 				<div class="ds-field">
 					<label for="infinite_slider_vertical_spacing"><?php esc_html_e( 'Portrait vertical spacing (px)', 'digital-signage' ); ?></label>
 					<input type="number" min="0" id="infinite_slider_vertical_spacing" name="infinite_slider_vertical_spacing" value="<?php echo esc_attr( $slider_vertical_spacing ); ?>" class="ds-input ds-input-small" />

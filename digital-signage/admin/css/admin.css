@@ -231,7 +231,7 @@
 .ds-orientation-field { margin-bottom: 18px; }
 .ds-segmented-control {
 	display: inline-grid;
-	grid-template-columns: repeat(3, minmax(88px, 1fr));
+	grid-template-columns: repeat(5, minmax(70px, 1fr));
 	gap: 2px;
 	padding: 3px;
 	border: 1px solid rgba(0, 0, 0, 0.08);
@@ -263,7 +263,8 @@
 .ds-slider-settings-grid { padding-top: 16px; border-top: 1px solid rgba(0, 0, 0, 0.08); }
 @media (max-width: 600px) {
 	.ds-feature-settings-header { flex-direction: column; }
-	.ds-segmented-control { display: grid; width: 100%; grid-template-columns: repeat(3, 1fr); }
+	.ds-segmented-control { display: grid; width: 100%; grid-template-columns: repeat(5, 1fr); }
+	.ds-segmented-option span { padding: 0 6px; font-size: 12px; }
 }
 .ds-code-input { text-align: center; font-size: 22px; letter-spacing: 4px; max-width: 200px; }
 .ds-code-block { display: inline-block; background: #f6f7f7; border-radius: 4px; padding: 6px 10px; font-size: 13px; }

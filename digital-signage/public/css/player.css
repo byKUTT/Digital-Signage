@@ -124,6 +124,8 @@ html[data-ds-orientation="portrait"] .ds-stage,
 .ds-continuous-slider-track.ds-continuous-vertical img { width: 100%; height: auto; display: block; flex-shrink: 0; object-fit: contain; }
 .ds-continuous-slider-track.ds-continuous-horizontal { flex-direction: row; height: 100%; }
 .ds-continuous-slider-track.ds-continuous-horizontal img { height: 100%; width: auto; display: block; flex-shrink: 0; object-fit: contain; }
+.ds-slider-width-sized .ds-continuous-slider-track { align-items: center; }
+.ds-slider-width-sized .ds-continuous-slider-track img { flex: 0 0 auto; object-fit: contain; }
 .ds-infinite-slider {
 	opacity: 0;
 	contain: layout paint;

@@ -1,11 +1,9 @@
-# Infinite Slider orientation and frontend polish
+# Infinite Slider direction and width
 
-- [x] Add Auto / Vertical / Horizontal channel orientation.
-- [x] Build the accessible segmented orientation control.
-- [x] Pass orientation through CRUD and REST.
-- [x] Preserve loop progress across resize and direction changes.
-- [x] Clamp stalled frames and support reduced motion.
-- [x] Add restrained signage-facing edge and image polish.
-- [x] Update version, readme, and architecture notes.
-- [x] Run verification and rebuild `digital-signage.zip`.
-- [x] Commit and push the approved branch.
+- [x] Add Auto / Up / Down / Left / Right channel direction.
+- [x] Migrate legacy Vertical and Horizontal values safely.
+- [x] Add full-width or custom screen-width percentage sizing.
+- [x] Pass direction and sizing through CRUD and REST.
+- [x] Implement seamless reverse movement for Down and Right.
+- [x] Verify source and rebuild the version 2.9.3 ZIP.
+- [x] Commit and publish version 2.9.3.

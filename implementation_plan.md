@@ -1,4 +1,12 @@
-# Digital Signage Infinite Slider orientation and frontend polish — implementation plan
+# Digital Signage Infinite Slider direction and sizing — implementation plan
+
+## 2.9.3 direction and screen-width amendment
+
+- Replace axis-only Auto/Vertical/Horizontal selection with Auto/Up/Down/Left/Right movement direction.
+- Map legacy Vertical to Up and Horizontal to Left without requiring channels to be resaved.
+- Add Full width and custom 10–100% screen-width image sizing.
+- Preserve normalized loop progress and seamless wrapping for both negative (Up/Left) and positive (Down/Right) movement.
+- Publish a refreshed installable plugin ZIP with the source update.
 
 ## 2.9.2 scope
 
