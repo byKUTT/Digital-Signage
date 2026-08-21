@@ -352,15 +352,20 @@ class DS_REST {
 	}
 
 	/**
-	 * How often an unclaimed pairing code rotates to a new one, so a code left
-	 * showing on an unattended screen can't be found/used by someone later —
-	 * only a code currently on-screen (within the last ROTATE_SECONDS) works.
+	 * Rotate the visible code every 30 seconds. The immediately previous code
+	 * remains valid for one additional rotation window so a user who scans or
+	 * types it near the boundary can still complete pairing.
 	 */
 	const PAIRING_CODE_ROTATE_SECONDS = 30;
+	const PAIRING_CODE_GRACE_SECONDS  = 30;
+
+	public static function pairing_grace_key( $code ) {
+		return 'ds_pair_grace_' . md5( strtoupper( (string) $code ) );
+	}
 
 	public function pair_status( WP_REST_Request $request ) {
 		global $wpdb;
-		// This is polled every 15s by an unattended screen expecting a fresh
+		// This is polled by an unattended screen expecting a fresh
 		// answer each time. Without this, a caching layer (host-level page
 		// cache, a caching plugin, even the browser's own HTTP cache) can serve
 		// the exact same response for every poll since the URL never changes —
@@ -374,27 +379,35 @@ class DS_REST {
 			return new WP_Error( 'ds_unknown_token', __( 'Unknown pairing token.', 'digital-signage' ), array( 'status' => 404 ) );
 		}
 
-		// Rotate to a fresh code every 15s while nobody has claimed it yet — the
-		// pairing screen polls this same endpoint on that cadence and swaps the
-		// on-screen code/QR in place, so this keeps them in lockstep.
-		if ( empty( $row->paired_at ) ) {
-			$age = time() - strtotime( $row->created_at . ' UTC' );
-			if ( $age >= self::PAIRING_CODE_ROTATE_SECONDS ) {
-				$new_code = self::generate_unique_pairing_code( $table );
-				if ( $new_code ) {
-					$wpdb->update(
-						$table,
-						array(
-							'code'       => $new_code,
-							'created_at' => current_time( 'mysql', true ),
-							'expires_at' => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
-						),
-						array( 'id' => $row->id )
-					);
-					$row->code = $new_code;
-				}
+		// Return the real time remaining, not a fresh 30 seconds on every poll.
+		// Otherwise a request just before the boundary can restart the display
+		// countdown while leaving the same server-side code in place.
+		$age = max( 0, time() - strtotime( $row->created_at . ' UTC' ) );
+		if ( empty( $row->paired_at ) && $age >= self::PAIRING_CODE_ROTATE_SECONDS ) {
+			$new_code = self::generate_unique_pairing_code( $table );
+			if ( $new_code ) {
+				// Keep the code that just left the screen valid for 30 more seconds.
+				set_transient(
+					self::pairing_grace_key( $row->code ),
+					(int) $row->id,
+					self::PAIRING_CODE_GRACE_SECONDS
+				);
+				$created_at = current_time( 'mysql', true );
+				$wpdb->update(
+					$table,
+					array(
+						'code'       => $new_code,
+						'created_at' => $created_at,
+						'expires_at' => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
+					),
+					array( 'id' => $row->id )
+				);
+				$row->code       = $new_code;
+				$row->created_at = $created_at;
+				$age             = 0;
 			}
 		}
+		$rotates_in = max( 1, self::PAIRING_CODE_ROTATE_SECONDS - $age );
 
 		return rest_ensure_response(
 			array(
@@ -402,7 +415,7 @@ class DS_REST {
 				'player_url'  => ! empty( $row->paired_at ) ? home_url( '/signage/play/' . $row->token . '/' ) : null,
 				'expired'     => strtotime( $row->expires_at . ' UTC' ) < time(),
 				'code'        => $row->code,
-				'rotates_in'  => self::PAIRING_CODE_ROTATE_SECONDS,
+				'rotates_in'  => $rotates_in,
 			)
 		);
 	}
