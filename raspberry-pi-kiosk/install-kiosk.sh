@@ -98,6 +98,35 @@ if [ -z "$CHROMIUM_BIN" ]; then
 	exit 1
 fi
 
+# --- Chromium enterprise policy: belt-and-suspenders against popups. ---
+# Command-line flags (--disable-translate etc., below) cover most of this,
+# but an enterprise policy file always wins regardless of Chromium version
+# quirks or flag-parsing edge cases — this is the same mechanism managed
+# corporate/school Chromebooks use, just pointed at a single kiosk device.
+# The policy directory differs by package name, so write to whichever one
+# was actually installed above.
+echo "==> Writing Chromium policy to disable translate/popups"
+POLICY_DIR="/etc/${CHROMIUM_PKG}/policies/managed"
+mkdir -p "$POLICY_DIR"
+cat > "${POLICY_DIR}/digital-signage-kiosk.json" <<'EOF'
+{
+	"TranslateEnabled": false,
+	"DefaultBrowserSettingEnabled": false,
+	"BrowserSignin": 0,
+	"SyncDisabled": true,
+	"PasswordManagerEnabled": false,
+	"AutofillAddressEnabled": false,
+	"AutofillCreditCardEnabled": false,
+	"PromptForDownloadLocation": false,
+	"BackgroundModeEnabled": false,
+	"DefaultNotificationsSetting": 2,
+	"DefaultGeolocationSetting": 2,
+	"AlternateErrorPagesEnabled": false,
+	"SearchSuggestEnabled": false,
+	"SpellcheckEnabled": false
+}
+EOF
+
 # --- Persistent device token: generate once, reuse forever (until --regenerate). ---
 TOKEN=""
 ROTATION="normal"

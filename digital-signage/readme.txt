@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.5.0
+Stable tag: 2.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,14 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.6.0 =
+* Fixed: deleting a screen now also frees its pairing code/token — previously the device's own persistent token stayed locked to an already-used code forever, so re-pairing the same physical device after deleting its screen was impossible ("invalid code") without manually clearing the database.
+* Pairing codes now rotate every 15 seconds while unclaimed, swapped in place on the pairing screen (code + QR update live, no reload) — an old code left showing on an unattended screen stops working after 15s rather than staying valid indefinitely.
+* Removed the "Tap anywhere for fullscreen" hint from the pairing screen entirely — it's still tried silently in the background for a normally-opened browser, but never shown as a prompt (a screen with no input device could never dismiss it anyway).
+* Raspberry Pi installer now also writes a Chromium enterprise policy (`TranslateEnabled: false` and friends) disabling translate, autofill, spellcheck, notification/geolocation prompts, and other popups at the policy level — more reliable than command-line flags alone, which weren't fully suppressing the translate popup on some Chromium versions.
+* New: the player shows "No channel selected" when a paired screen has no channel assigned (or nothing scheduled right now) instead of a blank/black screen that looked frozen or broken.
+* Reworked the pairing screen and several player elements (clock, ticker, corner clock, start overlay) to size with `min(vw, vh)` instead of `vw` alone, so they scale correctly on extreme-aspect-ratio displays (a bar-shaped screen like 1920x440, or its portrait equivalent 440x1920) instead of overflowing or clipping.
 
 = 2.5.0 =
 * New: **Custom resolution** for Raspberry Pi kiosks with an uncommon or stretched display (e.g. a bar-shaped screen like 1920x440) that EDID auto-detection gets wrong. Set it up-front with `install-kiosk.sh --resolution WIDTHxHEIGHT`, or remotely from wp-admin (Screen edit page > Device > Custom resolution) — no SSH needed. Uses `cvt` to generate a matching display mode and applies it the same reliable way rotation does (restarting the kiosk service).

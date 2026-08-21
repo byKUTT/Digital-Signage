@@ -351,6 +351,13 @@ class DS_REST {
 		);
 	}
 
+	/**
+	 * How often an unclaimed pairing code rotates to a new one, so a code left
+	 * showing on an unattended screen can't be found/used by someone later —
+	 * only a code currently on-screen (within the last ROTATE_SECONDS) works.
+	 */
+	const PAIRING_CODE_ROTATE_SECONDS = 15;
+
 	public function pair_status( WP_REST_Request $request ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'ds_pairing_codes';
@@ -360,13 +367,54 @@ class DS_REST {
 			return new WP_Error( 'ds_unknown_token', __( 'Unknown pairing token.', 'digital-signage' ), array( 'status' => 404 ) );
 		}
 
+		// Rotate to a fresh code every 15s while nobody has claimed it yet — the
+		// pairing screen polls this same endpoint on that cadence and swaps the
+		// on-screen code/QR in place, so this keeps them in lockstep.
+		if ( empty( $row->paired_at ) ) {
+			$age = time() - strtotime( $row->created_at . ' UTC' );
+			if ( $age >= self::PAIRING_CODE_ROTATE_SECONDS ) {
+				$new_code = self::generate_unique_pairing_code( $table );
+				if ( $new_code ) {
+					$wpdb->update(
+						$table,
+						array(
+							'code'       => $new_code,
+							'created_at' => current_time( 'mysql', true ),
+							'expires_at' => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
+						),
+						array( 'id' => $row->id )
+					);
+					$row->code = $new_code;
+				}
+			}
+		}
+
 		return rest_ensure_response(
 			array(
 				'paired'      => ! empty( $row->paired_at ),
 				'player_url'  => ! empty( $row->paired_at ) ? home_url( '/signage/play/' . $row->token . '/' ) : null,
 				'expired'     => strtotime( $row->expires_at . ' UTC' ) < time(),
+				'code'        => $row->code,
+				'rotates_in'  => self::PAIRING_CODE_ROTATE_SECONDS,
 			)
 		);
+	}
+
+	/**
+	 * Generates a 6-char pairing code not already in use, retrying a handful
+	 * of times against the table's UNIQUE KEY on collision (astronomically
+	 * unlikely with ~33^6 combinations, but cheap to guard against anyway).
+	 */
+	private static function generate_unique_pairing_code( $table ) {
+		global $wpdb;
+		for ( $attempt = 0; $attempt < 5; $attempt++ ) {
+			$code   = strtoupper( substr( str_shuffle( 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' ), 0, 6 ) );
+			$exists = $wpdb->get_var( $wpdb->prepare( "SELECT 1 FROM {$table} WHERE code = %s", $code ) );
+			if ( ! $exists ) {
+				return $code;
+			}
+		}
+		return null;
 	}
 
 	private function get_client_ip() {

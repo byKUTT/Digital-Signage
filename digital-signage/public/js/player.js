@@ -216,6 +216,14 @@
 				stopZone( zoneName );
 			}
 		} );
+
+		// A screen with no channel assigned (or an assigned channel with no
+		// slides for right now) would otherwise just show a blank stage —
+		// make that state visible instead of looking like a dead/frozen screen.
+		var noChannelEl = document.getElementById( 'ds-no-channel' );
+		if ( noChannelEl ) {
+			noChannelEl.hidden = !! ( data.channel_id && Object.keys( zones ).length );
+		}
 	}
 
 	function detectOrientation() {

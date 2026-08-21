@@ -59,6 +59,8 @@ $orientation   = $is_preview ? 'auto' : ( get_post_meta( $screen->ID, 'ds_orient
 		<div id="ds-zone-corner" class="ds-zone ds-zone-corner"></div>
 	</div>
 
+	<div id="ds-no-channel" class="ds-no-channel" hidden><?php esc_html_e( 'No channel selected', 'digital-signage' ); ?></div>
+
 	<div id="ds-offline-indicator" class="ds-offline-indicator" hidden></div>
 
 	<script>

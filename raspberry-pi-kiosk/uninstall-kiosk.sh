@@ -32,6 +32,10 @@ rm -f "${USER_HOME}/.xinitrc"
 rm -f /usr/local/bin/ds-kiosk-loop.sh /etc/digital-signage-kiosk.conf
 rm -f /tmp/ds-kiosk-chromium.log
 
+echo "==> Removing Chromium kiosk policy"
+rm -f /etc/chromium/policies/managed/digital-signage-kiosk.json
+rm -f /etc/chromium-browser/policies/managed/digital-signage-kiosk.json
+
 echo "==> Removing device-management agent and setup portal"
 systemctl disable --now ds-agent.service >/dev/null 2>&1 || true
 systemctl disable --now ds-setup.service >/dev/null 2>&1 || true

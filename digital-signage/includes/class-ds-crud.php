@@ -199,6 +199,14 @@ class DS_CRUD {
 	public static function delete_screen( $id ) {
 		global $wpdb;
 		$wpdb->delete( $wpdb->prefix . 'ds_heartbeats', array( 'screen_id' => $id ), array( '%d' ) );
+		// Also free up the pairing code/token this screen used. Without this, the
+		// ds_pairing_codes row stays behind with paired_at already set, so if the
+		// same physical device (same persistent token) ever revisits its player
+		// URL it's shown that same already-used code forever — which wp-admin's
+		// "Pair a Screen" form rejects as invalid, permanently locking the device
+		// out. Deleting the row here means the device's next visit mints a fresh,
+		// reusable code, same as a brand-new device.
+		$wpdb->delete( $wpdb->prefix . 'ds_pairing_codes', array( 'screen_id' => $id ), array( '%d' ) );
 		wp_delete_post( $id, true );
 	}
 
