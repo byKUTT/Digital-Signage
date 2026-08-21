@@ -17,7 +17,7 @@
 
 	var CONFIG = window.DS_PLAYER || {};
 	var CACHE_KEY = 'ds_playlist_cache_' + CONFIG.screenId;
-	var LOW_POWER_PROFILE = /(?:^|[?&])profile=pi3(?:&|$)/.test( window.location.search );
+	var LOW_POWER_PROFILE = /(?:^|[?&])profile=pi3(?:-safe)?(?:&|$)/.test( window.location.search );
 	if ( LOW_POWER_PROFILE ) {
 		document.documentElement.classList.add( 'ds-low-power' );
 	}
@@ -603,6 +603,8 @@
 		var compositorAnimation = null;
 		var animationDuration = 0;
 		var fallbackRunning = false;
+		var fallbackPaintTime = 0;
+		var fallbackFrameInterval = LOW_POWER_PROFILE ? ( 1000 / 30 ) : 0;
 		if ( sizeByWidth ) {
 			wrap.classList.add( 'ds-slider-width-sized' );
 		}
@@ -621,16 +623,28 @@
 		}
 
 		function appendCopy() {
+			var firstCopy = 0 === renderedCopies;
 			images.forEach( function ( src ) {
 				var img = document.createElement( 'img' );
 				img.alt = '';
+				img.decoding = 'async';
+				img.loading = 'eager';
+				img.draggable = false;
+				if ( ! firstCopy ) {
+					img.setAttribute( 'aria-hidden', 'true' );
+				}
 				img.style.borderRadius = borderRadius + 'px';
 				if ( sizeByWidth && wrap.clientWidth ) {
 					img.style.width = ( wrap.clientWidth * widthPercent / 100 ) + 'px';
 					img.style.height = 'auto';
 					img.style.maxHeight = '100%';
 				}
-				img.addEventListener( 'load', scheduleMeasure, { once: true } );
+				// Repeated sequences reuse the same cached sources. Only the logical
+				// first sequence determines dimensions, avoiding clone load/layout
+				// bursts on a Raspberry Pi 3.
+				if ( firstCopy ) {
+					img.addEventListener( 'load', scheduleMeasure, { once: true } );
+				}
 				img.src = src;
 				track.appendChild( img );
 			} );
@@ -784,8 +798,13 @@
 			if ( null === lastFrame ) {
 				lastFrame = now;
 			}
+			if ( fallbackFrameInterval && fallbackPaintTime && now - fallbackPaintTime < fallbackFrameInterval ) {
+				wrap.dataset.dsTimerId = String( requestAnimationFrame( frame ) );
+				return;
+			}
 			var dt = Math.min( ( now - lastFrame ) / 1000, 0.05 );
 			lastFrame = now;
+			fallbackPaintTime = now;
 
 			if ( loopLength > 0 ) {
 				position += ( reverse ? 1 : -1 ) * speed * dt;

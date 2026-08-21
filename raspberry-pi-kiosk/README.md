@@ -17,6 +17,18 @@ persists across every reboot, power cut, or SD card re-insert.
 Works on Raspberry Pi OS **Lite** or **Desktop** (Bullseye or Bookworm, 32-
 or 64-bit), Pi 3/4/5/Zero 2 W.
 
+### Safe Raspberry Pi 3 animation profile
+
+The installer detects a Pi 3 and adds `profile=pi3-safe` to its player URL.
+That profile removes costly slider masks and shadows, prevents redundant image
+measurement, and uses a 30 fps fallback only when compositor Web Animations
+are unavailable. Firefox content/cache memory is bounded, the kiosk receives
+modest scheduling priority, and the remote agent stays in the background.
+
+This profile deliberately keeps the last working software-renderer settings.
+It does **not** change KMS, `/boot/config.txt`, GPU drivers, hardware decoding,
+system services, CPU clocks or voltage.
+
 ---
 
 ## Complete install guide, start to finish
@@ -102,9 +114,11 @@ cd Digital-Signage/raspberry-pi-kiosk
 
 **Already cloned it before, want the latest fixes:**
 ```bash
-cd Digital-Signage
-git pull
+cd ~/Digital-Signage
+git pull origin claude/wordpress-digital-signage-plugin-mbfbdt
 cd raspberry-pi-kiosk
+sudo bash install-kiosk.sh "https://test.kutt.ee" robin --browser firefox --resolution 1920x440
+sudo reboot
 ```
 
 **No `git` installed** (rare on Raspberry Pi OS, but just in case):

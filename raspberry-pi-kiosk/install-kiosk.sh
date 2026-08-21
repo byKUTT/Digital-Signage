@@ -98,6 +98,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 USER_HOME=$(getent passwd "$KIOSK_USER" | cut -d: -f6)
 CONF_FILE="/etc/digital-signage-kiosk.conf"
 WATCHDOG="/usr/local/bin/ds-kiosk-loop.sh"
+KIOSK_PROFILE="standard"
+PI_MODEL="$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || true)"
+if echo "$PI_MODEL" | grep -qi 'Raspberry Pi 3'; then
+	# Browser/player tuning only. Do not change KMS, boot config, GPU drivers,
+	# services, clock speeds or voltage on this known-sensitive installation.
+	KIOSK_PROFILE="pi3-safe"
+fi
 
 # --browser wins if given; otherwise reuse whatever this device already used
 # (so re-running the installer for other reasons doesn't silently switch a
@@ -181,6 +188,14 @@ user_pref("gfx.webrender.all", false);
 user_pref("gfx.webrender.enabled", false);
 user_pref("layers.acceleration.disabled", true);
 user_pref("media.hardware-video-decoding.enabled", false);
+// Keep the known-working software renderer, but bound background browser
+// memory/process use so the JS/CSS animation has predictable CPU headroom.
+user_pref("dom.ipc.processCount", 2);
+user_pref("dom.ipc.processCount.webIsolated", 1);
+user_pref("browser.cache.memory.capacity", 32768);
+user_pref("media.memory_cache_max_size", 32768);
+user_pref("browser.sessionhistory.max_total_viewers", 0);
+user_pref("network.prefetch-next", false);
 USERJS
 	chown -R "$KIOSK_USER":"$KIOSK_USER" "$FIREFOX_PROFILE_DIR"
 
@@ -302,7 +317,7 @@ fi
 # ?kiosk=1 tells the player/pairing screens this browser is already OS-level
 # fullscreen (started with --kiosk below) with no chrome to hide and no input
 # device to click a "tap to start" prompt with, so they skip that entirely.
-URL="${SITE_URL}/signage/play/${TOKEN}/?kiosk=1&cv=284"
+URL="${SITE_URL}/signage/play/${TOKEN}/?kiosk=1&profile=${KIOSK_PROFILE}&cv=297"
 
 echo "==> Writing config to ${CONF_FILE}"
 cat > "$CONF_FILE" <<EOF
@@ -322,6 +337,7 @@ DS_KIOSK_BROWSER="${BROWSER}"
 DS_KIOSK_BROWSER_BIN="${BROWSER_BIN}"
 DS_KIOSK_USER="${KIOSK_USER}"
 DS_KIOSK_USER_HOME="${USER_HOME}"
+DS_KIOSK_PROFILE="${KIOSK_PROFILE}"
 DS_KIOSK_ROTATION="${ROTATION}"
 DS_KIOSK_RESOLUTION="${RESOLUTION}"
 EOF
@@ -532,6 +548,9 @@ ExecStartPre=-/usr/bin/chvt 1
 ExecStart=/usr/bin/startx ${USER_HOME}/.xinitrc -- vt1 -nocursor
 Restart=always
 RestartSec=3
+Nice=-3
+IOSchedulingClass=best-effort
+IOSchedulingPriority=3
 StandardOutput=journal
 StandardError=journal
 
@@ -585,6 +604,7 @@ echo ""
 echo "✅ Installed. Player URL (permanent for this device): ${URL}"
 echo "   Browser:                ${BROWSER} (${BROWSER_BIN})"
 echo "   Kiosk user:            ${KIOSK_USER}"
+echo "   Player profile:        ${KIOSK_PROFILE}"
 echo "   Config file:           ${CONF_FILE}"
 echo "   Watchdog script:       ${WATCHDOG}"
 echo "   Kiosk service:         ds-kiosk.service (owns tty1, starts X directly)"

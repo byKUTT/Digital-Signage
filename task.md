@@ -1,6 +1,9 @@
-# Raspberry Pi kiosk rollback
+# Safe Raspberry Pi JS/CSS slider optimization
 
-- [x] Restore the Raspberry kiosk scripts and services to the last working 2.9.4 state.
-- [x] Remove the Pi 3 optimizer introduced after that state.
-- [x] Rebuild and verify `raspberry-pi-kiosk.zip` from the restored source.
-- [x] Publish the Raspberry-only rollback to GitHub.
+- [x] Add a Pi 3-safe player profile without graphics-driver overrides.
+- [x] Reduce duplicate slider image work, layers and layout measurements.
+- [x] Add a 30 fps fallback only when compositor Web Animations are unavailable.
+- [x] Bound Firefox memory/process use while retaining the last working renderer settings.
+- [x] Bump to 2.9.7 and update Raspberry/plugin documentation.
+- [x] Verify and rebuild both ZIP packages.
+- [x] Publish the plugin and Raspberry updates to GitHub.
