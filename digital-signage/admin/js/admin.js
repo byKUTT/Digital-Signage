@@ -44,6 +44,45 @@
 			$( '#ds-media-preview' ).empty();
 		} );
 
+		/* ---- Infinite-scroll gallery: multi-image picker ---- */
+		var galleryFrame;
+		function addGalleryImage( attachment ) {
+			var thumb = attachment.sizes && attachment.sizes.thumbnail ? attachment.sizes.thumbnail.url : attachment.url;
+			$( '#ds-scroll-images-inputs' ).append( '<input type="hidden" name="scroll_images[]" value="' + attachment.id + '" />' );
+			$( '#ds-scroll-gallery-preview' ).append(
+				'<li data-id="' + attachment.id + '"><img src="' + thumb + '" alt="" /><button type="button" class="ds-scroll-gallery-remove" aria-label="Remove image">&times;</button></li>'
+			);
+		}
+		$( document ).on( 'click', '#ds-select-gallery', function ( e ) {
+			e.preventDefault();
+			if ( galleryFrame ) {
+				galleryFrame.open();
+				return;
+			}
+			galleryFrame = wp.media( { title: 'Select Images', multiple: true, library: { type: 'image' } } );
+			galleryFrame.on( 'select', function () {
+				galleryFrame.state().get( 'selection' ).map( function ( a ) { return a.toJSON(); } ).forEach( addGalleryImage );
+			} );
+			galleryFrame.open();
+		} );
+		$( document ).on( 'click', '.ds-scroll-gallery-remove', function () {
+			var $li = $( this ).closest( 'li' );
+			var id = $li.data( 'id' );
+			$( '#ds-scroll-images-inputs input[value="' + id + '"]' ).remove();
+			$li.remove();
+		} );
+		if ( $.fn.sortable ) {
+			$( '#ds-scroll-gallery-preview' ).sortable( {
+				update: function () {
+					var inputs = $( '#ds-scroll-images-inputs' );
+					inputs.empty();
+					$( '#ds-scroll-gallery-preview li' ).each( function () {
+						inputs.append( '<input type="hidden" name="scroll_images[]" value="' + $( this ).data( 'id' ) + '" />' );
+					} );
+				},
+			} );
+		}
+
 		/* ---- Drag-and-drop playlist reordering ---- */
 		if ( $.fn.sortable ) {
 			$( '#ds-sortable-playlist' ).sortable( {

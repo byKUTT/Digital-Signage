@@ -389,6 +389,22 @@ class DS_REST {
 			case 'social':
 				$data['embed_url'] = esc_url_raw( get_post_meta( $slide->ID, 'ds_content_url', true ) );
 				break;
+			case 'infinite_scroll':
+				$image_ids     = (array) get_post_meta( $slide->ID, 'ds_scroll_images', true );
+				$data['images'] = array_values(
+					array_filter(
+						array_map(
+							function ( $attachment_id ) {
+								return wp_get_attachment_image_url( $attachment_id, 'full' );
+							},
+							$image_ids
+						)
+					)
+				);
+				$data['bg_color'] = get_post_meta( $slide->ID, 'ds_scroll_bg_color', true ) ?: '#000000';
+				$data['spacing']  = absint( get_post_meta( $slide->ID, 'ds_scroll_spacing', true ) ?: 20 );
+				$data['speed']    = absint( get_post_meta( $slide->ID, 'ds_scroll_speed', true ) ?: 60 );
+				break;
 		}
 
 		return $data;

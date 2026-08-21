@@ -50,6 +50,7 @@ class DS_Activator {
 			'duration_clock'     => 10,
 			'duration_pdf'       => 15,
 			'duration_social'    => 15,
+			'duration_infinite_scroll' => 30,
 			'transition'         => 'fade',
 			'poll_interval'      => 60,
 			'heartbeat_interval' => 30,

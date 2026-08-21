@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.3.0
+Stable tag: 2.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,10 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.4.0 =
+* New slide type: **Infinite Scroll Gallery** — upload multiple images, set a background color and spacing between them, and they loop continuously with a configurable speed. Direction follows the screen's orientation automatically: top-to-bottom on portrait (images full width), left-to-right on landscape (images full height).
+* Raspberry Pi installer: replaced the console-autologin + `~/.bash_profile` autostart mechanism with a `ds-kiosk.service` systemd unit that takes `tty1` directly and starts X — fixes installs that booted to a bare terminal instead of the kiosk on some Raspberry Pi OS builds where the login shell didn't reliably source `.bash_profile`. `install-kiosk.sh` cleans up the old mechanism automatically on re-run.
 
 = 2.3.0 =
 * New: remote Raspberry Pi device management. A screen running the new `ds-agent` (bundled with the Raspberry Pi kiosk installer) reports WiFi network/signal, CPU temperature, free disk space and rotation on every heartbeat, and a new "Device" panel on the Screen edit page can change its WiFi network, rotate the display, restart the browser, reboot, or check for updates — all remotely, no SSH needed.

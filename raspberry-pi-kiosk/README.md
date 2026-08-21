@@ -118,12 +118,16 @@ ever required, so it works behind NAT/firewalls with no port forwarding.
   `unclutter`, `python3`, and `chromium`/`chromium-browser`.
 - **A permanent device token**, generated once on first install and stored
   in `/etc/digital-signage-kiosk.conf` — every reboot reuses it.
-- **Console autologin** for the kiosk user via `raspi-config nonint
-  do_boot_behaviour B2` (falls back to a systemd `getty@tty1` override on
-  systems without `raspi-config`).
-- `~/.bash_profile` / `~/.xinitrc` — auto-starts a minimal Openbox + Chromium
-  kiosk session on console login, with screen blanking and the cursor
-  disabled, applying any remotely-set rotation before Chromium opens.
+- **`ds-kiosk.service`** — a systemd service that takes ownership of `tty1`
+  directly and runs `startx` there (`Conflicts=getty@tty1.service`, so the
+  normal login prompt is replaced rather than raced against). No console
+  autologin, login shell, or `~/.bash_profile` hook is involved — that
+  older mechanism was replaced because whether the login shell actually
+  sourced `~/.bash_profile` (and therefore whether X started) varied by
+  Raspberry Pi OS build; a dedicated service removes that variable.
+- `~/.xinitrc` — the X session `ds-kiosk.service` runs: a minimal Openbox
+  session with screen blanking and the cursor disabled, applying any
+  remotely-set rotation before Chromium opens.
 - `/usr/local/bin/ds-kiosk-loop.sh` — the watchdog: relaunches Chromium if
   it ever exits.
 - `ds-agent.service` — the remote-management agent (`ds-agent/ds-agent.py`),
@@ -166,14 +170,23 @@ that builds and publishes the `.img` automatically.
 
 ## Troubleshooting
 
-- **Black screen / stuck on console**: SSH in and check
+- **Stuck at a terminal/login prompt instead of the kiosk** (most likely if
+  you installed before this fix): start it right now without rebooting —
+  `sudo systemctl start ds-kiosk.service` — then check what's actually
+  wrong with `sudo systemctl status ds-kiosk` and
+  `sudo journalctl -u ds-kiosk -f`. If it's not even installed yet on this
+  device, just re-run `install-kiosk.sh` (safe — keeps your device token)
+  and reboot.
+- **Black screen but `ds-kiosk.service` is active**: SSH in and check
   `/tmp/ds-kiosk-chromium.log` for Chromium errors, and confirm
   `/etc/digital-signage-kiosk.conf` has a reachable `DS_KIOSK_URL`.
-- **Wrong user logs in**: pass the correct username as the 2nd argument to
-  `install-kiosk.sh`, or re-run `sudo raspi-config` → *System Options* →
-  *Boot / Auto Login* → *Console Autologin* and pick the right user.
-- **Want a visible cursor for touch-screen kiosks**: remove the `-- -nocursor`
-  flag from the `startx` line in `~/.bash_profile`.
+- **Wrong user's session starts**: pass the correct username as the 2nd
+  argument to `install-kiosk.sh` and re-run it (rewrites `ds-kiosk.service`
+  with that user).
+- **Want a visible cursor for touch-screen kiosks**: edit
+  `/etc/systemd/system/ds-kiosk.service` and remove `-nocursor` from the
+  `ExecStart` line, then `sudo systemctl daemon-reload && sudo systemctl
+  restart ds-kiosk`.
 - **Screen moved to a different WordPress site**: edit `DS_KIOSK_SITE` (and
   `DS_KIOSK_URL`) in `/etc/digital-signage-kiosk.conf`, or just re-run the
   installer with the new site URL (keeps the same device token).

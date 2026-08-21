@@ -25,6 +25,10 @@ $duration = $id ? get_post_meta( $id, 'ds_duration_override', true ) : '';
 $transition = $id ? ( get_post_meta( $id, 'ds_transition_override', true ) ?: 'default' ) : 'default';
 $fit      = $id ? ( get_post_meta( $id, 'ds_fit', true ) ?: 'cover' ) : 'cover';
 $zone     = $id ? ( get_post_meta( $id, 'ds_zone', true ) ?: 'main' ) : 'main';
+$scroll_images  = $id ? array_map( 'absint', (array) get_post_meta( $id, 'ds_scroll_images', true ) ) : array();
+$scroll_bg      = $id ? ( get_post_meta( $id, 'ds_scroll_bg_color', true ) ?: '#000000' ) : '#000000';
+$scroll_spacing = $id ? ( get_post_meta( $id, 'ds_scroll_spacing', true ) ?: 20 ) : 20;
+$scroll_speed   = $id ? ( get_post_meta( $id, 'ds_scroll_speed', true ) ?: 60 ) : 60;
 $order    = $id ? get_post_meta( $id, 'ds_order', true ) : '';
 if ( ! $id && '' === $order ) {
 	$last  = get_posts( array( 'post_type' => 'ds_slide', 'posts_per_page' => 1, 'meta_key' => 'ds_channel_id', 'meta_value' => $channel_id, 'orderby' => 'meta_value_num', 'meta_key2' => 'ds_order', 'order' => 'DESC', 'fields' => 'ids' ) );
@@ -46,6 +50,7 @@ $types = array(
 	'clock'   => __( 'Live clock / date', 'digital-signage' ),
 	'pdf'     => __( 'PDF page / Google Slides embed', 'digital-signage' ),
 	'social'  => __( 'Social media embed', 'digital-signage' ),
+	'infinite_scroll' => __( 'Infinite scroll gallery', 'digital-signage' ),
 );
 $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue', 'digital-signage' ), 'wed' => __( 'Wed', 'digital-signage' ), 'thu' => __( 'Thu', 'digital-signage' ), 'fri' => __( 'Fri', 'digital-signage' ), 'sat' => __( 'Sat', 'digital-signage' ), 'sun' => __( 'Sun', 'digital-signage' ) );
 ?>
@@ -151,6 +156,42 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 					<div class="ds-field">
 						<label><?php esc_html_e( 'Weather API key', 'digital-signage' ); ?></label>
 						<input type="text" name="weather_api_key" class="ds-input" value="<?php echo esc_attr( $api_key ); ?>" />
+					</div>
+				</div>
+
+				<div class="ds-type-field" data-type="infinite_scroll">
+					<div class="ds-field">
+						<label><?php esc_html_e( 'Images', 'digital-signage' ); ?></label>
+						<div id="ds-scroll-images-inputs">
+							<?php foreach ( $scroll_images as $attachment_id ) : ?>
+								<input type="hidden" name="scroll_images[]" value="<?php echo esc_attr( $attachment_id ); ?>" />
+							<?php endforeach; ?>
+						</div>
+						<div class="ds-media-row">
+							<button type="button" class="ds-btn" id="ds-select-gallery"><?php esc_html_e( 'Add Images', 'digital-signage' ); ?></button>
+							<span class="ds-hint"><?php esc_html_e( 'Select multiple — drag to reorder, click × to remove.', 'digital-signage' ); ?></span>
+						</div>
+						<ul id="ds-scroll-gallery-preview" class="ds-scroll-gallery-preview">
+							<?php foreach ( $scroll_images as $attachment_id ) : ?>
+								<li data-id="<?php echo esc_attr( $attachment_id ); ?>">
+									<?php echo wp_get_attachment_image( $attachment_id, 'thumbnail' ); ?>
+									<button type="button" class="ds-scroll-gallery-remove" aria-label="<?php esc_attr_e( 'Remove image', 'digital-signage' ); ?>">&times;</button>
+								</li>
+							<?php endforeach; ?>
+						</ul>
+					</div>
+					<div class="ds-field">
+						<label for="scroll_bg_color"><?php esc_html_e( 'Background color', 'digital-signage' ); ?></label>
+						<input type="color" id="scroll_bg_color" name="scroll_bg_color" value="<?php echo esc_attr( $scroll_bg ); ?>" class="ds-color-input" />
+					</div>
+					<div class="ds-field">
+						<label for="scroll_spacing"><?php esc_html_e( 'Spacing between images (px)', 'digital-signage' ); ?></label>
+						<input type="number" min="0" id="scroll_spacing" name="scroll_spacing" value="<?php echo esc_attr( $scroll_spacing ); ?>" class="ds-input ds-input-small" />
+					</div>
+					<div class="ds-field">
+						<label for="scroll_speed"><?php esc_html_e( 'Scroll speed (px/second)', 'digital-signage' ); ?></label>
+						<input type="number" min="5" id="scroll_speed" name="scroll_speed" value="<?php echo esc_attr( $scroll_speed ); ?>" class="ds-input ds-input-small" />
+						<span class="ds-hint"><?php esc_html_e( 'Scrolls top-to-bottom on portrait screens (images full width), left-to-right on landscape (images full height) — direction follows the screen\'s orientation automatically.', 'digital-signage' ); ?></span>
 					</div>
 				</div>
 			</div>

@@ -321,6 +321,10 @@
 				el.appendChild( socialFrame );
 				break;
 			}
+			case 'infinite_scroll': {
+				el.appendChild( buildInfiniteScrollEl( item ) );
+				break;
+			}
 			default: {
 				el.textContent = item.title || '';
 			}
@@ -340,7 +344,7 @@
 
 	function buildClockEl() {
 		var wrap = document.createElement( 'div' );
-		wrap.className = 'ds-clock';
+		wrap.className = 'ds-clock ds-has-timer';
 		var time = document.createElement( 'div' );
 		time.className = 'ds-time';
 		var date = document.createElement( 'div' );
@@ -355,7 +359,106 @@
 		}
 		tick();
 		var interval = setInterval( tick, 1000 );
-		wrap.dataset.dsInterval = String( interval );
+		wrap.dataset.dsTimerKind = 'interval';
+		wrap.dataset.dsTimerId = String( interval );
+		return wrap;
+	}
+
+	/**
+	 * Stops any interval/requestAnimationFrame loop started by an element this
+	 * player created (clock ticks, infinite-scroll animation) before it's
+	 * removed from the DOM — otherwise those loops keep running invisibly.
+	 */
+	function stopTimers( container ) {
+		container.querySelectorAll( '.ds-has-timer' ).forEach( function ( el ) {
+			var id = Number( el.dataset.dsTimerId );
+			if ( ! id ) {
+				return;
+			}
+			if ( 'raf' === el.dataset.dsTimerKind ) {
+				cancelAnimationFrame( id );
+			} else {
+				clearInterval( id );
+			}
+		} );
+	}
+
+	/**
+	 * Infinite-scroll image gallery: images auto-loop in the direction that
+	 * matches the screen's current orientation — top-to-bottom (images full
+	 * width) on portrait, left-to-right (images full height) on landscape —
+	 * at a configurable speed, with the sequence duplicated once so the loop
+	 * is seamless.
+	 */
+	function buildInfiniteScrollEl( item ) {
+		var wrap = document.createElement( 'div' );
+		wrap.className = 'ds-infinite-scroll ds-has-timer';
+		wrap.style.background = item.bg_color || '#000';
+
+		var portrait = 'portrait' === document.documentElement.getAttribute( 'data-ds-orientation' );
+		var track = document.createElement( 'div' );
+		track.className = 'ds-infinite-scroll-track ' + ( portrait ? 'ds-scroll-vertical' : 'ds-scroll-horizontal' );
+		track.style.gap = ( item.spacing || 20 ) + 'px';
+		wrap.appendChild( track );
+
+		var images = item.images || [];
+		if ( ! images.length ) {
+			return wrap;
+		}
+
+		// Render the sequence twice back-to-back so scrolling by exactly one
+		// copy's length loops with no visible seam, then jump back to 0.
+		[ images, images ].forEach( function ( set ) {
+			set.forEach( function ( src ) {
+				var img = document.createElement( 'img' );
+				img.src = src;
+				img.alt = '';
+				track.appendChild( img );
+			} );
+		} );
+
+		var speed = Math.max( 5, item.speed || 60 ); // px/second
+		var position = 0;
+		var loopLength = 0;
+		var lastFrame = null;
+
+		function measure() {
+			loopLength = portrait ? track.scrollHeight / 2 : track.scrollWidth / 2;
+		}
+		// Images load asynchronously; ResizeObserver re-measures whenever the
+		// track's rendered size actually changes, rather than guessing once.
+		if ( 'ResizeObserver' in window ) {
+			new ResizeObserver( measure ).observe( track );
+		} else {
+			track.querySelectorAll( 'img' ).forEach( function ( img ) {
+				img.addEventListener( 'load', measure );
+			} );
+		}
+		measure();
+
+		function frame( now ) {
+			if ( null === lastFrame ) {
+				lastFrame = now;
+			}
+			var dt = ( now - lastFrame ) / 1000;
+			lastFrame = now;
+
+			if ( loopLength > 0 ) {
+				position -= speed * dt;
+				if ( position <= -loopLength ) {
+					position += loopLength;
+				}
+				track.style.transform = portrait
+					? 'translate3d(0,' + position + 'px,0)'
+					: 'translate3d(' + position + 'px,0,0)';
+			}
+
+			var id = requestAnimationFrame( frame );
+			wrap.dataset.dsTimerId = String( id );
+		}
+		wrap.dataset.dsTimerKind = 'raf';
+		wrap.dataset.dsTimerId = String( requestAnimationFrame( frame ) );
+
 		return wrap;
 	}
 
@@ -446,10 +549,7 @@
 			prevEl.classList.remove( 'ds-active' );
 			prevEl.classList.add( 'ds-prev' );
 			setTimeout( function () {
-				var iv = prevEl.querySelector( '.ds-clock' );
-				if ( iv && iv.dataset.dsInterval ) {
-					clearInterval( Number( iv.dataset.dsInterval ) );
-				}
+				stopTimers( prevEl );
 				prevEl.remove();
 			}, 700 );
 		} );

@@ -3,10 +3,11 @@
 # Digital Signage — Raspberry Pi kiosk installer.
 #
 # Turns a Raspberry Pi (running Raspberry Pi OS, Lite or Desktop, Bullseye or
-# Bookworm) into a dedicated signage player: boots straight to a console
-# autologin, starts a minimal X session, and opens this device's player URL
-# full-screen in Chromium with no browser chrome. If Chromium ever crashes
-# or the URL is unreachable at boot, a watchdog loop relaunches it.
+# Bookworm) into a dedicated signage player: a systemd service (ds-kiosk,
+# no console autologin involved) takes tty1 straight to a minimal X session
+# and opens this device's player URL full-screen in Chromium with no browser
+# chrome. If Chromium ever crashes or the URL is unreachable at boot, a
+# watchdog loop relaunches it.
 #
 # Also deploys ds-agent, a small background service that lets this device be
 # managed remotely from the plugin's admin UI — WiFi network, screen
@@ -161,40 +162,50 @@ EOF
 chmod +x "${USER_HOME}/.xinitrc"
 chown "$KIOSK_USER":"$KIOSK_USER" "${USER_HOME}/.xinitrc"
 
-echo "==> Auto-starting X on console login for ${KIOSK_USER}"
+# --- Clean up the old (pre-2.3.1) autostart mechanism if present: a login-shell
+# ~/.bash_profile hook + console autologin. It depended on the exact shell,
+# login-file-sourcing behavior and getty timing, which didn't reliably start X
+# on every Raspberry Pi OS build. Replaced below by a systemd service that
+# owns tty1 directly — no login shell, autologin or .bash_profile involved. ---
 PROFILE_FILE="${USER_HOME}/.bash_profile"
-START_BLOCK='
-# --- Digital Signage kiosk autostart ---
-if [ -z "${DISPLAY:-}" ] && [ "$(tty)" = "/dev/tty1" ]; then
-	exec startx -- -nocursor
+if [ -f "$PROFILE_FILE" ] && grep -q "Digital Signage kiosk autostart" "$PROFILE_FILE"; then
+	sed -i '/# --- Digital Signage kiosk autostart ---/,/# --- end Digital Signage kiosk autostart ---/d' "$PROFILE_FILE"
 fi
-# --- end Digital Signage kiosk autostart ---
-'
-if [ ! -f "$PROFILE_FILE" ] || ! grep -q "Digital Signage kiosk autostart" "$PROFILE_FILE"; then
-	echo "$START_BLOCK" >> "$PROFILE_FILE"
-	chown "$KIOSK_USER":"$KIOSK_USER" "$PROFILE_FILE"
-fi
-
-echo "==> Enabling console autologin for ${KIOSK_USER}"
 if command -v raspi-config >/dev/null 2>&1; then
-	raspi-config nonint do_boot_behaviour B2
-	# raspi-config's B2 always targets the 'pi'/first user account; fix the
-	# generated getty override if a different kiosk user was requested.
-	OVERRIDE="/etc/systemd/system/getty@tty1.service.d/autologin.conf"
-	if [ -f "$OVERRIDE" ] && [ "$KIOSK_USER" != "pi" ]; then
-		sed -i "s/--autologin [^ ]*/--autologin ${KIOSK_USER}/" "$OVERRIDE"
-		systemctl daemon-reload
-	fi
-else
-	mkdir -p /etc/systemd/system/getty@tty1.service.d
-	cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<EOF
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin ${KIOSK_USER} --noclear %I \$TERM
-EOF
-	systemctl daemon-reload
-	systemctl enable getty@tty1.service
+	raspi-config nonint do_boot_behaviour B1 >/dev/null 2>&1 || true
 fi
+rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
+systemctl daemon-reload 2>/dev/null || true
+
+echo "==> Installing ds-kiosk.service (owns tty1, starts X directly — no autologin needed)"
+cat > /etc/systemd/system/ds-kiosk.service <<EOF
+[Unit]
+Description=Digital Signage kiosk (X + Chromium)
+After=network-online.target systemd-user-sessions.service getty@tty1.service
+Wants=network-online.target
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+User=${KIOSK_USER}
+PAMName=login
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+Restart=always
+RestartSec=3
+ExecStart=/usr/bin/startx ${USER_HOME}/.xinitrc -- vt1 -nocursor
+
+[Install]
+WantedBy=graphical.target multi-user.target
+EOF
+systemctl daemon-reload
+# The two units both want tty1; disabling the getty (Conflicts= above handles
+# runtime, this stops it winning a future boot race) hands the console to us.
+systemctl disable getty@tty1.service >/dev/null 2>&1 || true
+systemctl enable ds-kiosk.service
 
 # --- Remote device management agent (WiFi, rotation, reboot, updates from wp-admin) ---
 AGENT_INSTALLED=0
@@ -236,6 +247,7 @@ echo "✅ Installed. Player URL (permanent for this device): ${URL}"
 echo "   Kiosk user:            ${KIOSK_USER}"
 echo "   Config file:           ${CONF_FILE}"
 echo "   Watchdog script:       ${WATCHDOG}"
+echo "   Kiosk service:         ds-kiosk.service (owns tty1, starts X directly)"
 if [ "$AGENT_INSTALLED" -eq 1 ]; then
 	echo "   Device agent:          installed and running (ds-agent.service)"
 fi
@@ -251,5 +263,8 @@ if [ "$AGENT_INSTALLED" -eq 1 ]; then
 fi
 echo ""
 echo "Reboot now to start the kiosk: sudo reboot"
+echo "Already rebooted and stuck at a terminal from an older install? Start it now"
+echo "without rebooting again: sudo systemctl start ds-kiosk.service"
+echo "Check its status/logs any time: sudo systemctl status ds-kiosk ; sudo journalctl -u ds-kiosk -f"
 echo "To re-pair this device as a different screen: sudo bash install-kiosk.sh ${SITE_URL} ${KIOSK_USER} --regenerate"
 echo "To remove: sudo bash uninstall-kiosk.sh ${KIOSK_USER}"

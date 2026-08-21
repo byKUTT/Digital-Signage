@@ -110,6 +110,9 @@ class DS_CRUD {
 			'zone'              => array( 'ds_zone', 'sanitize_key' ),
 			'order'             => array( 'ds_order', 'absint' ),
 			'fit'               => array( 'ds_fit', 'sanitize_key' ),
+			'scroll_bg_color'   => array( 'ds_scroll_bg_color', 'sanitize_hex_color' ),
+			'scroll_spacing'    => array( 'ds_scroll_spacing', 'absint' ),
+			'scroll_speed'      => array( 'ds_scroll_speed', 'absint' ),
 		);
 
 		foreach ( $fields as $input_key => $meta ) {
@@ -121,6 +124,10 @@ class DS_CRUD {
 
 		update_post_meta( $post_id, 'ds_content_html', wp_kses_post( $data['content_html'] ?? '' ) );
 		update_post_meta( $post_id, 'ds_sched_days', array_map( 'sanitize_key', (array) ( $data['sched_days'] ?? array() ) ) );
+
+		// Infinite-scroll gallery: an ordered list of attachment IDs.
+		$scroll_images = array_filter( array_map( 'absint', (array) ( $data['scroll_images'] ?? array() ) ) );
+		update_post_meta( $post_id, 'ds_scroll_images', array_values( $scroll_images ) );
 
 		return $post_id;
 	}

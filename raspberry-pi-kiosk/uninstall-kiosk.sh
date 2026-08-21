@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# Reverts install-kiosk.sh: removes the autostart hook, watchdog script and
-# config file, and restores normal console/desktop login behavior.
+# Reverts install-kiosk.sh: removes ds-kiosk.service, the watchdog script,
+# ds-agent, the setup portal and the config file, and restores normal
+# console login behavior on tty1.
 #
 # Usage: sudo bash uninstall-kiosk.sh [kiosk-user]
 
@@ -15,7 +16,11 @@ fi
 KIOSK_USER="${1:-${SUDO_USER:-pi}}"
 USER_HOME=$(getent passwd "$KIOSK_USER" | cut -d: -f6 || true)
 
-echo "==> Removing autostart block from ${USER_HOME}/.bash_profile"
+echo "==> Removing kiosk service"
+systemctl disable --now ds-kiosk.service >/dev/null 2>&1 || true
+rm -f /etc/systemd/system/ds-kiosk.service
+
+echo "==> Removing any leftover autostart block from ${USER_HOME}/.bash_profile"
 if [ -n "${USER_HOME:-}" ] && [ -f "${USER_HOME}/.bash_profile" ]; then
 	sed -i '/# --- Digital Signage kiosk autostart ---/,/# --- end Digital Signage kiosk autostart ---/d' "${USER_HOME}/.bash_profile"
 fi
@@ -31,15 +36,14 @@ rm -f /usr/local/bin/ds-agent.py /usr/local/bin/ds-setup-portal.py
 rm -f /usr/local/bin/ds-setup-ap-up.sh /usr/local/bin/ds-setup-ap-down.sh
 rm -f /usr/local/bin/install-kiosk.sh
 nmcli connection delete ds-setup-ap >/dev/null 2>&1 || true
-systemctl daemon-reload
 
-echo "==> Disabling console autologin"
+echo "==> Restoring normal console login on tty1"
+rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
 if command -v raspi-config >/dev/null 2>&1; then
-	raspi-config nonint do_boot_behaviour B1
-else
-	rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
-	systemctl daemon-reload
+	raspi-config nonint do_boot_behaviour B1 >/dev/null 2>&1 || true
 fi
+systemctl enable getty@tty1.service >/dev/null 2>&1 || true
+systemctl daemon-reload
 
 echo ""
 echo "✅ Kiosk mode removed for ${KIOSK_USER}. Reboot to apply: sudo reboot"

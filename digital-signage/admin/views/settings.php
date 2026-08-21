@@ -30,6 +30,7 @@ $s = DS_Settings::get_all();
 					'clock'   => __( 'Clock / date', 'digital-signage' ),
 					'pdf'     => __( 'PDF page', 'digital-signage' ),
 					'social'  => __( 'Social media embed', 'digital-signage' ),
+					'infinite_scroll' => __( 'Infinite scroll gallery', 'digital-signage' ),
 				);
 				foreach ( $types as $key => $label ) :
 					?>
