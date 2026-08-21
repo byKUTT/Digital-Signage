@@ -20,12 +20,27 @@ $layouts = array(
 $zone_bg        = $id ? ( get_post_meta( $id, 'ds_zone_bg_color', true ) ?: '#000000' ) : '#000000';
 $scroll_bg      = $id ? ( get_post_meta( $id, 'ds_scroll_bg_color', true ) ?: '#000000' ) : '#000000';
 $transition     = $id ? ( get_post_meta( $id, 'ds_transition', true ) ?: 'default' ) : 'default';
-$legacy_spacing = $id ? get_post_meta( $id, 'ds_scroll_spacing', true ) : '';
-$vertical_spacing_meta = $id ? get_post_meta( $id, 'ds_scroll_vertical_spacing', true ) : '';
-$horizontal_spacing_meta = $id ? get_post_meta( $id, 'ds_scroll_horizontal_spacing', true ) : '';
-$scroll_vertical_spacing = '' !== $vertical_spacing_meta ? absint( $vertical_spacing_meta ) : ( '' !== $legacy_spacing ? absint( $legacy_spacing ) : 20 );
-$scroll_horizontal_spacing = '' !== $horizontal_spacing_meta ? absint( $horizontal_spacing_meta ) : ( '' !== $legacy_spacing ? absint( $legacy_spacing ) : 20 );
+$scroll_spacing_meta = $id ? get_post_meta( $id, 'ds_scroll_spacing', true ) : '';
+$scroll_spacing_fallback = $id ? get_post_meta( $id, 'ds_scroll_vertical_spacing', true ) : '';
+$scroll_spacing = '' !== $scroll_spacing_meta ? absint( $scroll_spacing_meta ) : ( '' !== $scroll_spacing_fallback ? absint( $scroll_spacing_fallback ) : 20 );
 $scroll_speed   = $id ? ( get_post_meta( $id, 'ds_scroll_speed', true ) ?: 60 ) : 60;
+$slider_vertical_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_vertical_spacing', true ) : '';
+$slider_horizontal_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_horizontal_spacing', true ) : '';
+$slider_speed_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_speed', true ) : '';
+$slider_radius_meta = $id ? get_post_meta( $id, 'ds_infinite_slider_border_radius', true ) : '';
+$slider_vertical_fallback = $id ? get_post_meta( $id, 'ds_scroll_vertical_spacing', true ) : '';
+$slider_horizontal_fallback = $id ? get_post_meta( $id, 'ds_scroll_horizontal_spacing', true ) : '';
+$slider_vertical_spacing = '' !== $slider_vertical_meta ? absint( $slider_vertical_meta ) : ( '' !== $slider_vertical_fallback ? absint( $slider_vertical_fallback ) : 20 );
+$slider_horizontal_spacing = '' !== $slider_horizontal_meta ? absint( $slider_horizontal_meta ) : ( '' !== $slider_horizontal_fallback ? absint( $slider_horizontal_fallback ) : 20 );
+$slider_speed = '' !== $slider_speed_meta ? max( 5, absint( $slider_speed_meta ) ) : $scroll_speed;
+$slider_border_radius = '' !== $slider_radius_meta ? absint( $slider_radius_meta ) : 0;
+$transition_options = array(
+	'none'            => __( 'None', 'digital-signage' ),
+	'fade'            => __( 'Fade', 'digital-signage' ),
+	'slide'           => __( 'Slide', 'digital-signage' ),
+	'zoom'            => __( 'Zoom', 'digital-signage' ),
+	'infinite_slider' => __( 'Infinite Slider', 'digital-signage' ),
+);
 ?>
 <div class="ds-app-wrap">
 	<div class="ds-app-header">
@@ -88,11 +103,11 @@ $scroll_speed   = $id ? ( get_post_meta( $id, 'ds_scroll_speed', true ) ?: 60 ) 
 				<label for="transition"><?php esc_html_e( 'Slide transition', 'digital-signage' ); ?></label>
 				<select id="transition" name="transition" class="ds-input">
 					<option value="default" <?php selected( $transition, 'default' ); ?>><?php esc_html_e( 'Use global default', 'digital-signage' ); ?></option>
-					<?php foreach ( array( 'none', 'fade', 'slide', 'zoom' ) as $transition_option ) : ?>
-						<option value="<?php echo esc_attr( $transition_option ); ?>" <?php selected( $transition, $transition_option ); ?>><?php echo esc_html( ucfirst( $transition_option ) ); ?></option>
+					<?php foreach ( $transition_options as $transition_key => $transition_label ) : ?>
+						<option value="<?php echo esc_attr( $transition_key ); ?>" <?php selected( $transition, $transition_key ); ?>><?php echo esc_html( $transition_label ); ?></option>
 					<?php endforeach; ?>
 				</select>
-				<span class="ds-hint"><?php esc_html_e( 'Applied to every slide in this channel.', 'digital-signage' ); ?></span>
+				<span class="ds-hint"><?php esc_html_e( 'Applied to every slide in this channel. Infinite Slider continuously loops image-only zones; mixed-content zones safely use Fade.', 'digital-signage' ); ?></span>
 			</div>
 
 			<div class="ds-field">
@@ -102,20 +117,37 @@ $scroll_speed   = $id ? ( get_post_meta( $id, 'ds_scroll_speed', true ) ?: 60 ) 
 				</label>
 			</div>
 
-			<h3><?php esc_html_e( 'Sliding carousel settings', 'digital-signage' ); ?></h3>
-			<p class="ds-hint"><?php esc_html_e( 'Applied to every Sliding carousel slide in this channel. Portrait carousels use full-width images and vertical spacing; landscape carousels use full-height images and horizontal spacing.', 'digital-signage' ); ?></p>
+			<h3><?php esc_html_e( 'Infinite Slider settings', 'digital-signage' ); ?></h3>
+			<p class="ds-hint"><?php esc_html_e( 'Used when Slide transition is Infinite Slider. Portrait zones show one vertical column of full-width images; landscape zones show one horizontal row of full-height images.', 'digital-signage' ); ?></p>
+			<div class="ds-settings-grid">
+				<div class="ds-field">
+					<label for="infinite_slider_vertical_spacing"><?php esc_html_e( 'Portrait vertical spacing (px)', 'digital-signage' ); ?></label>
+					<input type="number" min="0" id="infinite_slider_vertical_spacing" name="infinite_slider_vertical_spacing" value="<?php echo esc_attr( $slider_vertical_spacing ); ?>" class="ds-input ds-input-small" />
+				</div>
+				<div class="ds-field">
+					<label for="infinite_slider_horizontal_spacing"><?php esc_html_e( 'Landscape horizontal spacing (px)', 'digital-signage' ); ?></label>
+					<input type="number" min="0" id="infinite_slider_horizontal_spacing" name="infinite_slider_horizontal_spacing" value="<?php echo esc_attr( $slider_horizontal_spacing ); ?>" class="ds-input ds-input-small" />
+				</div>
+				<div class="ds-field">
+					<label for="infinite_slider_speed"><?php esc_html_e( 'Slider speed (px/second)', 'digital-signage' ); ?></label>
+					<input type="number" min="5" id="infinite_slider_speed" name="infinite_slider_speed" value="<?php echo esc_attr( $slider_speed ); ?>" class="ds-input ds-input-small" />
+				</div>
+				<div class="ds-field">
+					<label for="infinite_slider_border_radius"><?php esc_html_e( 'Image border radius (px)', 'digital-signage' ); ?></label>
+					<input type="number" min="0" id="infinite_slider_border_radius" name="infinite_slider_border_radius" value="<?php echo esc_attr( $slider_border_radius ); ?>" class="ds-input ds-input-small" />
+				</div>
+			</div>
+
+			<h3><?php esc_html_e( 'Infinite Scroll Gallery defaults', 'digital-signage' ); ?></h3>
+			<p class="ds-hint"><?php esc_html_e( 'Applies only to the separate Infinite Scroll Gallery slide type.', 'digital-signage' ); ?></p>
 			<div class="ds-settings-grid">
 				<div class="ds-field">
 					<label for="scroll_bg_color"><?php esc_html_e( 'Background color', 'digital-signage' ); ?></label>
 					<input type="color" id="scroll_bg_color" name="scroll_bg_color" value="<?php echo esc_attr( $scroll_bg ); ?>" class="ds-color-input" />
 				</div>
 				<div class="ds-field">
-					<label for="scroll_vertical_spacing"><?php esc_html_e( 'Portrait vertical spacing (px)', 'digital-signage' ); ?></label>
-					<input type="number" min="0" id="scroll_vertical_spacing" name="scroll_vertical_spacing" value="<?php echo esc_attr( $scroll_vertical_spacing ); ?>" class="ds-input ds-input-small" />
-				</div>
-				<div class="ds-field">
-					<label for="scroll_horizontal_spacing"><?php esc_html_e( 'Landscape horizontal spacing (px)', 'digital-signage' ); ?></label>
-					<input type="number" min="0" id="scroll_horizontal_spacing" name="scroll_horizontal_spacing" value="<?php echo esc_attr( $scroll_horizontal_spacing ); ?>" class="ds-input ds-input-small" />
+					<label for="scroll_spacing"><?php esc_html_e( 'Spacing between images (px)', 'digital-signage' ); ?></label>
+					<input type="number" min="0" id="scroll_spacing" name="scroll_spacing" value="<?php echo esc_attr( $scroll_spacing ); ?>" class="ds-input ds-input-small" />
 				</div>
 				<div class="ds-field">
 					<label for="scroll_speed"><?php esc_html_e( 'Scroll speed (px/second)', 'digital-signage' ); ?></label>

@@ -486,7 +486,7 @@ class DS_REST {
 
 		$channel_id        = absint( get_post_meta( $slide->ID, 'ds_channel_id', true ) );
 		$transition        = $channel_id ? sanitize_key( get_post_meta( $channel_id, 'ds_transition', true ) ) : '';
-		$valid_transitions = array( 'none', 'fade', 'slide', 'zoom' );
+		$valid_transitions = array( 'none', 'fade', 'slide', 'zoom', 'infinite_slider' );
 		if ( ! in_array( $transition, $valid_transitions, true ) ) {
 			$transition = sanitize_key( $settings['transition'] ?? 'fade' );
 		}
@@ -503,6 +503,19 @@ class DS_REST {
 			'fit'         => get_post_meta( $slide->ID, 'ds_fit', true ) ?: 'cover',
 			'order'       => absint( get_post_meta( $slide->ID, 'ds_order', true ) ),
 		);
+
+		if ( 'infinite_slider' === $transition ) {
+			$vertical_spacing = $channel_id ? get_post_meta( $channel_id, 'ds_infinite_slider_vertical_spacing', true ) : '';
+			$horizontal_spacing = $channel_id ? get_post_meta( $channel_id, 'ds_infinite_slider_horizontal_spacing', true ) : '';
+			$slider_speed = $channel_id ? get_post_meta( $channel_id, 'ds_infinite_slider_speed', true ) : '';
+			$border_radius = $channel_id ? get_post_meta( $channel_id, 'ds_infinite_slider_border_radius', true ) : '';
+			$legacy_vertical = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_vertical_spacing', true ) : '';
+			$legacy_horizontal = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_horizontal_spacing', true ) : '';
+			$data['slider_vertical_spacing'] = '' !== $vertical_spacing ? absint( $vertical_spacing ) : ( '' !== $legacy_vertical ? absint( $legacy_vertical ) : 20 );
+			$data['slider_horizontal_spacing'] = '' !== $horizontal_spacing ? absint( $horizontal_spacing ) : ( '' !== $legacy_horizontal ? absint( $legacy_horizontal ) : 20 );
+			$data['slider_speed'] = '' !== $slider_speed ? max( 5, absint( $slider_speed ) ) : 60;
+			$data['slider_border_radius'] = '' !== $border_radius ? absint( $border_radius ) : 0;
+		}
 
 		switch ( $type ) {
 			case 'image':
@@ -545,14 +558,11 @@ class DS_REST {
 						)
 					)
 				);
-				// Appearance and direction-specific spacing belong to the channel.
-				$legacy_spacing     = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_spacing', true ) : '';
-				$vertical_spacing   = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_vertical_spacing', true ) : '';
-				$horizontal_spacing = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_horizontal_spacing', true ) : '';
-				$data['bg_color']   = $channel_id ? ( get_post_meta( $channel_id, 'ds_scroll_bg_color', true ) ?: '#000000' ) : '#000000';
-				$data['vertical_spacing'] = '' !== $vertical_spacing ? absint( $vertical_spacing ) : ( '' !== $legacy_spacing ? absint( $legacy_spacing ) : 20 );
-				$data['horizontal_spacing'] = '' !== $horizontal_spacing ? absint( $horizontal_spacing ) : ( '' !== $legacy_spacing ? absint( $legacy_spacing ) : 20 );
-				$data['spacing'] = '' !== $legacy_spacing ? absint( $legacy_spacing ) : 20;
+				// Infinite Scroll Gallery appearance remains separate from Infinite Slider.
+				$gallery_spacing = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_spacing', true ) : '';
+				$gallery_spacing_fallback = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_vertical_spacing', true ) : '';
+				$data['bg_color'] = $channel_id ? ( get_post_meta( $channel_id, 'ds_scroll_bg_color', true ) ?: '#000000' ) : '#000000';
+				$data['spacing'] = '' !== $gallery_spacing ? absint( $gallery_spacing ) : ( '' !== $gallery_spacing_fallback ? absint( $gallery_spacing_fallback ) : 20 );
 				$data['speed']   = $channel_id ? absint( get_post_meta( $channel_id, 'ds_scroll_speed', true ) ?: 60 ) : 60;
 				break;
 		}

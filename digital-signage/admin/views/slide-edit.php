@@ -46,7 +46,7 @@ $types = array(
 	'clock'   => __( 'Live clock / date', 'digital-signage' ),
 	'pdf'     => __( 'PDF page / Google Slides embed', 'digital-signage' ),
 	'social'  => __( 'Social media embed', 'digital-signage' ),
-	'infinite_scroll' => __( 'Sliding carousel', 'digital-signage' ),
+	'infinite_scroll' => __( 'Infinite scroll gallery', 'digital-signage' ),
 );
 $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue', 'digital-signage' ), 'wed' => __( 'Wed', 'digital-signage' ), 'thu' => __( 'Thu', 'digital-signage' ), 'fri' => __( 'Fri', 'digital-signage' ), 'sat' => __( 'Sat', 'digital-signage' ), 'sun' => __( 'Sun', 'digital-signage' ) );
 ?>
@@ -176,7 +176,7 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 							<?php endforeach; ?>
 						</ul>
 					</div>
-					<p class="ds-hint"><?php echo wp_kses_post( sprintf( /* translators: %s: link to the channel edit screen */ __( 'Background color, portrait/landscape spacing and speed are set once for the whole channel — see %s. Portrait uses full-width images and vertical movement; landscape uses full-height images and horizontal movement.', 'digital-signage' ), '<a href="' . esc_url( admin_url( 'admin.php?page=ds-channel-edit&id=' . $channel_id ) ) . '">' . esc_html__( 'this channel\'s settings', 'digital-signage' ) . '</a>' ) ); ?></p>
+					<p class="ds-hint"><?php echo wp_kses_post( sprintf( /* translators: %s: link to the channel edit screen */ __( 'Background color, spacing and scroll speed are set once for the whole channel — see %s. This is a separate multi-image slide type and is not the Infinite Slider channel transition.', 'digital-signage' ), '<a href="' . esc_url( admin_url( 'admin.php?page=ds-channel-edit&id=' . $channel_id ) ) . '">' . esc_html__( 'this channel\'s settings', 'digital-signage' ) . '</a>' ) ); ?></p>
 				</div>
 			</div>
 

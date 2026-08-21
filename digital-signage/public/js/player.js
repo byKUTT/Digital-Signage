@@ -258,10 +258,10 @@
 
 		var existing = state.zones[ zoneName ];
 
-		// If content is unchanged (same slide IDs, same order), don't restart the rotation
-		// mid-cycle — this is what makes polling invisible to the viewer.
-		if ( existing && sameItemIds( existing.items, items ) ) {
-			existing.items = items; // durations/etc. may have changed; index/timer keep running.
+		// If the complete zone payload is unchanged, don't restart its rotation or
+		// continuous slider — polling stays invisible to the viewer.
+		if ( existing && sameItems( existing.items, items ) ) {
+			existing.items = items;
 			setZoneTransition( container, items );
 			return;
 		}
@@ -280,13 +280,27 @@
 			return;
 		}
 
-		renderSlide( zoneName, 0 );
+		if ( canUseInfiniteSlider( items ) ) {
+			renderInfiniteSlider( zoneName );
+		} else {
+			renderSlide( zoneName, 0 );
+		}
 	}
 
 	function setZoneTransition( container, items ) {
-		var transitionClass = 'ds-transition-' + ( ( items[0] && items[0].transition ) || 'fade' );
+		var transition = ( items[0] && items[0].transition ) || 'fade';
+		if ( 'infinite_slider' === transition ) {
+			transition = canUseInfiniteSlider( items ) ? 'none' : 'fade';
+		}
+		var transitionClass = 'ds-transition-' + transition;
 		var zoneName = container.id.replace( 'ds-zone-', '' );
 		container.className = 'ds-zone ds-zone-' + zoneName + ' ' + transitionClass;
+	}
+
+	function canUseInfiniteSlider( items ) {
+		return !! items.length && 'infinite_slider' === items[0].transition && items.every( function ( item ) {
+			return 'image' === item.type && !! item.src;
+		} );
 	}
 
 	function stopZone( zoneName ) {
@@ -302,16 +316,26 @@
 		}
 	}
 
-	function sameItemIds( a, b ) {
-		if ( a.length !== b.length ) {
-			return false;
+	function sameItems( a, b ) {
+		return JSON.stringify( a ) === JSON.stringify( b );
+	}
+
+	function renderInfiniteSlider( zoneName ) {
+		var zone = state.zones[ zoneName ];
+		if ( ! zone || ! zone.items.length ) {
+			return;
 		}
-		for ( var i = 0; i < a.length; i++ ) {
-			if ( a[ i ].id !== b[ i ].id ) {
-				return false;
-			}
-		}
-		return true;
+
+		var container = zoneEl( zoneName );
+		var slide = document.createElement( 'div' );
+		slide.className = 'ds-slide ds-active ds-infinite-slider-slide';
+		slide.dataset.slideId = 'infinite-slider';
+		slide.appendChild( buildInfiniteSliderEl( zone.items ) );
+		container.appendChild( slide );
+
+		zone.items.forEach( function ( item ) {
+			logProofOfPlay( zoneName, item );
+		} );
 	}
 
 	function buildSlideEl( item ) {
@@ -441,27 +465,56 @@
 		} );
 	}
 
-	/**
-	 * Sliding image carousel. Portrait zones use full-width images and vertical
-	 * spacing; landscape zones use full-height images and horizontal spacing.
-	 * Enough sequence copies are rendered to cover the viewport continuously,
-	 * including when the source sequence is shorter than the screen.
-	 */
+	function buildInfiniteSliderEl( items ) {
+		var settings = items[0] || {};
+		return buildContinuousImageSlider(
+			items.map( function ( item ) { return item.src; } ),
+			{
+				className: 'ds-infinite-slider',
+				verticalSpacing: settings.slider_vertical_spacing,
+				horizontalSpacing: settings.slider_horizontal_spacing,
+				speed: settings.slider_speed,
+				borderRadius: settings.slider_border_radius,
+			}
+		);
+	}
+
 	function buildSlidingCarouselEl( item ) {
+		return buildContinuousImageSlider(
+			item.images || [],
+			{
+				className: 'ds-infinite-scroll-gallery',
+				background: item.bg_color || '#000',
+				verticalSpacing: item.spacing,
+				horizontalSpacing: item.spacing,
+				speed: item.speed,
+				borderRadius: 0,
+			}
+		);
+	}
+
+	/**
+	 * Dependency-free equivalent of the Motion Primitives Infinite Slider:
+	 * repeat one logical sequence until the viewport is covered, then move by
+	 * exactly one sequence length for a seamless continuous loop.
+	 */
+	function buildContinuousImageSlider( images, options ) {
 		var wrap = document.createElement( 'div' );
-		wrap.className = 'ds-sliding-carousel ds-has-timer';
-		wrap.style.background = item.bg_color || '#000';
+		wrap.className = ( options.className || 'ds-continuous-slider' ) + ' ds-continuous-slider ds-has-timer';
+		if ( options.background ) {
+			wrap.style.background = options.background;
+		}
 
 		var track = document.createElement( 'div' );
-		track.className = 'ds-sliding-carousel-track';
+		track.className = 'ds-continuous-slider-track';
 		wrap.appendChild( track );
 
-		var images = item.images || [];
 		if ( ! images.length ) {
 			return wrap;
 		}
 
-		var speed = Math.max( 5, item.speed || 60 ); // px/second
+		var speed = Math.max( 5, Number( options.speed ) || 60 ); // px/second
+		var borderRadius = Math.max( 0, Number( options.borderRadius ) || 0 );
 		var position = 0;
 		var loopLength = 0;
 		var lastFrame = null;
@@ -473,9 +526,10 @@
 		function appendCopy() {
 			images.forEach( function ( src ) {
 				var img = document.createElement( 'img' );
-				img.src = src;
 				img.alt = '';
+				img.style.borderRadius = borderRadius + 'px';
 				img.addEventListener( 'load', measure, { once: true } );
+				img.src = src;
 				track.appendChild( img );
 			} );
 			renderedCopies++;
@@ -492,10 +546,10 @@
 				track.style.transform = 'translate3d(0,0,0)';
 			}
 
-			track.className = 'ds-sliding-carousel-track ' + ( portrait ? 'ds-carousel-vertical' : 'ds-carousel-horizontal' );
+			track.className = 'ds-continuous-slider-track ' + ( portrait ? 'ds-continuous-vertical' : 'ds-continuous-horizontal' );
 			var spacing = portrait
-				? ( undefined !== item.vertical_spacing ? item.vertical_spacing : item.spacing )
-				: ( undefined !== item.horizontal_spacing ? item.horizontal_spacing : item.spacing );
+				? options.verticalSpacing
+				: options.horizontalSpacing;
 			spacing = Math.max( 0, Number( spacing ) || 0 );
 			track.style.gap = spacing + 'px';
 

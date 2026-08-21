@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.9.0
+Stable tag: 2.9.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,12 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.9.1 =
+* Added **Infinite Slider** as a channel-level Slide transition for image-only zones. It continuously loops ordinary image slides in one vertical portrait column or one horizontal landscape row, with multiple images visible at once.
+* Infinite Slider has separate portrait/landscape spacing, speed and image border-radius controls on the Channel edit page.
+* Mixed-content zones preserve every slide by using normal Fade rotation when Infinite Slider is selected, rather than hiding unsupported content.
+* Restored Infinite Scroll Gallery as a clearly separate multi-image slide type while keeping its existing saved content compatible.
 
 = 2.9.0 =
 * Transitions now belong to channels, so every slide in a channel uses one consistent transition instead of storing separate per-slide overrides.

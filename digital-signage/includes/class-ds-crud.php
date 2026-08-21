@@ -31,20 +31,23 @@ class DS_CRUD {
 		update_post_meta( $post_id, 'ds_layout_template', sanitize_key( $data['layout_template'] ?? 'fullscreen' ) );
 		update_post_meta( $post_id, 'ds_is_priority', empty( $data['is_priority'] ) ? 0 : 1 );
 		$transition = sanitize_key( $data['transition'] ?? 'default' );
-		if ( ! in_array( $transition, array( 'default', 'none', 'fade', 'slide', 'zoom' ), true ) ) {
+		if ( ! in_array( $transition, array( 'default', 'none', 'fade', 'slide', 'zoom', 'infinite_slider' ), true ) ) {
 			$transition = 'default';
 		}
 		update_post_meta( $post_id, 'ds_transition', $transition );
+		update_post_meta( $post_id, 'ds_infinite_slider_vertical_spacing', absint( $data['infinite_slider_vertical_spacing'] ?? 20 ) );
+		update_post_meta( $post_id, 'ds_infinite_slider_horizontal_spacing', absint( $data['infinite_slider_horizontal_spacing'] ?? 20 ) );
+		update_post_meta( $post_id, 'ds_infinite_slider_speed', max( 5, absint( $data['infinite_slider_speed'] ?? 60 ) ) );
+		update_post_meta( $post_id, 'ds_infinite_slider_border_radius', absint( $data['infinite_slider_border_radius'] ?? 0 ) );
 
 		$zone_bg = sanitize_hex_color( $data['zone_bg_color'] ?? '' );
 		update_post_meta( $post_id, 'ds_zone_bg_color', $zone_bg ? $zone_bg : '' );
 
-		// Sliding-carousel defaults apply to every such slide in this
+		// Infinite-scroll gallery defaults apply to every such slide in this
 		// channel — one place to tune the look/feel rather than per slide.
 		$scroll_bg = sanitize_hex_color( $data['scroll_bg_color'] ?? '' );
 		update_post_meta( $post_id, 'ds_scroll_bg_color', $scroll_bg ? $scroll_bg : '#000000' );
-		update_post_meta( $post_id, 'ds_scroll_vertical_spacing', absint( $data['scroll_vertical_spacing'] ?? 20 ) );
-		update_post_meta( $post_id, 'ds_scroll_horizontal_spacing', absint( $data['scroll_horizontal_spacing'] ?? 20 ) );
+		update_post_meta( $post_id, 'ds_scroll_spacing', absint( $data['scroll_spacing'] ?? 20 ) );
 		update_post_meta( $post_id, 'ds_scroll_speed', max( 5, absint( $data['scroll_speed'] ?? 60 ) ) );
 
 		return $post_id;
@@ -140,8 +143,7 @@ class DS_CRUD {
 		update_post_meta( $post_id, 'ds_sched_days', array_map( 'sanitize_key', (array) ( $data['sched_days'] ?? array() ) ) );
 		delete_post_meta( $post_id, 'ds_transition_override' );
 
-		// Sliding carousel: an ordered list of attachment IDs. The legacy
-		// infinite_scroll type key is retained so existing slides stay valid.
+		// Infinite-scroll gallery: an ordered list of attachment IDs.
 		$scroll_images = array_filter( array_map( 'absint', (array) ( $data['scroll_images'] ?? array() ) ) );
 		update_post_meta( $post_id, 'ds_scroll_images', array_values( $scroll_images ) );
 
