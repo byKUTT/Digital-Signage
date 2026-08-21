@@ -136,7 +136,15 @@ if ( $Site ) {
 		Write-Host "==> Reusing existing device token from $tokenFile." -ForegroundColor Cyan
 	}
 
-	$Url = "$Site/signage/play/$token/"
+	$Url = "$Site/signage/play/$token/?kiosk=1"
+}
+
+# ?kiosk=1 tells the player/pairing screens this browser is already OS-level
+# fullscreen (started with --kiosk) with no chrome to hide and no mouse/touch
+# to click a "click to start" prompt with, so they skip that entirely. Add it
+# even when -Url was passed directly, unless it's already there.
+if ( $Url -notmatch '[?&]kiosk=1(&|$)' ) {
+	$Url += if ( $Url -match '\?' ) { '&kiosk=1' } else { '?kiosk=1' }
 }
 
 $modifiersArg = ($CloseModifiers -join ',')

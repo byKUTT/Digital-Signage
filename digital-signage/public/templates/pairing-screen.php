@@ -116,7 +116,14 @@ $status_url = esc_url_raw( rest_url( 'ds/v1/pair/status/' . $token ) );
 					} catch ( e ) {}
 				}
 			}
+			// Set by the Raspberry Pi / Windows kiosk installers on the URL they launch.
+			// That browser is already started with --kiosk (OS-level fullscreen, no
+			// chrome) — the Fullscreen API needs a user gesture the device has no
+			// input for, so skip asking for it and never show the tap hint.
+			var isKioskBrowser = /(?:^|[?&])kiosk=1(?:&|$)/.test( window.location.search );
+
 			var hint = document.getElementById( 'fs-hint' );
+			if ( isKioskBrowser ) { return; }
 			requestFs();
 			setTimeout( function () {
 				if ( ! isFullscreen() ) { hint.classList.add( 'ds-visible' ); }

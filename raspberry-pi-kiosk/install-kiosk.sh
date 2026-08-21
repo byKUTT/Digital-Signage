@@ -100,7 +100,10 @@ else
 	echo "==> Reusing existing device token from ${CONF_FILE}."
 fi
 
-URL="${SITE_URL}/signage/play/${TOKEN}/"
+# ?kiosk=1 tells the player/pairing screens this browser is already OS-level
+# fullscreen (started with --kiosk below) with no chrome to hide and no input
+# device to click a "tap to start" prompt with, so they skip that entirely.
+URL="${SITE_URL}/signage/play/${TOKEN}/?kiosk=1"
 
 echo "==> Writing config to ${CONF_FILE}"
 cat > "$CONF_FILE" <<EOF

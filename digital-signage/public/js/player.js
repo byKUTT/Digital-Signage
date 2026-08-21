@@ -47,9 +47,23 @@
 		return !! ( document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement );
 	}
 
+	function isKioskBrowser() {
+		// Set by the Raspberry Pi / Windows kiosk installers on the URL they launch.
+		// A browser started with --kiosk (or Windows equivalent) is already OS-level
+		// fullscreen with no chrome to hide — the Fullscreen API here would just need
+		// a user gesture the device has no mouse/keyboard/touch to provide, so there's
+		// nothing useful left for it to do.
+		return /(?:^|[?&])kiosk=1(?:&|$)/.test( window.location.search );
+	}
+
 	function initFullscreen() {
 		var overlay = document.getElementById( 'ds-start-overlay' );
 		var button  = document.getElementById( 'ds-start-button' );
+
+		if ( isKioskBrowser() ) {
+			if ( overlay ) { overlay.classList.add( 'ds-hidden' ); }
+			return;
+		}
 
 		// Try automatically first (works if the page itself was opened by a user gesture,
 		// e.g. a kiosk browser launched fresh, or on browsers that allow it for top-level nav).
