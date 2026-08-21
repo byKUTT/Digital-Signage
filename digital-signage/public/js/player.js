@@ -17,6 +17,10 @@
 
 	var CONFIG = window.DS_PLAYER || {};
 	var CACHE_KEY = 'ds_playlist_cache_' + CONFIG.screenId;
+	var LOW_POWER_PROFILE = /(?:^|[?&])profile=pi3(?:&|$)/.test( window.location.search );
+	if ( LOW_POWER_PROFILE ) {
+		document.documentElement.classList.add( 'ds-low-power' );
+	}
 
 	var state = {
 		playlist: null,
@@ -321,12 +325,15 @@
 		if ( existing ) {
 			clearTimeout( existing.timer );
 			stopTimers( container );
+			if ( existing.preloaded ) {
+				stopTimers( existing.preloaded.el );
+			}
 		}
 
 		container.innerHTML = '';
 		setZoneTransition( container, items );
 
-		state.zones[ zoneName ] = { items: items, index: 0, timer: null, els: {} };
+		state.zones[ zoneName ] = { items: items, index: 0, timer: null, els: {}, preloaded: null, renderSerial: 0 };
 
 		if ( ! items.length ) {
 			return;
@@ -359,6 +366,9 @@
 		var zone = state.zones[ zoneName ];
 		if ( zone ) {
 			clearTimeout( zone.timer );
+			if ( zone.preloaded ) {
+				stopTimers( zone.preloaded.el );
+			}
 		}
 		delete state.zones[ zoneName ];
 		var el = zoneEl( zoneName );
@@ -406,9 +416,10 @@
 			case 'video': {
 				var video = document.createElement( 'video' );
 				video.src = item.src || '';
-				video.autoplay = true;
+				video.preload = 'auto';
 				video.muted = true;
 				video.playsInline = true;
+				video.setAttribute( 'playsinline', '' );
 				video.loop = 'fixed_duration' === item.play_mode;
 				el.appendChild( video );
 				break;
@@ -501,6 +512,11 @@
 	 * removed from the DOM — otherwise those loops keep running invisibly.
 	 */
 	function stopTimers( container ) {
+		container.querySelectorAll( 'video' ).forEach( function ( video ) {
+			video.pause();
+			video.removeAttribute( 'src' );
+			video.load();
+		} );
 		container.querySelectorAll( '.ds-has-timer' ).forEach( function ( el ) {
 			if ( el.dsCleanup ) {
 				el.dsCleanup();
@@ -837,20 +853,22 @@
 		return wrap;
 	}
 
-	function preload( item ) {
-		if ( ! item ) {
+	function preload( item, zone ) {
+		if ( ! item || ! zone || ( 'image' !== item.type && 'video' !== item.type ) ) {
 			return;
 		}
-		if ( 'image' === item.type && item.src ) {
-			var img = new Image();
-			img.src = item.src;
-		} else if ( 'video' === item.type && item.src ) {
-			var video = document.createElement( 'video' );
-			video.preload = 'auto';
-			video.src = item.src;
-			video.muted = true;
-			video.style.display = 'none';
+		if ( zone.preloaded && String( zone.preloaded.item.id ) === String( item.id ) ) {
+			return;
 		}
+		if ( zone.preloaded ) {
+			stopTimers( zone.preloaded.el );
+		}
+		var el = buildSlideEl( item );
+		var video = el.querySelector( 'video' );
+		if ( video ) {
+			video.load();
+		}
+		zone.preloaded = { item: item, el: el };
 	}
 
 	function renderSlide( zoneName, index ) {
@@ -861,44 +879,63 @@
 
 		var container = zoneEl( zoneName );
 		var item = zone.items[ index ];
+		var serial = ++zone.renderSerial;
+		clearTimeout( zone.timer );
 
-		// Fade previous slide out, current slide in; keep max 2 elements in DOM for perf.
-		var newEl = buildSlideEl( item );
+		// Reuse the retained next-media element. Unlike a temporary detached video,
+		// this survives garbage collection and keeps its decoder/network buffer.
+		var newEl;
+		if ( zone.preloaded && String( zone.preloaded.item.id ) === String( item.id ) ) {
+			newEl = zone.preloaded.el;
+			zone.preloaded = null;
+		} else {
+			newEl = buildSlideEl( item );
+		}
 		container.appendChild( newEl );
 
-		requestAnimationFrame( function () {
-			requestAnimationFrame( function () {
-				newEl.classList.add( 'ds-active' );
-			} );
-		} );
-
-		var previous = Array.prototype.filter.call( container.querySelectorAll( '.ds-slide' ), function ( slideEl ) {
-			return slideEl !== newEl;
-		} );
-		previous.forEach( function ( prevEl ) {
-			prevEl.classList.remove( 'ds-active' );
-			prevEl.classList.add( 'ds-prev' );
-			setTimeout( function () {
-				stopTimers( prevEl );
-				prevEl.remove();
-			}, 700 );
-		} );
-
-		logProofOfPlay( zoneName, item );
-
 		var nextIndex = ( index + 1 ) % zone.items.length;
-		preload( zone.items[ nextIndex ] );
-
 		var video = newEl.querySelector( 'video' );
-		if ( 'video' === item.type && video && 'full_length' === item.play_mode ) {
-			video.addEventListener( 'ended', function () {
-				advanceZone( zoneName );
-			}, { once: true } );
+		var activated = false;
+		function activate() {
+			if ( activated || ! state.zones[ zoneName ] || zone.renderSerial !== serial ) {
+				return;
+			}
+			activated = true;
+			requestAnimationFrame( function () { newEl.classList.add( 'ds-active' ); } );
+
+			Array.prototype.filter.call( container.querySelectorAll( '.ds-slide' ), function ( slideEl ) {
+				return slideEl !== newEl;
+			} ).forEach( function ( prevEl ) {
+				prevEl.classList.remove( 'ds-active' );
+				prevEl.classList.add( 'ds-prev' );
+				setTimeout( function () {
+					stopTimers( prevEl );
+					prevEl.remove();
+				}, LOW_POWER_PROFILE ? 120 : 700 );
+			} );
+
+			if ( video ) {
+				var playPromise = video.play();
+				if ( playPromise && playPromise.catch ) { playPromise.catch( function () {} ); }
+			}
+			logProofOfPlay( zoneName, item );
+			if ( zone.items.length > 1 ) {
+				preload( zone.items[ nextIndex ], zone );
+			}
+
+			if ( video && 'full_length' === item.play_mode ) {
+				video.addEventListener( 'ended', function () { advanceZone( zoneName ); }, { once: true } );
+			} else {
+				zone.timer = setTimeout( function () { advanceZone( zoneName ); }, Math.max( 1, item.duration || 10 ) * 1000 );
+			}
+		}
+
+		if ( video && video.readyState < 3 ) {
+			video.addEventListener( 'canplay', activate, { once: true } );
+			video.load();
+			setTimeout( activate, 3000 );
 		} else {
-			var duration = Math.max( 1, item.duration || 10 ) * 1000;
-			zone.timer = setTimeout( function () {
-				advanceZone( zoneName );
-			}, duration );
+			activate();
 		}
 	}
 

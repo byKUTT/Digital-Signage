@@ -1,4 +1,86 @@
-# Digital Signage live updates and low-power slider — implementation plan
+# Digital Signage Raspberry Pi 3 performance — implementation plan
+
+## 2.9.5 Pi 3 acceleration and playback scope
+
+### Confirmed bottleneck
+
+The current Firefox kiosk configuration explicitly disables WebRender, accelerated layers, and hardware video decoding in both `user.js` and the browser environment. Raspberry Pi OS Bookworm added V4L2 H.264 hardware decoding to Firefox specifically to improve playback on older Raspberry Pi models, so the current configuration forces expensive software rendering/decoding on the Pi 3.
+
+### Outcome
+
+- Automatically detect Raspberry Pi 3 and install a dedicated low-power kiosk profile.
+- Enable KMS/WebRender/compositor acceleration and Raspberry Pi OS Firefox V4L2 H.264 decoding, while retaining browser/software fallbacks when a capability is unavailable.
+- Prioritize the kiosk process over background management work without unsafe overclocking.
+- Reduce SD-card I/O, Wi-Fi latency, background services, and decorative GPU effects that do not help signage playback.
+- Preload and retain only the next video, keep the current slide visible until the next video can play, and avoid starting duration timers while video is buffering.
+
+### Files
+
+#### [NEW] `raspberry-pi-kiosk/optimize-pi.sh`
+
+- Detect Pi model and Raspberry Pi OS generation; apply the Pi 3 profile only on matching hardware.
+- Ensure the full KMS `vc4-kms-v3d` overlay is configured without duplicating or conflicting with an existing VC4 setting.
+- Disable Wi-Fi power saving and apply conservative VM writeback/swappiness tuning.
+- Install a small boot service that selects the `performance` CPU governor for the dedicated kiosk workload; do not overclock or alter voltage.
+- Record and disable only safe, unrelated services that are actually enabled (`bluetooth`, `hciuart`, printing, ModemManager, triggerhappy, and Avahi), so uninstall can restore only what this optimizer changed.
+- Use volatile bounded journaling to reduce SD-card contention while retaining current-boot diagnostics.
+
+#### [MODIFY] `raspberry-pi-kiosk/install-kiosk.sh`
+
+- Run the optimizer and persist `DS_KIOSK_PROFILE=pi3` after automatic detection.
+- Replace the Firefox software-rendering overrides with WebRender, EGL/DMABUF, and hardware H.264 decoding preferences on the Pi 3 profile.
+- Remove `MOZ_WEBRENDER=0`; launch with the accelerated X11/EGL path and safe media sandbox settings.
+- Give `ds-kiosk.service` higher CPU/I/O priority and OOM protection.
+- Add `profile=pi3` to the kiosk URL so the web player can remove expensive cosmetic effects.
+- Keep the existing Firefox restart backoff and translation-blocking policy.
+- For Chromium fallback, use shared memory and the Raspberry Pi package's native GPU path instead of forcing disk-backed `/dev/shm` behavior or discarding the shader cache.
+
+#### [MODIFY] `raspberry-pi-kiosk/uninstall-kiosk.sh`
+
+- Remove the performance/sysctl/NetworkManager/journald tuning files.
+- Restore only services recorded as enabled before optimization.
+
+#### [MODIFY] `raspberry-pi-kiosk/ds-agent/ds-agent.service`
+
+- Run telemetry/management at low CPU and idle I/O priority so it cannot interrupt animation or video decode.
+
+#### [MODIFY] `raspberry-pi-kiosk/README.md`
+
+- Document the Pi 3 profile, supported H.264 recommendation (1080p30 maximum; lower bitrate/resolution preferred for the 1920×440 display), cooling/power requirements, verification commands, and update procedure.
+
+#### [MODIFY] `digital-signage/public/js/player.js`
+
+- Detect the Pi 3 query profile and mark the document for low-power rendering.
+- Keep one bounded next-media preload per zone and reuse the prepared video element.
+- Set video preload/inline/Pi-friendly playback attributes.
+- Keep the previous slide visible until `canplay`, then start proof-of-play and the slide timer; retain a bounded timeout fallback for broken media.
+- Pause and unload removed video elements promptly to release decoder/memory resources.
+
+#### [MODIFY] `digital-signage/public/css/player.css`
+
+- Promote video to its own compositor layer.
+- Disable Infinite Slider edge masks, shadows, and nonessential entrance effects only under the `ds-low-power` Pi profile.
+
+#### [MODIFY] `digital-signage/digital-signage.php`, `digital-signage/readme.txt`
+
+- Bump plugin/assets to 2.9.5 and document Pi 3 media behavior.
+
+#### [MODIFY] `system_architecture.md`, `task.md`
+
+- Record the device-profile boundary, reversible OS tuning, media readiness gate, and verification checklist.
+
+#### [REBUILD] `digital-signage.zip`
+
+- Rebuild and byte-check the installable plugin archive.
+
+### Verification
+
+- Shell syntax passes for installer, optimizer, and uninstaller.
+- Python compilation passes for the device agent and setup portal.
+- JavaScript syntax and static media-lifecycle invariants pass.
+- Optimizer tests use a temporary fake root/model so they cannot modify the development host.
+- ZIP integrity and byte-for-byte source comparison pass.
+- Publish the scripts, plugin, and updated ZIP to `claude/wordpress-digital-signage-plugin-mbfbdt` without a force update.
 
 ## 2.9.4 live-update and smooth-motion scope
 

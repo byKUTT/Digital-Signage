@@ -1,10 +1,10 @@
-# Live screen updates and smooth low-power slider
+# Raspberry Pi 3 playback optimization
 
-- [x] Add channel content revisions and invalidate them after every channel/slide change.
-- [x] Add the lightweight token-protected screen changes endpoint.
-- [x] Add non-overlapping one-second revision checks with offline backoff.
-- [x] Move Infinite Slider motion to compositor-backed Web Animations with rAF fallback.
-- [x] Keep custom-width images centered and debounce remeasurement.
-- [x] Bump to 2.9.4 and update architecture/readme notes.
-- [x] Run verification and rebuild the plugin ZIP.
-- [x] Commit and publish the updated ZIP to GitHub.
+- [x] Add a safe, reversible Raspberry Pi 3 system optimization profile.
+- [x] Enable Firefox/Chromium GPU compositing and hardware H.264 decoding.
+- [x] Give the kiosk predictable CPU, I/O and memory priority.
+- [x] Add retained video preloading and wait for playback readiness before transitions.
+- [x] Reduce expensive screen effects only for the Pi 3 player profile.
+- [x] Update documentation and bump the plugin to 2.9.5.
+- [x] Run shell, JavaScript and packaging verification (PHP CLI unavailable; PHP changes are version/readme only).
+- [x] Rebuild and publish `digital-signage.zip` and `raspberry-pi-kiosk.zip` to GitHub.

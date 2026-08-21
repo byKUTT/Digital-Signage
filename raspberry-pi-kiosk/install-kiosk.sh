@@ -98,6 +98,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 USER_HOME=$(getent passwd "$KIOSK_USER" | cut -d: -f6)
 CONF_FILE="/etc/digital-signage-kiosk.conf"
 WATCHDOG="/usr/local/bin/ds-kiosk-loop.sh"
+KIOSK_PROFILE="standard"
+PI_MODEL="$(tr -d '\000' < /proc/device-tree/model 2>/dev/null || true)"
+if echo "$PI_MODEL" | grep -qi 'Raspberry Pi 3'; then
+	KIOSK_PROFILE="pi3"
+	if [ -f "${SCRIPT_DIR}/optimize-pi.sh" ]; then
+		echo "==> Raspberry Pi 3 detected — installing the low-power acceleration profile"
+		bash "${SCRIPT_DIR}/optimize-pi.sh"
+		install -m 755 "${SCRIPT_DIR}/optimize-pi.sh" /usr/local/bin/ds-optimize-pi.sh
+	else
+		echo "   ⚠ optimize-pi.sh was not found; continuing without system tuning."
+	fi
+fi
 
 # --browser wins if given; otherwise reuse whatever this device already used
 # (so re-running the installer for other reasons doesn't silently switch a
@@ -176,11 +188,21 @@ user_pref("dom.push.enabled", false);
 user_pref("browser.sessionstore.resume_from_crash", false);
 user_pref("browser.tabs.warnOnClose", false);
 user_pref("app.update.auto", false);
-// Prefer the stable software rendering path on Raspberry Pi kiosk displays.
-user_pref("gfx.webrender.all", false);
-user_pref("gfx.webrender.enabled", false);
-user_pref("layers.acceleration.disabled", true);
-user_pref("media.hardware-video-decoding.enabled", false);
+// Raspberry Pi OS Bookworm's Firefox ESR supports accelerated compositing and
+// V4L2 H.264 decode. The old kiosk profile disabled all of these and forced the
+// Pi 3 CPU to render/decode everything in software.
+user_pref("gfx.webrender.all", true);
+user_pref("gfx.webrender.enabled", true);
+user_pref("gfx.webrender.software", false);
+user_pref("gfx.x11-egl.force-enabled", true);
+user_pref("widget.dmabuf.force-enabled", true);
+user_pref("layers.acceleration.disabled", false);
+user_pref("media.hardware-video-decoding.enabled", true);
+user_pref("media.hardware-video-decoding.force-enabled", true);
+user_pref("media.ffmpeg.vaapi.enabled", true);
+user_pref("media.rdd-process.enabled", true);
+user_pref("media.av1.enabled", false);
+user_pref("media.memory_cache_max_size", 32768);
 USERJS
 	chown -R "$KIOSK_USER":"$KIOSK_USER" "$FIREFOX_PROFILE_DIR"
 
@@ -302,7 +324,7 @@ fi
 # ?kiosk=1 tells the player/pairing screens this browser is already OS-level
 # fullscreen (started with --kiosk below) with no chrome to hide and no input
 # device to click a "tap to start" prompt with, so they skip that entirely.
-URL="${SITE_URL}/signage/play/${TOKEN}/?kiosk=1&cv=284"
+URL="${SITE_URL}/signage/play/${TOKEN}/?kiosk=1&profile=${KIOSK_PROFILE}&cv=295"
 
 echo "==> Writing config to ${CONF_FILE}"
 cat > "$CONF_FILE" <<EOF
@@ -322,6 +344,7 @@ DS_KIOSK_BROWSER="${BROWSER}"
 DS_KIOSK_BROWSER_BIN="${BROWSER_BIN}"
 DS_KIOSK_USER="${KIOSK_USER}"
 DS_KIOSK_USER_HOME="${USER_HOME}"
+DS_KIOSK_PROFILE="${KIOSK_PROFILE}"
 DS_KIOSK_ROTATION="${ROTATION}"
 DS_KIOSK_RESOLUTION="${RESOLUTION}"
 EOF
@@ -387,9 +410,9 @@ if [ "${DS_KIOSK_BROWSER:-chromium}" = "firefox" ]; then
 	chown -R "$KIOSK_USER":"$KIOSK_USER" "$PROFILE_DIR"
 	xhost +SI:localuser:"$KIOSK_USER" >/dev/null 2>&1 || true
 
-	# Firefox ESR kiosk launch. Software rendering avoids Raspberry Pi GPU
-	# content-process crashes. If Firefox genuinely exits, use a modest backoff
-	# so a persistent failure cannot look like a page refresh every 3 seconds.
+	# Firefox ESR kiosk launch. WebRender and Raspberry Pi OS's hardware H.264
+	# path remain enabled; if the driver cannot initialize, Firefox falls back
+	# automatically. A modest relaunch backoff prevents crash-refresh loops.
 	while true; do
 		runuser -u "$KIOSK_USER" -- env \
 			HOME="$KIOSK_HOME" \
@@ -397,9 +420,9 @@ if [ "${DS_KIOSK_BROWSER:-chromium}" = "firefox" ]; then
 			LOGNAME="$KIOSK_USER" \
 			DISPLAY="${DISPLAY:-:0}" \
 			XDG_RUNTIME_DIR="$KIOSK_RUNTIME_DIR" \
+			MOZ_WEBRENDER=1 \
+			MOZ_X11_EGL=1 \
 			MOZ_ENABLE_WAYLAND=0 \
-			MOZ_WEBRENDER=0 \
-			MOZ_DISABLE_RDD_SANDBOX=1 \
 			"$DS_KIOSK_BROWSER_BIN" \
 			-kiosk \
 			-no-remote \
@@ -410,13 +433,9 @@ if [ "${DS_KIOSK_BROWSER:-chromium}" = "firefox" ]; then
 	done
 else
 	PROFILE_DIR="/var/lib/digital-signage-kiosk-chromium-profile"
-	# --disable-dev-shm-usage: on a resource-constrained Pi, Chromium's renderer
-	# can exhaust the default (often small) /dev/shm shared-memory pool and
-	# crash; --kiosk mode auto-reloads the page a few seconds after that, which
-	# looks exactly like an unexplained periodic refresh even though the main
-	# browser process (and its PID in this log) never actually restarted. This
-	# flag makes Chromium fall back to disk-backed temp files instead of
-	# /dev/shm, avoiding that crash entirely.
+	# Keep Chromium's rendering buffers in /dev/shm. The previous disk-backed
+	# fallback prevented one low-memory failure mode but causes visible stutter
+	# and extra SD-card I/O during video playback and continuous animation.
 	#
 	# --user-data-dir instead of --incognito: incognito keeps its whole profile
 	# (cache included) in RAM, adding to the same memory pressure. A small
@@ -469,8 +488,9 @@ PYEOF
 			--check-for-update-interval=31536000 \
 			--autoplay-policy=no-user-gesture-required \
 			--user-data-dir="$PROFILE_DIR" \
-			--disable-dev-shm-usage \
-			--disable-gpu-shader-disk-cache \
+			--enable-gpu-rasterization \
+			--enable-zero-copy \
+			--ignore-gpu-blocklist \
 			--lang=et-EE \
 			--no-sandbox \
 			"$DS_KIOSK_URL" \
@@ -532,6 +552,10 @@ ExecStartPre=-/usr/bin/chvt 1
 ExecStart=/usr/bin/startx ${USER_HOME}/.xinitrc -- vt1 -nocursor
 Restart=always
 RestartSec=3
+Nice=-5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=2
+OOMScoreAdjust=-500
 StandardOutput=journal
 StandardError=journal
 
@@ -577,6 +601,9 @@ if [ -f "${SCRIPT_DIR}/setup-portal/ds-setup-portal.py" ]; then
 	install -m 644 "${SCRIPT_DIR}/setup-portal/ds-setup.service" /etc/systemd/system/ds-setup.service
 	# Also make this installer itself reachable by that portal's handoff step.
 	install -m 755 "${SCRIPT_DIR}/install-kiosk.sh" /usr/local/bin/install-kiosk.sh
+	if [ -f "${SCRIPT_DIR}/optimize-pi.sh" ]; then
+		install -m 755 "${SCRIPT_DIR}/optimize-pi.sh" /usr/local/bin/ds-optimize-pi.sh
+	fi
 	systemctl daemon-reload
 	systemctl enable ds-setup.service >/dev/null 2>&1 || true
 fi
@@ -585,6 +612,7 @@ echo ""
 echo "✅ Installed. Player URL (permanent for this device): ${URL}"
 echo "   Browser:                ${BROWSER} (${BROWSER_BIN})"
 echo "   Kiosk user:            ${KIOSK_USER}"
+echo "   Performance profile:   ${KIOSK_PROFILE}"
 echo "   Config file:           ${CONF_FILE}"
 echo "   Watchdog script:       ${WATCHDOG}"
 echo "   Kiosk service:         ds-kiosk.service (owns tty1, starts X directly)"

@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.9.4
+Stable tag: 2.9.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,13 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.9.5 =
+* Added a Raspberry Pi 3 low-power player profile that removes expensive slider masks/shadows while retaining compositor-backed motion.
+* Videos are now retained and preloaded as real media elements, then shown only after `canplay` (with a bounded fallback), preventing black/jumpy video transitions and ensuring slide time starts when content is actually visible.
+* The Raspberry Pi installer now enables Firefox WebRender/EGL and hardware H.264 decoding instead of explicitly forcing software rendering and decoding.
+* Added a safe, idempotent `optimize-pi.sh` for Pi 3: full KMS when unconfigured, performance CPU governor, WiFi power-save off, bounded volatile journals, conservative VM settings, and reversible removal of unrelated appliance services.
+* Kiosk rendering receives higher CPU/I/O priority while the remote device agent runs at background priority. Chromium keeps shared-memory and shader acceleration rather than using the slower disk-backed rendering fallback.
 
 = 2.9.4 =
 * Connected screens now check a lightweight channel revision endpoint every second and fetch a fresh playlist immediately after a real channel or slide change.
