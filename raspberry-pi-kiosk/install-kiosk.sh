@@ -113,6 +113,9 @@ cat > "$WATCHDOG" <<'EOF'
 #!/usr/bin/env bash
 # Relaunches Chromium in kiosk mode if it ever exits/crashes, so an
 # unattended screen recovers on its own instead of showing a black screen.
+# Runs as root (ds-kiosk.service — see install-kiosk.sh) so Chromium refuses
+# to start without --no-sandbox; that's fine here since this is a dedicated,
+# single-purpose kiosk device showing one fixed URL, not general browsing.
 set -u
 source /etc/digital-signage-kiosk.conf
 
@@ -141,6 +144,7 @@ while true; do
 		--check-for-update-interval=31536000 \
 		--autoplay-policy=no-user-gesture-required \
 		--incognito \
+		--no-sandbox \
 		"$DS_KIOSK_URL" \
 		>/tmp/ds-kiosk-chromium.log 2>&1 || true
 	sleep 3
@@ -162,11 +166,20 @@ EOF
 chmod +x "${USER_HOME}/.xinitrc"
 chown "$KIOSK_USER":"$KIOSK_USER" "${USER_HOME}/.xinitrc"
 
-# --- Clean up the old (pre-2.3.1) autostart mechanism if present: a login-shell
-# ~/.bash_profile hook + console autologin. It depended on the exact shell,
-# login-file-sourcing behavior and getty timing, which didn't reliably start X
-# on every Raspberry Pi OS build. Replaced below by a systemd service that
-# owns tty1 directly — no login shell, autologin or .bash_profile involved. ---
+# --- Clean up any older autostart mechanism this installer has used, so
+# re-running it always converges on the current, most reliable setup:
+#   v1: console autologin + a ~/.bash_profile hook running 'exec startx'.
+#       Depended on the login shell actually sourcing .bash_profile, which
+#       turned out not to fire reliably on every Raspberry Pi OS build.
+#   v2: a systemd service running startx AS the kiosk user via
+#       PAMName=login/TTYPath, to get VT permissions without root. Still
+#       depends on logind granting that session the console correctly,
+#       which isn't guaranteed on every setup either.
+# v3 (current): the kiosk service runs as root. Root can always open the
+# console/framebuffer/DRM devices directly — no PAM session, no VT
+# permission grant, no getty race to get right. This trades a bit of
+# isolation (Chromium needs --no-sandbox as root — see ds-kiosk-loop.sh)
+# for actually starting reliably on a single-purpose kiosk device. ---
 PROFILE_FILE="${USER_HOME}/.bash_profile"
 if [ -f "$PROFILE_FILE" ] && grep -q "Digital Signage kiosk autostart" "$PROFILE_FILE"; then
 	sed -i '/# --- Digital Signage kiosk autostart ---/,/# --- end Digital Signage kiosk autostart ---/d' "$PROFILE_FILE"
@@ -175,36 +188,33 @@ if command -v raspi-config >/dev/null 2>&1; then
 	raspi-config nonint do_boot_behaviour B1 >/dev/null 2>&1 || true
 fi
 rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
-systemctl daemon-reload 2>/dev/null || true
 
-echo "==> Installing ds-kiosk.service (owns tty1, starts X directly — no autologin needed)"
+echo "==> Installing ds-kiosk.service (runs as root, owns tty1, starts X directly)"
 cat > /etc/systemd/system/ds-kiosk.service <<EOF
 [Unit]
 Description=Digital Signage kiosk (X + Chromium)
-After=network-online.target systemd-user-sessions.service getty@tty1.service
+After=network-online.target getty@tty1.service
 Wants=network-online.target
 Conflicts=getty@tty1.service
 
 [Service]
 Type=simple
-User=${KIOSK_USER}
-PAMName=login
-TTYPath=/dev/tty1
-StandardInput=tty
-StandardOutput=journal
-StandardError=journal
-UtmpIdentifier=tty1
+ExecStartPre=-/usr/bin/chvt 1
+ExecStart=/usr/bin/startx ${USER_HOME}/.xinitrc -- vt1 -nocursor
 Restart=always
 RestartSec=3
-ExecStart=/usr/bin/startx ${USER_HOME}/.xinitrc -- vt1 -nocursor
+StandardOutput=journal
+StandardError=journal
 
 [Install]
-WantedBy=graphical.target multi-user.target
+WantedBy=multi-user.target
 EOF
+
+# Mask (not just disable) the getty on tty1: getty.target's own [Unit] file
+# wants it regardless of enablement, so plain 'disable' doesn't reliably keep
+# it from starting and racing our service for the console. Masking does.
+systemctl mask getty@tty1.service >/dev/null 2>&1 || true
 systemctl daemon-reload
-# The two units both want tty1; disabling the getty (Conflicts= above handles
-# runtime, this stops it winning a future boot race) hands the console to us.
-systemctl disable getty@tty1.service >/dev/null 2>&1 || true
 systemctl enable ds-kiosk.service
 
 # --- Remote device management agent (WiFi, rotation, reboot, updates from wp-admin) ---
@@ -264,7 +274,12 @@ fi
 echo ""
 echo "Reboot now to start the kiosk: sudo reboot"
 echo "Already rebooted and stuck at a terminal from an older install? Start it now"
-echo "without rebooting again: sudo systemctl start ds-kiosk.service"
-echo "Check its status/logs any time: sudo systemctl status ds-kiosk ; sudo journalctl -u ds-kiosk -f"
+echo "without rebooting again: sudo systemctl start ds-kiosk"
+echo ""
+echo "If the kiosk still doesn't appear after that, gather diagnostics:"
+echo "  sudo systemctl status ds-kiosk"
+echo "  sudo journalctl -u ds-kiosk -e --no-pager"
+echo "  cat /tmp/ds-kiosk-chromium.log"
+echo "  cat /var/log/Xorg.0.log 2>/dev/null | tail -40"
 echo "To re-pair this device as a different screen: sudo bash install-kiosk.sh ${SITE_URL} ${KIOSK_USER} --regenerate"
-echo "To remove: sudo bash uninstall-kiosk.sh ${KIOSK_USER}"
+echo "To completely remove: sudo bash uninstall-kiosk.sh ${KIOSK_USER}"

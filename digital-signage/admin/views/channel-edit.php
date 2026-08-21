@@ -17,7 +17,10 @@ $layouts = array(
 	'split_screen' => __( 'Split Screen', 'digital-signage' ),
 	'grid'         => __( 'Grid', 'digital-signage' ),
 );
-$zone_bg = $id ? ( get_post_meta( $id, 'ds_zone_bg_color', true ) ?: '#000000' ) : '#000000';
+$zone_bg        = $id ? ( get_post_meta( $id, 'ds_zone_bg_color', true ) ?: '#000000' ) : '#000000';
+$scroll_bg      = $id ? ( get_post_meta( $id, 'ds_scroll_bg_color', true ) ?: '#000000' ) : '#000000';
+$scroll_spacing = $id ? ( get_post_meta( $id, 'ds_scroll_spacing', true ) ?: 20 ) : 20;
+$scroll_speed   = $id ? ( get_post_meta( $id, 'ds_scroll_speed', true ) ?: 60 ) : 60;
 ?>
 <div class="ds-app-wrap">
 	<div class="ds-app-header">
@@ -81,6 +84,23 @@ $zone_bg = $id ? ( get_post_meta( $id, 'ds_zone_bg_color', true ) ?: '#000000' )
 					<input type="checkbox" name="is_priority" value="1" <?php checked( $is_priority ); ?> />
 					<?php esc_html_e( 'Emergency / priority channel — takes over ALL screens immediately, ignoring schedules', 'digital-signage' ); ?>
 				</label>
+			</div>
+
+			<h3><?php esc_html_e( 'Infinite Scroll Gallery defaults', 'digital-signage' ); ?></h3>
+			<p class="ds-hint"><?php esc_html_e( 'Applies to every Infinite Scroll Gallery slide in this channel — set once here rather than per slide.', 'digital-signage' ); ?></p>
+			<div class="ds-settings-grid">
+				<div class="ds-field">
+					<label for="scroll_bg_color"><?php esc_html_e( 'Background color', 'digital-signage' ); ?></label>
+					<input type="color" id="scroll_bg_color" name="scroll_bg_color" value="<?php echo esc_attr( $scroll_bg ); ?>" class="ds-color-input" />
+				</div>
+				<div class="ds-field">
+					<label for="scroll_spacing"><?php esc_html_e( 'Spacing between images (px)', 'digital-signage' ); ?></label>
+					<input type="number" min="0" id="scroll_spacing" name="scroll_spacing" value="<?php echo esc_attr( $scroll_spacing ); ?>" class="ds-input ds-input-small" />
+				</div>
+				<div class="ds-field">
+					<label for="scroll_speed"><?php esc_html_e( 'Scroll speed (px/second)', 'digital-signage' ); ?></label>
+					<input type="number" min="5" id="scroll_speed" name="scroll_speed" value="<?php echo esc_attr( $scroll_speed ); ?>" class="ds-input ds-input-small" />
+				</div>
 			</div>
 
 			<button type="submit" class="ds-btn ds-btn-primary"><?php echo $id ? esc_html__( 'Save Changes', 'digital-signage' ) : esc_html__( 'Create Channel', 'digital-signage' ); ?></button>

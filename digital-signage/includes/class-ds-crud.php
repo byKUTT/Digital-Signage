@@ -34,6 +34,13 @@ class DS_CRUD {
 		$zone_bg = sanitize_hex_color( $data['zone_bg_color'] ?? '' );
 		update_post_meta( $post_id, 'ds_zone_bg_color', $zone_bg ? $zone_bg : '' );
 
+		// Infinite-scroll gallery defaults apply to every such slide in this
+		// channel — one place to tune the look/feel rather than per slide.
+		$scroll_bg = sanitize_hex_color( $data['scroll_bg_color'] ?? '' );
+		update_post_meta( $post_id, 'ds_scroll_bg_color', $scroll_bg ? $scroll_bg : '#000000' );
+		update_post_meta( $post_id, 'ds_scroll_spacing', absint( $data['scroll_spacing'] ?? 20 ) );
+		update_post_meta( $post_id, 'ds_scroll_speed', max( 5, absint( $data['scroll_speed'] ?? 60 ) ) );
+
 		return $post_id;
 	}
 
@@ -110,9 +117,6 @@ class DS_CRUD {
 			'zone'              => array( 'ds_zone', 'sanitize_key' ),
 			'order'             => array( 'ds_order', 'absint' ),
 			'fit'               => array( 'ds_fit', 'sanitize_key' ),
-			'scroll_bg_color'   => array( 'ds_scroll_bg_color', 'sanitize_hex_color' ),
-			'scroll_spacing'    => array( 'ds_scroll_spacing', 'absint' ),
-			'scroll_speed'      => array( 'ds_scroll_speed', 'absint' ),
 		);
 
 		foreach ( $fields as $input_key => $meta ) {

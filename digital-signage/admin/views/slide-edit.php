@@ -26,9 +26,6 @@ $transition = $id ? ( get_post_meta( $id, 'ds_transition_override', true ) ?: 'd
 $fit      = $id ? ( get_post_meta( $id, 'ds_fit', true ) ?: 'cover' ) : 'cover';
 $zone     = $id ? ( get_post_meta( $id, 'ds_zone', true ) ?: 'main' ) : 'main';
 $scroll_images  = $id ? array_map( 'absint', (array) get_post_meta( $id, 'ds_scroll_images', true ) ) : array();
-$scroll_bg      = $id ? ( get_post_meta( $id, 'ds_scroll_bg_color', true ) ?: '#000000' ) : '#000000';
-$scroll_spacing = $id ? ( get_post_meta( $id, 'ds_scroll_spacing', true ) ?: 20 ) : 20;
-$scroll_speed   = $id ? ( get_post_meta( $id, 'ds_scroll_speed', true ) ?: 60 ) : 60;
 $order    = $id ? get_post_meta( $id, 'ds_order', true ) : '';
 if ( ! $id && '' === $order ) {
 	$last  = get_posts( array( 'post_type' => 'ds_slide', 'posts_per_page' => 1, 'meta_key' => 'ds_channel_id', 'meta_value' => $channel_id, 'orderby' => 'meta_value_num', 'meta_key2' => 'ds_order', 'order' => 'DESC', 'fields' => 'ids' ) );
@@ -180,19 +177,7 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 							<?php endforeach; ?>
 						</ul>
 					</div>
-					<div class="ds-field">
-						<label for="scroll_bg_color"><?php esc_html_e( 'Background color', 'digital-signage' ); ?></label>
-						<input type="color" id="scroll_bg_color" name="scroll_bg_color" value="<?php echo esc_attr( $scroll_bg ); ?>" class="ds-color-input" />
-					</div>
-					<div class="ds-field">
-						<label for="scroll_spacing"><?php esc_html_e( 'Spacing between images (px)', 'digital-signage' ); ?></label>
-						<input type="number" min="0" id="scroll_spacing" name="scroll_spacing" value="<?php echo esc_attr( $scroll_spacing ); ?>" class="ds-input ds-input-small" />
-					</div>
-					<div class="ds-field">
-						<label for="scroll_speed"><?php esc_html_e( 'Scroll speed (px/second)', 'digital-signage' ); ?></label>
-						<input type="number" min="5" id="scroll_speed" name="scroll_speed" value="<?php echo esc_attr( $scroll_speed ); ?>" class="ds-input ds-input-small" />
-						<span class="ds-hint"><?php esc_html_e( 'Scrolls top-to-bottom on portrait screens (images full width), left-to-right on landscape (images full height) — direction follows the screen\'s orientation automatically.', 'digital-signage' ); ?></span>
-					</div>
+					<p class="ds-hint"><?php echo wp_kses_post( sprintf( /* translators: %s: link to the channel edit screen */ __( 'Background color, spacing and scroll speed are set once for the whole channel — see %s. Scrolls top-to-bottom on portrait screens (images full width), left-to-right on landscape (images full height); direction follows the screen\'s orientation automatically.', 'digital-signage' ), '<a href="' . esc_url( admin_url( 'admin.php?page=ds-channel-edit&id=' . $channel_id ) ) . '">' . esc_html__( 'this channel\'s settings', 'digital-signage' ) . '</a>' ) ); ?></p>
 				</div>
 			</div>
 

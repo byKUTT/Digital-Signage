@@ -401,9 +401,12 @@ class DS_REST {
 						)
 					)
 				);
-				$data['bg_color'] = get_post_meta( $slide->ID, 'ds_scroll_bg_color', true ) ?: '#000000';
-				$data['spacing']  = absint( get_post_meta( $slide->ID, 'ds_scroll_spacing', true ) ?: 20 );
-				$data['speed']    = absint( get_post_meta( $slide->ID, 'ds_scroll_speed', true ) ?: 60 );
+				// Background/spacing/speed are set once per channel (not per slide) so every
+				// Infinite Scroll gallery in that channel shares the same look and feel.
+				$scroll_channel_id = absint( get_post_meta( $slide->ID, 'ds_channel_id', true ) );
+				$data['bg_color']  = $scroll_channel_id ? ( get_post_meta( $scroll_channel_id, 'ds_scroll_bg_color', true ) ?: '#000000' ) : '#000000';
+				$data['spacing']   = $scroll_channel_id ? absint( get_post_meta( $scroll_channel_id, 'ds_scroll_spacing', true ) ?: 20 ) : 20;
+				$data['speed']     = $scroll_channel_id ? absint( get_post_meta( $scroll_channel_id, 'ds_scroll_speed', true ) ?: 60 ) : 60;
 				break;
 		}
 

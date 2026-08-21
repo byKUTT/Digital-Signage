@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.4.0
+Stable tag: 2.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,12 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.4.1 =
+* Infinite Scroll Gallery: background color, image spacing and scroll speed are now set once per channel (new "Infinite Scroll Gallery defaults" section on the Channel edit page) instead of per slide, so every gallery slide in a channel shares the same look automatically.
+* Raspberry Pi installer: `ds-kiosk.service` now runs as root and masks (not just disables) `getty@tty1.service` — the previous non-root/PAM-based approach could still fail to actually own the console on some systems. This removes that whole class of failure at the cost of Chromium needing `--no-sandbox` as root (already set), an acceptable trade for a dedicated single-purpose kiosk device.
+* `uninstall-kiosk.sh` now removes everything installed (including `~/.xinitrc` and the pairing config) and fully restores console login.
+* Expanded the Raspberry Pi README with a complete numbered install guide and manual `git clone`/`git pull` instructions.
 
 = 2.4.0 =
 * New slide type: **Infinite Scroll Gallery** — upload multiple images, set a background color and spacing between them, and they loop continuously with a configurable speed. Direction follows the screen's orientation automatically: top-to-bottom on portrait (images full width), left-to-right on landscape (images full height).
