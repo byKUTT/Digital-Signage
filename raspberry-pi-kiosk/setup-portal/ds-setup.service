@@ -1,0 +1,20 @@
+[Unit]
+Description=Digital Signage first-boot WiFi + site setup portal
+After=NetworkManager.service
+Wants=NetworkManager.service
+# The key line: this unit only ever runs while the device has never been
+# configured. Once install-kiosk.sh writes this file (on setup success, or if
+# you run it manually), the condition is false on every future boot and
+# systemd skips the unit entirely — it never fights with the kiosk or the
+# device-management agent.
+ConditionPathExists=!/etc/digital-signage-kiosk.conf
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/ds-setup-portal.py
+Restart=on-failure
+RestartSec=30
+User=root
+
+[Install]
+WantedBy=multi-user.target

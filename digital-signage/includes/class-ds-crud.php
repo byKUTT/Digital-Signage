@@ -191,6 +191,15 @@ class DS_CRUD {
 		wp_delete_post( $id, true );
 	}
 
+	/**
+	 * Queues a command for the on-device agent (ds-agent, Raspberry Pi only) —
+	 * delivered the next time that device's heartbeat is answered, then cleared.
+	 * Overwrites any still-pending command rather than stacking them.
+	 */
+	public static function queue_device_command( $screen_id, array $command ) {
+		update_post_meta( $screen_id, 'ds_device_command', wp_json_encode( $command ) );
+	}
+
 	/* ---------------- Schedule ---------------- */
 
 	public static function save_schedule( $id, array $data ) {

@@ -1,0 +1,15 @@
+[Unit]
+Description=Digital Signage device management agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/ds-agent.py
+Restart=always
+RestartSec=5
+# Applies WiFi changes (nmcli), rotation, and reboots the device — needs root.
+User=root
+
+[Install]
+WantedBy=multi-user.target

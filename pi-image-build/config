@@ -1,0 +1,27 @@
+#!/bin/bash
+# pi-gen top-level configuration for the Digital Signage kiosk image.
+# See ../README.md for how this is used.
+
+IMG_NAME='digital-signage'
+RELEASE='bookworm'
+DEPLOY_COMPRESSION='xz'
+
+# Lite base (stage0 + stage1 + stage2) plus our custom kiosk stage — skips
+# pi-gen's stock stage3 (desktop locales)/stage4 (Desktop)/stage5 (full), so
+# the result is a small, headless-by-default image with just what the kiosk
+# needs, same spirit as Raspberry Pi OS Lite.
+STAGE_LIST="stage0 stage1 stage2 stage-ds-kiosk"
+
+TARGET_HOSTNAME='digital-signage'
+FIRST_USER_NAME='pi'
+# No fixed password: the image ships with SSH password auth left at pi-gen's
+# default (SSH is enabled in stage2, key-only unless you set a password) —
+# set one yourself post-flash, or use Raspberry Pi Imager's own "Edit
+# Settings" on top of this image if you prefer. The kiosk itself needs no
+# password since it's the setup portal / ds-agent driving it remotely.
+ENABLE_SSH=1
+
+LOCALE_DEFAULT='en_US.UTF-8'
+KEYBOARD_KEYMAP='us'
+KEYBOARD_LAYOUT='English (US)'
+TIMEZONE_DEFAULT='Etc/UTC'

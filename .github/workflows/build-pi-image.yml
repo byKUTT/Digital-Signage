@@ -1,0 +1,74 @@
+name: Build Raspberry Pi Image
+
+# Builds a flashable Digital Signage .img using pi-gen (the Raspberry Pi
+# Foundation's own image-build tool) — see pi-image-build/README.md.
+# Runs on GitHub's runners because building an OS image needs real internet
+# access and root/loop-device privileges that most sandboxes don't grant.
+#
+# Trigger manually from the Actions tab (Run workflow), or on a version tag.
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - "pi-image-v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          df -h
+
+      - name: Install pi-gen build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git quilt qemu-user-static debootstrap zerofree zip dosfstools \
+            libarchive-tools libcap2-bin grep rsync xz-utils file kmod bc \
+            pigz arch-test binfmt-support
+
+      - name: Clone pi-gen
+        run: git clone --depth 1 https://github.com/RPi-Distro/pi-gen.git
+
+      - name: Stage our kiosk files into pi-gen
+        run: |
+          cp -r pi-image-build/stage-ds-kiosk pi-gen/
+          cp pi-image-build/config pi-gen/config
+
+          FILES_DIR=pi-gen/stage-ds-kiosk/00-install-kiosk/files
+          mkdir -p "$FILES_DIR/ds-agent" "$FILES_DIR/setup-portal"
+          cp raspberry-pi-kiosk/install-kiosk.sh "$FILES_DIR/"
+          cp raspberry-pi-kiosk/uninstall-kiosk.sh "$FILES_DIR/"
+          cp raspberry-pi-kiosk/ds-agent/ds-agent.py "$FILES_DIR/ds-agent/"
+          cp raspberry-pi-kiosk/ds-agent/ds-agent.service "$FILES_DIR/ds-agent/"
+          cp raspberry-pi-kiosk/setup-portal/ds-setup-portal.py "$FILES_DIR/setup-portal/"
+          cp raspberry-pi-kiosk/setup-portal/ds-setup-ap-up.sh "$FILES_DIR/setup-portal/"
+          cp raspberry-pi-kiosk/setup-portal/ds-setup-ap-down.sh "$FILES_DIR/setup-portal/"
+          cp raspberry-pi-kiosk/setup-portal/ds-setup.service "$FILES_DIR/setup-portal/"
+
+      - name: Build image
+        working-directory: pi-gen
+        run: sudo ./build.sh
+
+      - name: List build output
+        run: find pi-gen/deploy -maxdepth 1 -type f
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: digital-signage-pi-image
+          path: pi-gen/deploy/*
+          retention-days: 30
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/pi-image-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pi-gen/deploy/*

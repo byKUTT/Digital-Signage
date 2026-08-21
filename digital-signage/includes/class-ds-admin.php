@@ -46,6 +46,7 @@ class DS_Admin {
 		add_action( 'admin_post_ds_pair_screen', array( $this, 'handle_pairing' ) );
 		add_action( 'admin_post_ds_bulk_assign_channel', array( $this, 'handle_bulk_assign' ) );
 		add_action( 'admin_post_ds_remote_action', array( $this, 'handle_remote_action' ) );
+		add_action( 'admin_post_ds_device_command', array( $this, 'handle_device_command' ) );
 	}
 
 	/* =================================================================
@@ -203,8 +204,9 @@ class DS_Admin {
 		$locations   = get_terms( array( 'taxonomy' => 'ds_location', 'hide_empty' => false ) );
 		$current_loc = $id ? wp_get_post_terms( $id, 'ds_location', array( 'fields' => 'ids' ) ) : array();
 		$heartbeat   = $id ? $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}ds_heartbeats WHERE screen_id = %d", $id ) ) : null;
+		$device      = ( $heartbeat && ! empty( $heartbeat->device_info ) ) ? json_decode( $heartbeat->device_info, true ) : null;
 
-		$this->view( 'screen-edit', compact( 'id', 'screen', 'channel_id', 'orientation', 'token', 'channels', 'locations', 'current_loc', 'heartbeat' ) );
+		$this->view( 'screen-edit', compact( 'id', 'screen', 'channel_id', 'orientation', 'token', 'channels', 'locations', 'current_loc', 'heartbeat', 'device' ) );
 	}
 
 	public function render_schedules_list() {
@@ -430,6 +432,65 @@ class DS_Admin {
 		}
 
 		wp_safe_redirect( admin_url( 'admin.php?page=ds-screen-edit&id=' . $screen_id . '&ds_saved=1' ) );
+		exit;
+	}
+
+	/**
+	 * Queues a command for the on-device agent (raspberry-pi-kiosk/ds-agent) —
+	 * WiFi change, screen rotation, reboot, restart the browser, or check for
+	 * OS/package updates. Delivered next time that device's heartbeat answers.
+	 */
+	public function handle_device_command() {
+		$this->require_cap();
+		check_admin_referer( 'ds_device_command' );
+
+		$screen_id = absint( $_POST['screen_id'] ?? 0 );
+		$type      = sanitize_key( $_POST['command_type'] ?? '' );
+
+		if ( ! $screen_id ) {
+			wp_die( esc_html__( 'Missing screen.', 'digital-signage' ) );
+		}
+
+		switch ( $type ) {
+			case 'wifi':
+				$ssid = sanitize_text_field( wp_unslash( $_POST['wifi_ssid'] ?? '' ) );
+				if ( ! $ssid ) {
+					wp_safe_redirect( admin_url( 'admin.php?page=ds-screen-edit&id=' . $screen_id . '&ds_error=wifi_ssid' ) );
+					exit;
+				}
+				DS_CRUD::queue_device_command(
+					$screen_id,
+					array(
+						'type'     => 'wifi',
+						'ssid'     => $ssid,
+						// Sent once, applied by the device, never stored anywhere after that —
+						// see raspberry-pi-kiosk/ds-agent, which discards it immediately after nmcli.
+						'password' => (string) ( $_POST['wifi_password'] ?? '' ),
+					)
+				);
+				break;
+
+			case 'rotation':
+				DS_CRUD::queue_device_command(
+					$screen_id,
+					array(
+						'type'     => 'rotation',
+						'rotation' => sanitize_key( $_POST['rotation'] ?? 'normal' ),
+					)
+				);
+				break;
+
+			case 'reboot':
+			case 'restart_browser':
+			case 'check_updates':
+				DS_CRUD::queue_device_command( $screen_id, array( 'type' => $type ) );
+				break;
+
+			default:
+				wp_die( esc_html__( 'Unknown device command.', 'digital-signage' ) );
+		}
+
+		wp_safe_redirect( admin_url( 'admin.php?page=ds-screen-edit&id=' . $screen_id . '&ds_device_queued=1' ) );
 		exit;
 	}
 }

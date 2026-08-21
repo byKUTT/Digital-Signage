@@ -8,6 +8,11 @@
 # full-screen in Chromium with no browser chrome. If Chromium ever crashes
 # or the URL is unreachable at boot, a watchdog loop relaunches it.
 #
+# Also deploys ds-agent, a small background service that lets this device be
+# managed remotely from the plugin's admin UI — WiFi network, screen
+# rotation, reboot, restart-the-browser and check-for-updates, all from the
+# Screen's edit page in wp-admin, no SSH/keyboard needed after this point.
+#
 # The device generates its own pairing token ONCE and stores it in
 # /etc/digital-signage-kiosk.conf — every reboot reuses that same token, so
 # the pairing code shown on screen (and the screen's identity once paired)
@@ -48,6 +53,7 @@ if ! id "$KIOSK_USER" &>/dev/null; then
 	exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 USER_HOME=$(getent passwd "$KIOSK_USER" | cut -d: -f6)
 CONF_FILE="/etc/digital-signage-kiosk.conf"
 WATCHDOG="/usr/local/bin/ds-kiosk-loop.sh"
@@ -61,7 +67,7 @@ if ! apt-cache show chromium-browser >/dev/null 2>&1; then
 	CHROMIUM_PKG="chromium"
 fi
 apt-get install -y --no-install-recommends \
-	xserver-xorg xinit x11-xserver-utils openbox unclutter "$CHROMIUM_PKG"
+	xserver-xorg xinit x11-xserver-utils openbox unclutter python3 "$CHROMIUM_PKG"
 
 CHROMIUM_BIN=$(command -v chromium-browser || command -v chromium || true)
 if [ -z "$CHROMIUM_BIN" ]; then
@@ -71,10 +77,12 @@ fi
 
 # --- Persistent device token: generate once, reuse forever (until --regenerate). ---
 TOKEN=""
+ROTATION="normal"
 if [ -f "$CONF_FILE" ] && [ "$REGENERATE" -eq 0 ]; then
 	# shellcheck disable=SC1090
 	source "$CONF_FILE"
 	TOKEN="${DS_KIOSK_TOKEN:-}"
+	ROTATION="${DS_KIOSK_ROTATION:-normal}"
 fi
 if [ -z "$TOKEN" ]; then
 	TOKEN=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 40)
@@ -90,11 +98,13 @@ cat > "$CONF_FILE" <<EOF
 # Digital Signage kiosk configuration.
 # DS_KIOSK_TOKEN is this device's permanent identity — do not edit unless you
 # intend to re-pair this device as a different screen. Change DS_KIOSK_SITE
-# and reboot if the WordPress site moves to a new domain.
+# and reboot if the WordPress site moves to a new domain. DS_KIOSK_ROTATION
+# is normally managed remotely from wp-admin (Screen edit page > Device).
 DS_KIOSK_TOKEN="${TOKEN}"
 DS_KIOSK_SITE="${SITE_URL}"
 DS_KIOSK_URL="${URL}"
 DS_KIOSK_CHROMIUM="${CHROMIUM_BIN}"
+DS_KIOSK_ROTATION="${ROTATION}"
 EOF
 
 echo "==> Writing watchdog launcher to ${WATCHDOG}"
@@ -107,6 +117,14 @@ source /etc/digital-signage-kiosk.conf
 
 # Give the network a moment on cold boot before the first load.
 sleep 5
+
+# Apply any rotation set remotely from wp-admin (Screen edit page > Device)
+# before the browser starts, so it opens already in the right orientation.
+if [ "${DS_KIOSK_ROTATION:-normal}" != "normal" ]; then
+	for output in $(xrandr --listmonitors 2>/dev/null | awk '/ /{print $NF}'); do
+		xrandr --output "$output" --rotate "$DS_KIOSK_ROTATION" 2>/dev/null || true
+	done
+fi
 
 while true; do
 	"$DS_KIOSK_CHROMIUM" \
@@ -178,15 +196,59 @@ EOF
 	systemctl enable getty@tty1.service
 fi
 
+# --- Remote device management agent (WiFi, rotation, reboot, updates from wp-admin) ---
+AGENT_INSTALLED=0
+if [ -f "${SCRIPT_DIR}/ds-agent/ds-agent.py" ]; then
+	echo "==> Installing the device-management agent (ds-agent)…"
+	install -m 755 "${SCRIPT_DIR}/ds-agent/ds-agent.py" /usr/local/bin/ds-agent.py
+	install -m 644 "${SCRIPT_DIR}/ds-agent/ds-agent.service" /etc/systemd/system/ds-agent.service
+	systemctl daemon-reload
+	systemctl enable --now ds-agent.service
+	AGENT_INSTALLED=1
+
+	if ! command -v nmcli >/dev/null 2>&1; then
+		echo "   ⚠ nmcli not found — remote WiFi changes need NetworkManager"
+		echo "     (the default network stack on Raspberry Pi OS Bookworm and newer)."
+		echo "     Rotation, reboot, restart-browser and update commands still work."
+	fi
+else
+	echo "==> Skipping ds-agent install (ds-agent/ directory not found next to this script)."
+	echo "    Download the full raspberry-pi-kiosk folder (not just install-kiosk.sh) to get"
+	echo "    remote WiFi/rotation/reboot management from wp-admin."
+fi
+
+# --- First-boot setup portal (only ever fires again if the config file above is
+#     removed — e.g. wiping the SD card's config to re-provision this device by
+#     WiFi hotspot instead of SSH). Harmless to install even when unused. ---
+if [ -f "${SCRIPT_DIR}/setup-portal/ds-setup-portal.py" ]; then
+	install -m 755 "${SCRIPT_DIR}/setup-portal/ds-setup-portal.py" /usr/local/bin/ds-setup-portal.py
+	install -m 755 "${SCRIPT_DIR}/setup-portal/ds-setup-ap-up.sh" /usr/local/bin/ds-setup-ap-up.sh
+	install -m 755 "${SCRIPT_DIR}/setup-portal/ds-setup-ap-down.sh" /usr/local/bin/ds-setup-ap-down.sh
+	install -m 644 "${SCRIPT_DIR}/setup-portal/ds-setup.service" /etc/systemd/system/ds-setup.service
+	# Also make this installer itself reachable by that portal's handoff step.
+	install -m 755 "${SCRIPT_DIR}/install-kiosk.sh" /usr/local/bin/install-kiosk.sh
+	systemctl daemon-reload
+	systemctl enable ds-setup.service >/dev/null 2>&1 || true
+fi
+
 echo ""
 echo "✅ Installed. Player URL (permanent for this device): ${URL}"
 echo "   Kiosk user:            ${KIOSK_USER}"
 echo "   Config file:           ${CONF_FILE}"
 echo "   Watchdog script:       ${WATCHDOG}"
+if [ "$AGENT_INSTALLED" -eq 1 ]; then
+	echo "   Device agent:          installed and running (ds-agent.service)"
+fi
 echo ""
 echo "On first boot this screen will show a pairing code + QR code full-screen —"
 echo "scan it or open wp-admin > Digital Signage > Pair a Screen to link it."
 echo "The same code/token stays valid across every reboot."
+if [ "$AGENT_INSTALLED" -eq 1 ]; then
+	echo ""
+	echo "Once paired, open this screen in wp-admin (Digital Signage > Screens) to see a"
+	echo "'Device' panel — change its WiFi network, rotate the display, restart the"
+	echo "browser, reboot, or check for updates, all remotely."
+fi
 echo ""
 echo "Reboot now to start the kiosk: sudo reboot"
 echo "To re-pair this device as a different screen: sudo bash install-kiosk.sh ${SITE_URL} ${KIOSK_USER} --regenerate"

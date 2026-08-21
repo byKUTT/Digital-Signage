@@ -1,0 +1,8 @@
+xserver-xorg
+xinit
+x11-xserver-utils
+openbox
+unclutter
+python3
+chromium
+network-manager

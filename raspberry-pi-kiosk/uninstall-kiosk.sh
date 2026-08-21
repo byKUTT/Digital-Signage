@@ -23,6 +23,16 @@ fi
 echo "==> Removing watchdog script and config"
 rm -f /usr/local/bin/ds-kiosk-loop.sh /etc/digital-signage-kiosk.conf
 
+echo "==> Removing device-management agent and setup portal"
+systemctl disable --now ds-agent.service >/dev/null 2>&1 || true
+systemctl disable --now ds-setup.service >/dev/null 2>&1 || true
+rm -f /etc/systemd/system/ds-agent.service /etc/systemd/system/ds-setup.service
+rm -f /usr/local/bin/ds-agent.py /usr/local/bin/ds-setup-portal.py
+rm -f /usr/local/bin/ds-setup-ap-up.sh /usr/local/bin/ds-setup-ap-down.sh
+rm -f /usr/local/bin/install-kiosk.sh
+nmcli connection delete ds-setup-ap >/dev/null 2>&1 || true
+systemctl daemon-reload
+
 echo "==> Disabling console autologin"
 if command -v raspi-config >/dev/null 2>&1; then
 	raspi-config nonint do_boot_behaviour B1

@@ -10,7 +10,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Namespace: ds/v1
  *   GET  /screen/{token}/playlist   Resolved channel + zones + slides for right now
- *   POST /screen/{token}/heartbeat  "I'm alive" ping (resolution, orientation, IP, channel)
+ *   POST /screen/{token}/heartbeat  "I'm alive" ping (resolution, orientation, IP, channel,
+ *                                  optional device telemetry) — response carries any pending
+ *                                  device command (WiFi change, rotation, reboot, ...) for
+ *                                  hardware running the ds-agent (see raspberry-pi-kiosk/ds-agent)
  *   POST /screen/{token}/proof      Proof-of-play log entry
  *   POST /pair/request              Generates a pairing code for an unpaired player
  *   GET  /pair/status/{token}       Poll: has this pairing token been claimed yet?
@@ -197,6 +200,7 @@ class DS_REST {
 			'user_agent'         => isset( $params['user_agent'] ) ? sanitize_text_field( mb_substr( $params['user_agent'], 0, 255 ) ) : '',
 			'current_channel_id' => isset( $params['channel_id'] ) ? absint( $params['channel_id'] ) : 0,
 			'app_version'        => isset( $params['app_version'] ) ? sanitize_text_field( $params['app_version'] ) : DS_VERSION,
+			'device_info'        => isset( $params['device'] ) && is_array( $params['device'] ) ? wp_json_encode( self::sanitize_device_info( $params['device'] ) ) : null,
 		);
 
 		$exists = $wpdb->get_var( $wpdb->prepare( "SELECT screen_id FROM {$table} WHERE screen_id = %d", $screen->ID ) );
@@ -206,7 +210,38 @@ class DS_REST {
 			$wpdb->insert( $table, $data );
 		}
 
-		return rest_ensure_response( array( 'ok' => true ) );
+		// Deliver any pending device command (WiFi change, rotation, reboot, ...) in the
+		// same round trip — ds-agent polls via heartbeat rather than a separate endpoint.
+		$command = get_post_meta( $screen->ID, 'ds_device_command', true );
+		if ( $command ) {
+			delete_post_meta( $screen->ID, 'ds_device_command' );
+		}
+
+		return rest_ensure_response(
+			array(
+				'ok'      => true,
+				'command' => $command ? json_decode( $command, true ) : null,
+			)
+		);
+	}
+
+	/**
+	 * Whitelist + sanitize the device telemetry object ds-agent reports each
+	 * heartbeat (never trust hardware-reported strings going into storage/UI).
+	 */
+	private static function sanitize_device_info( array $device ) {
+		$out = array();
+		foreach ( array( 'wifi_ssid', 'hostname', 'os_version', 'agent_version', 'rotation' ) as $key ) {
+			if ( isset( $device[ $key ] ) ) {
+				$out[ $key ] = sanitize_text_field( mb_substr( (string) $device[ $key ], 0, 100 ) );
+			}
+		}
+		foreach ( array( 'wifi_signal', 'cpu_temp_c', 'disk_free_mb', 'mem_free_mb' ) as $key ) {
+			if ( isset( $device[ $key ] ) ) {
+				$out[ $key ] = is_numeric( $device[ $key ] ) ? $device[ $key ] + 0 : null;
+			}
+		}
+		return $out;
 	}
 
 	public function post_proof( WP_REST_Request $request ) {

@@ -77,6 +77,7 @@ class DS_Activator {
 			user_agent VARCHAR(255) DEFAULT '',
 			current_channel_id BIGINT UNSIGNED DEFAULT 0,
 			app_version VARCHAR(20) DEFAULT '',
+			device_info LONGTEXT NULL,
 			PRIMARY KEY  (screen_id)
 		) {$charset_collate};
 

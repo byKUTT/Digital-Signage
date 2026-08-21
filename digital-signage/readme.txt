@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.2.0
+Stable tag: 2.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,12 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.3.0 =
+* New: remote Raspberry Pi device management. A screen running the new `ds-agent` (bundled with the Raspberry Pi kiosk installer) reports WiFi network/signal, CPU temperature, free disk space and rotation on every heartbeat, and a new "Device" panel on the Screen edit page can change its WiFi network, rotate the display, restart the browser, reboot, or check for updates — all remotely, no SSH needed.
+* New `raspberry-pi-kiosk/setup-portal/`: a device with no configuration yet puts up a temporary WiFi hotspot with a one-page setup form (WiFi + site URL) instead of the kiosk — connect from a phone, submit, and it provisions itself and reboots into its pairing screen.
+* New `pi-image-build/`: a `pi-gen` configuration plus a GitHub Actions workflow to build an actual flashable `.img` with all of the above pre-installed, for provisioning many screens at once.
+* Database: added a `device_info` column to the heartbeats table (auto-migrated).
 
 = 2.2.0 =
 * Removed all byKUTT branding from the pairing/setup screen and admin footers — it now shows your own site name instead, so the product reads as one cohesive system rather than a watermarked template.
