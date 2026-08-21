@@ -68,33 +68,50 @@ class DS_Player {
 	}
 
 	/**
-	 * A screen visits its player URL before it has been claimed in the admin.
-	 * We mint a pairing code/token pair on the fly and show it full-screen so
-	 * staff can read it off the TV and enter it in wp-admin > Pair a Screen.
+	 * Render an unpaired token without rotating twice. The status endpoint
+	 * rotates the code immediately before the countdown reloads this page, so
+	 * a still-current row must be reused here rather than replaced again.
 	 *
-	 * A fresh code is generated every time this is hit fresh — i.e. every
-	 * full page load, which in practice means every boot/browser (re)start —
-	 * not reused from a previous visit. Between full loads the pairing
-	 * screen's own JS keeps rotating it further every 30s on its own (see
-	 * DS_REST::pair_status()); this is what makes a code minted right before
-	 * boot never linger as a stale, already-displayed one.
+	 * If this token was paired before but its screen post no longer exists,
+	 * clear that orphaned pairing state. Otherwise the newly displayed code
+	 * still carries paired_at and wp-admin rejects it as already used.
 	 */
 	private function render_unpaired_screen( $token ) {
 		global $wpdb;
-		$table = $wpdb->prefix . 'ds_pairing_codes';
-		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE token = %s", $token ) );
-		$code  = DS_REST::generate_unique_pairing_code( $table ) ?: strtoupper( substr( str_shuffle( 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' ), 0, 6 ) );
+		$table       = $wpdb->prefix . 'ds_pairing_codes';
+		$row         = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE token = %s", $token ) );
+		$now         = time();
+		$stale_pair  = $row && ( ! empty( $row->paired_at ) || ! empty( $row->screen_id ) );
+		$age         = $row ? max( 0, $now - strtotime( $row->created_at . ' UTC' ) ) : PHP_INT_MAX;
+		$needs_code  = ! $row || $stale_pair || $age >= DS_REST::PAIRING_CODE_ROTATE_SECONDS;
+
+		if ( $needs_code ) {
+			$code = DS_REST::generate_unique_pairing_code( $table ) ?: strtoupper( substr( str_shuffle( 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' ), 0, 6 ) );
+		} else {
+			$code = $row->code;
+		}
 
 		if ( $row ) {
-			$wpdb->update(
-				$table,
-				array(
-					'code'       => $code,
-					'created_at' => current_time( 'mysql', true ),
-					'expires_at' => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
-				),
-				array( 'id' => $row->id )
-			);
+			$update = array();
+			if ( $stale_pair ) {
+				$update['screen_id'] = null;
+				$update['paired_at'] = null;
+			}
+			if ( $needs_code ) {
+				if ( ! $stale_pair ) {
+					set_transient(
+						DS_REST::pairing_grace_key( $row->code ),
+						(int) $row->id,
+						DS_REST::PAIRING_CODE_GRACE_SECONDS
+					);
+				}
+				$update['code']       = $code;
+				$update['created_at'] = current_time( 'mysql', true );
+				$update['expires_at'] = gmdate( 'Y-m-d H:i:s', $now + DAY_IN_SECONDS );
+			}
+			if ( $update ) {
+				$wpdb->update( $table, $update, array( 'id' => $row->id ) );
+			}
 		} else {
 			$wpdb->insert(
 				$table,
@@ -102,7 +119,7 @@ class DS_Player {
 					'code'       => $code,
 					'token'      => $token,
 					'created_at' => current_time( 'mysql', true ),
-					'expires_at' => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
+					'expires_at' => gmdate( 'Y-m-d H:i:s', $now + DAY_IN_SECONDS ),
 				)
 			);
 		}
