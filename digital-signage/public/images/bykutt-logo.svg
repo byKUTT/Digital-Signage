@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" role="img" aria-label="byKUTT">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="320" height="90" role="img" aria-label="byKUTT">
 	<title>byKUTT</title>
 	<defs>
 		<radialGradient id="bykuttGradient" cx="50%" cy="50%" r="75%" gradientUnits="objectBoundingBox">
@@ -16,14 +16,7 @@
 			</stop>
 			<animateTransform attributeName="gradientTransform" type="rotate" from="0 0.5 0.5" to="360 0.5 0.5" dur="18s" repeatCount="indefinite" />
 		</radialGradient>
-		<clipPath id="bykuttClip">
-			<rect width="400" height="400" rx="40" />
-		</clipPath>
 	</defs>
 
-	<g clip-path="url(#bykuttClip)">
-		<rect width="400" height="400" fill="url(#bykuttGradient)" />
-		<text x="200" y="222" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="52" font-weight="700" fill="#ffffff" letter-spacing="1" style="paint-order: stroke; text-shadow: 0 2px 12px rgba(0,0,0,.18);">byKUTT</text>
-		<text x="200" y="252" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" letter-spacing="4" fill="rgba(255,255,255,0.85)">DIGITAL SIGNAGE</text>
-	</g>
+	<text x="50%" y="62" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="56" font-weight="800" letter-spacing="1" fill="url(#bykuttGradient)">byKUTT</text>
 </svg>

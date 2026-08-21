@@ -35,7 +35,7 @@ $status_url = esc_url_raw( rest_url( 'ds/v1/pair/status/' . $token ) );
 		html, body { margin:0; padding:0; height:100%; background:#0b0e14; color:#fff; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
 		.wrap { display:grid; grid-template-columns: 1.1fr 0.9fr; align-items:center; height:100%; padding: 5vh 6vw; gap: 4vw; }
 		.left { display:flex; flex-direction:column; justify-content:center; }
-		.logo { width: 96px; height: 96px; border-radius: 20px; margin-bottom: 28px; box-shadow: 0 8px 30px rgba(242,73,87,.25); }
+		.logo { width: 180px; height: auto; margin-bottom: 28px; }
 		h1 { font-weight: 300; font-size: clamp(24px, 3vw, 34px); margin: 0 0 6px; color: #cdd4e0; }
 		.code { font-size: clamp(64px, 9vw, 108px); font-weight: 800; letter-spacing: .12em; margin: 10px 0 22px; background: linear-gradient(120deg, var(--ds-red), var(--ds-orange), var(--ds-yellow)); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1; }
 		.steps { list-style: none; margin: 8px 0 0; padding: 0; max-width: 560px; }
@@ -51,6 +51,12 @@ $status_url = esc_url_raw( rest_url( 'ds/v1/pair/status/' . $token ) );
 		.qr-caption { color:#8b93a7; font-size: 14px; text-align:center; max-width: 260px; }
 		.footer { position:absolute; bottom: 20px; left: 0; right: 0; text-align:center; color:#4a5468; font-size: 12px; letter-spacing:.03em; }
 		.footer a { color:#6b7690; text-decoration:none; }
+		.fs-hint {
+			position: fixed; inset: 0; z-index: 20; display:none;
+			align-items:center; justify-content:center; background: rgba(0,0,0,.4);
+			color:#fff; font-size: 20px; cursor: pointer; text-align:center; padding: 20px;
+		}
+		.fs-hint.ds-visible { display:flex; }
 		@media (max-width: 900px) {
 			.wrap { grid-template-columns: 1fr; text-align:center; }
 			.left { align-items:center; }
@@ -82,6 +88,8 @@ $status_url = esc_url_raw( rest_url( 'ds/v1/pair/status/' . $token ) );
 
 	<p class="footer"><?php esc_html_e( 'Digital Signage CMS', 'digital-signage' ); ?> &middot; <?php esc_html_e( 'by', 'digital-signage' ); ?> <a href="https://github.com/byKUTT" target="_blank" rel="noopener">byKUTT</a></p>
 
+	<div class="fs-hint" id="fs-hint"><?php esc_html_e( 'Tap anywhere for fullscreen', 'digital-signage' ); ?></div>
+
 	<script>
 		(function poll() {
 			fetch( <?php echo wp_json_encode( $status_url ); ?> )
@@ -94,6 +102,37 @@ $status_url = esc_url_raw( rest_url( 'ds/v1/pair/status/' . $token ) );
 					setTimeout( poll, 5000 );
 				})
 				.catch(function(){ setTimeout( poll, 8000 ); });
+		})();
+
+		// This screen should be as full-screen/chrome-less as the player itself.
+		// Auto-request it on load; if the browser blocks that (needs a user
+		// gesture), show a tap-anywhere hint instead of silently staying windowed.
+		(function () {
+			function isFullscreen() {
+				return !!( document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement );
+			}
+			function requestFs() {
+				var el = document.documentElement;
+				var request = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+				if ( request ) {
+					try {
+						var result = request.call( el );
+						if ( result && result.catch ) { result.catch( function () {} ); }
+					} catch ( e ) {}
+				}
+			}
+			var hint = document.getElementById( 'fs-hint' );
+			requestFs();
+			setTimeout( function () {
+				if ( ! isFullscreen() ) { hint.classList.add( 'ds-visible' ); }
+			}, 500 );
+			document.addEventListener( 'fullscreenchange', function () {
+				if ( isFullscreen() ) { hint.classList.remove( 'ds-visible' ); }
+			} );
+			hint.addEventListener( 'click', function () {
+				requestFs();
+				hint.classList.remove( 'ds-visible' );
+			} );
 		})();
 	</script>
 </body>

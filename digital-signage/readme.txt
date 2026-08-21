@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,10 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.1.1 =
+* byKUTT logo is now just the animated-gradient wordmark (no background card), matching how it's used everywhere it appears.
+* The unpaired-screen setup display now requests fullscreen on load too, with a tap-to-enable fallback, same as the player.
 
 = 2.1.0 =
 * Raspberry Pi and Windows kiosk installers now generate and persist the device's own pairing token, so the pairing code/identity survives every reboot without re-pairing.

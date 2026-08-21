@@ -37,7 +37,7 @@
 }
 .ds-app-footer a { color: #8c8f94; }
 .ds-app-footer a:hover { color: #2271b1; }
-.ds-footer-logo { width: 16px; height: 16px; border-radius: 4px; vertical-align: -3px; margin-right: 2px; }
+.ds-footer-logo { width: auto; height: 14px; vertical-align: -2px; margin-right: 4px; }
 
 /* ---- Buttons ---- */
 .ds-btn {
