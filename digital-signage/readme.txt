@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.9.5
+Stable tag: 2.9.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,12 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.9.6 =
+* Fixed a Raspberry Pi 3 black screen introduced by 2.9.5: the installer no longer forces KMS, Firefox WebRender/EGL/DMABUF, or Chromium GPU overrides. Raspberry Pi OS and the browser now select their tested graphics backend automatically.
+* Re-running the installer removes only the KMS block written by 2.9.5, restoring the prior OS/display configuration while preserving the Pi 3 CPU, I/O, WiFi and background-service optimizations.
+* Hardware H.264 decoding remains enabled as a preference, with automatic browser fallback when unavailable.
+* Fixed the Pi 3 Infinite Slider becoming black when image playback began: removed size containment from the moving track and made low-power image content visible even while its motion dimensions are being measured.
 
 = 2.9.5 =
 * Added a Raspberry Pi 3 low-power player profile that removes expensive slider masks/shadows while retaining compositor-backed motion.

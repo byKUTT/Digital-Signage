@@ -58,16 +58,12 @@ fi
 echo "==> Applying conservative Raspberry Pi 3 signage optimizations"
 mkdir -p "$STATE_DIR" /etc/systemd/journald.conf.d /etc/NetworkManager/conf.d
 
-# Modern Raspberry Pi OS uses the full KMS driver. Add it only when no VC4
-# overlay is already selected, avoiding conflicts with an administrator's
-# existing graphics configuration.
-if [ -n "$CONFIG_FILE" ] && ! grep -qE '^[[:space:]]*dtoverlay=vc4-(f)?kms-v3d' "$CONFIG_FILE"; then
-	cat >> "$CONFIG_FILE" <<'EOF'
-
-# --- Digital Signage KMS ---
-dtoverlay=vc4-kms-v3d
-# --- end Digital Signage KMS ---
-EOF
+# Raspberry Pi OS already selects the graphics driver appropriate for its
+# release and board. Version 2.9.5 added a forced KMS block here, which can
+# leave uncommon/custom HDMI modes black. Remove only that installer-owned
+# block and leave every user/OS graphics setting untouched.
+if [ -n "$CONFIG_FILE" ] && [ -f "$CONFIG_FILE" ]; then
+	sed -i '/# --- Digital Signage KMS ---/,/# --- end Digital Signage KMS ---/d' "$CONFIG_FILE"
 fi
 
 cat > "$SYSCTL_FILE" <<'EOF'
@@ -127,4 +123,4 @@ if command -v iw >/dev/null 2>&1; then
 fi
 systemctl restart systemd-journald >/dev/null 2>&1 || true
 
-echo "✅ Raspberry Pi 3 profile applied. A reboot is required for KMS graphics changes."
+echo "✅ Raspberry Pi 3 profile applied. OS-managed graphics settings were preserved."

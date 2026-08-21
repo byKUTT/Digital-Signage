@@ -20,15 +20,17 @@ or 64-bit), Pi 3/4/5/Zero 2 W.
 ### Raspberry Pi 3 performance profile
 
 When a Pi 3 is detected, the installer automatically runs `optimize-pi.sh`.
-It enables the normal full-KMS graphics path when no VC4 overlay is already
-configured, turns off WiFi power saving, prioritizes kiosk rendering, bounds
-journal writes, and disables only unrelated services such as Bluetooth,
-printing and ModemManager. The changes are idempotent and are reversed by
-`uninstall-kiosk.sh`.
+It preserves Raspberry Pi OS's existing graphics-driver configuration, turns
+off WiFi power saving, prioritizes kiosk rendering, bounds journal writes, and
+disables only unrelated services such as Bluetooth, printing and ModemManager.
+The changes are idempotent and are reversed by `uninstall-kiosk.sh`. Re-running
+version 2.9.6 also removes the installer-owned KMS override written by 2.9.5,
+which could produce a black screen with uncommon HDMI modes.
 
-Firefox ESR is recommended on this installation. The kiosk profile enables
-WebRender/EGL and Raspberry Pi OS's hardware H.264 decoding. Encode signage
-video as **H.264 at 30 fps or less**; avoid AV1, VP9, HEVC and 60 fps on a Pi 3.
+Firefox ESR is recommended on this installation. Firefox chooses its own safe
+compositor backend while the kiosk profile keeps hardware H.264 decoding
+enabled. Encode signage video as **H.264 at 30 fps or less**; avoid AV1, VP9,
+HEVC and 60 fps on a Pi 3.
 For a 1920×440 display, encoding at the display's actual dimensions and a
 moderate bitrate avoids decoding pixels that can never be shown. Use a proper
 5 V / 2.5 A supply and cooling so thermal throttling does not cause stutter.
@@ -245,8 +247,9 @@ ever required, so it works behind NAT/firewalls with no port forwarding.
 - `ds-agent.service` — the remote-management agent (`ds-agent/ds-agent.py`),
   reporting device telemetry and applying queued commands every 30s.
 - `optimize-pi.sh` / `ds-performance.service` — automatically enabled on a
-  Raspberry Pi 3 to keep graphics/video responsive; `uninstall-kiosk.sh`
-  reverses its KMS marker, sysctl, journal, WiFi and service changes.
+  Raspberry Pi 3 to keep graphics/video responsive without overriding the
+  OS graphics driver; `uninstall-kiosk.sh` reverses its sysctl, journal, WiFi
+  and service changes.
 - `ds-setup.service` — the WiFi-hotspot re-provisioning portal
   (`setup-portal/`), which only ever runs while the device is unconfigured
   (see "Re-provisioning" above) — inert and harmless otherwise.

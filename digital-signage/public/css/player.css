@@ -150,11 +150,11 @@ html[data-ds-orientation="portrait"] .ds-stage,
 .ds-low-power .ds-infinite-slider {
 	-webkit-mask-image: none;
 	mask-image: none;
+	opacity: 1;
 	transition: none;
 }
 .ds-low-power .ds-infinite-slider .ds-continuous-slider-track img { box-shadow: none; }
 .ds-low-power .ds-slide { transition-duration: 120ms; }
-.ds-low-power .ds-compositor-slider .ds-continuous-slider-track { contain: strict; }
 @media (prefers-reduced-motion: reduce) {
 	.ds-infinite-slider { transition: none; }
 	.ds-infinite-slider .ds-continuous-slider-track { will-change: auto; }

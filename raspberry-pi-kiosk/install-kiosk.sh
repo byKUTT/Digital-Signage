@@ -188,18 +188,12 @@ user_pref("dom.push.enabled", false);
 user_pref("browser.sessionstore.resume_from_crash", false);
 user_pref("browser.tabs.warnOnClose", false);
 user_pref("app.update.auto", false);
-// Raspberry Pi OS Bookworm's Firefox ESR supports accelerated compositing and
-// V4L2 H.264 decode. The old kiosk profile disabled all of these and forced the
-// Pi 3 CPU to render/decode everything in software.
-user_pref("gfx.webrender.all", true);
-user_pref("gfx.webrender.enabled", true);
-user_pref("gfx.webrender.software", false);
-user_pref("gfx.x11-egl.force-enabled", true);
-user_pref("widget.dmabuf.force-enabled", true);
+// Keep Raspberry Pi OS/Firefox's board-tested compositor choice. Forcing
+// WebRender, EGL or DMABUF can produce a black window on some Pi 3/display
+// combinations. Hardware H.264 remains preferred and Firefox may still use
+// accelerated compositing whenever its own capability checks allow it.
 user_pref("layers.acceleration.disabled", false);
 user_pref("media.hardware-video-decoding.enabled", true);
-user_pref("media.hardware-video-decoding.force-enabled", true);
-user_pref("media.ffmpeg.vaapi.enabled", true);
 user_pref("media.rdd-process.enabled", true);
 user_pref("media.av1.enabled", false);
 user_pref("media.memory_cache_max_size", 32768);
@@ -324,7 +318,7 @@ fi
 # ?kiosk=1 tells the player/pairing screens this browser is already OS-level
 # fullscreen (started with --kiosk below) with no chrome to hide and no input
 # device to click a "tap to start" prompt with, so they skip that entirely.
-URL="${SITE_URL}/signage/play/${TOKEN}/?kiosk=1&profile=${KIOSK_PROFILE}&cv=295"
+URL="${SITE_URL}/signage/play/${TOKEN}/?kiosk=1&profile=${KIOSK_PROFILE}&cv=296"
 
 echo "==> Writing config to ${CONF_FILE}"
 cat > "$CONF_FILE" <<EOF
@@ -410,9 +404,9 @@ if [ "${DS_KIOSK_BROWSER:-chromium}" = "firefox" ]; then
 	chown -R "$KIOSK_USER":"$KIOSK_USER" "$PROFILE_DIR"
 	xhost +SI:localuser:"$KIOSK_USER" >/dev/null 2>&1 || true
 
-	# Firefox ESR kiosk launch. WebRender and Raspberry Pi OS's hardware H.264
-	# path remain enabled; if the driver cannot initialize, Firefox falls back
-	# automatically. A modest relaunch backoff prevents crash-refresh loops.
+	# Firefox ESR kiosk launch. Do not force a compositor backend: Raspberry Pi
+	# OS and Firefox select the working backend for this board/display. Hardware
+	# H.264 remains enabled in user.js. A modest relaunch backoff prevents loops.
 	while true; do
 		runuser -u "$KIOSK_USER" -- env \
 			HOME="$KIOSK_HOME" \
@@ -420,8 +414,6 @@ if [ "${DS_KIOSK_BROWSER:-chromium}" = "firefox" ]; then
 			LOGNAME="$KIOSK_USER" \
 			DISPLAY="${DISPLAY:-:0}" \
 			XDG_RUNTIME_DIR="$KIOSK_RUNTIME_DIR" \
-			MOZ_WEBRENDER=1 \
-			MOZ_X11_EGL=1 \
 			MOZ_ENABLE_WAYLAND=0 \
 			"$DS_KIOSK_BROWSER_BIN" \
 			-kiosk \
@@ -488,9 +480,6 @@ PYEOF
 			--check-for-update-interval=31536000 \
 			--autoplay-policy=no-user-gesture-required \
 			--user-data-dir="$PROFILE_DIR" \
-			--enable-gpu-rasterization \
-			--enable-zero-copy \
-			--ignore-gpu-blocklist \
 			--lang=et-EE \
 			--no-sandbox \
 			"$DS_KIOSK_URL" \

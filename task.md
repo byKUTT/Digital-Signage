@@ -1,10 +1,9 @@
-# Raspberry Pi 3 playback optimization
+# Raspberry Pi 3 black-screen recovery
 
-- [x] Add a safe, reversible Raspberry Pi 3 system optimization profile.
-- [x] Enable Firefox/Chromium GPU compositing and hardware H.264 decoding.
-- [x] Give the kiosk predictable CPU, I/O and memory priority.
-- [x] Add retained video preloading and wait for playback readiness before transitions.
-- [x] Reduce expensive screen effects only for the Pi 3 player profile.
-- [x] Update documentation and bump the plugin to 2.9.5.
-- [x] Run shell, JavaScript and packaging verification (PHP CLI unavailable; PHP changes are version/readme only).
-- [x] Rebuild and publish `digital-signage.zip` and `raspberry-pi-kiosk.zip` to GitHub.
+- [x] Remove the forced KMS block introduced by 2.9.5.
+- [x] Stop forcing Firefox/Chromium compositor backends; retain hardware H.264 preference.
+- [x] Remove Pi 3 slider size containment and guarantee images remain visible during measurement.
+- [x] Preserve the safe Pi 3 CPU, I/O, WiFi and service optimizations.
+- [x] Bump to 2.9.6 and document the black-screen recovery.
+- [x] Validate scripts and rebuild both ZIP archives.
+- [x] Publish the repaired Raspberry code and ZIPs to GitHub.
