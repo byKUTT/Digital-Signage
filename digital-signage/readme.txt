@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.8.4
+Stable tag: 2.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -17,7 +17,7 @@ Digital Signage CMS gives you:
 
 * **Channels** — named playlists of content ("Lobby Menu", "Cafeteria Board") assignable to one or more screens.
 * **Screens** — registered displays, paired via an unguessable token / pairing code, each with orientation, location and live online/offline status.
-* **Slides** — images, videos, webpages (iframe), custom HTML/CSS, RSS/Atom tickers, weather, live clock, PDF/Google Slides embeds and social embeds, with per-slide duration and transition overrides.
+* **Slides** — images, videos, webpages (iframe), custom HTML/CSS, RSS/Atom tickers, weather, live clock, PDF/Google Slides embeds, social embeds and multi-image sliding carousels, with per-slide duration and channel-level transitions.
 * **Schedules** — recurring day-of-week/time rules and one-off date overrides per screen, plus priority/emergency channels that interrupt normal rotation everywhere instantly.
 * **Fullscreen player** — a chrome-less, auto-fullscreen frontend at `/signage/play/{token}/` that polls for updates, preloads the next slide, keeps playing from a local cache when offline, and supports multi-zone layouts (main + ticker + corner clock, split screen, grid).
 * **Admin dashboard** — live screen status, pairing flow, bulk channel assignment, drag-and-drop playlist reordering, a weekly calendar view, proof-of-play analytics with CSV export, JSON import/export, and remote refresh/reload commands.
@@ -41,6 +41,12 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.9.0 =
+* Transitions now belong to channels, so every slide in a channel uses one consistent transition instead of storing separate per-slide overrides.
+* Infinite Scroll Gallery is now presented as Sliding carousel while retaining its original stored type for compatibility. Portrait zones use full-width images with adjustable vertical spacing; landscape zones use full-height images with adjustable horizontal spacing.
+* Sliding carousels now render enough repeated image sequences to fill the screen continuously without blank gaps, including short galleries, and recalculate safely after screen resizing or orientation changes.
+* Saving a slide without a name automatically creates the next available editable name such as `Slide 1` or `Slide 2`.
 
 = 2.8.0 =
 * New: `install-kiosk.sh --browser firefox` switches a Raspberry Pi kiosk from Chromium to Firefox ESR — a real alternative for a device where Chromium's translate popup (or other browser UI) keeps appearing despite every flag, policy and profile-level override already applied against it. Firefox has no equivalent auto-popping "translate this page?" prompt by default. Firefox gets its own `/etc/firefox/policies/policies.json` and a `user.js` in the kiosk profile disabling translations, telemetry, form/password saving, and other first-run prompts. `ds-agent`'s "Restart Browser" command now targets whichever browser is actually configured. Re-run with `--browser chromium` (or without `--browser`) to switch back — the choice persists across reboots either way.

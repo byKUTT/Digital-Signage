@@ -262,16 +262,17 @@
 		// mid-cycle — this is what makes polling invisible to the viewer.
 		if ( existing && sameItemIds( existing.items, items ) ) {
 			existing.items = items; // durations/etc. may have changed; index/timer keep running.
+			setZoneTransition( container, items );
 			return;
 		}
 
 		if ( existing ) {
 			clearTimeout( existing.timer );
+			stopTimers( container );
 		}
 
 		container.innerHTML = '';
-		var transitionClass = 'ds-transition-' + ( ( items[0] && items[0].transition ) || 'fade' );
-		container.className = 'ds-zone ds-zone-' + zoneName + ' ' + transitionClass;
+		setZoneTransition( container, items );
 
 		state.zones[ zoneName ] = { items: items, index: 0, timer: null, els: {} };
 
@@ -282,6 +283,12 @@
 		renderSlide( zoneName, 0 );
 	}
 
+	function setZoneTransition( container, items ) {
+		var transitionClass = 'ds-transition-' + ( ( items[0] && items[0].transition ) || 'fade' );
+		var zoneName = container.id.replace( 'ds-zone-', '' );
+		container.className = 'ds-zone ds-zone-' + zoneName + ' ' + transitionClass;
+	}
+
 	function stopZone( zoneName ) {
 		var zone = state.zones[ zoneName ];
 		if ( zone ) {
@@ -290,6 +297,7 @@
 		delete state.zones[ zoneName ];
 		var el = zoneEl( zoneName );
 		if ( el ) {
+			stopTimers( el );
 			el.innerHTML = '';
 		}
 	}
@@ -369,7 +377,7 @@
 				break;
 			}
 			case 'infinite_scroll': {
-				el.appendChild( buildInfiniteScrollEl( item ) );
+				el.appendChild( buildSlidingCarouselEl( item ) );
 				break;
 			}
 			default: {
@@ -413,11 +421,14 @@
 
 	/**
 	 * Stops any interval/requestAnimationFrame loop started by an element this
-	 * player created (clock ticks, infinite-scroll animation) before it's
+	 * player created (clock ticks, carousel animation) before it's
 	 * removed from the DOM — otherwise those loops keep running invisibly.
 	 */
 	function stopTimers( container ) {
 		container.querySelectorAll( '.ds-has-timer' ).forEach( function ( el ) {
+			if ( el.dsCleanup ) {
+				el.dsCleanup();
+			}
 			var id = Number( el.dataset.dsTimerId );
 			if ( ! id ) {
 				return;
@@ -431,21 +442,18 @@
 	}
 
 	/**
-	 * Infinite-scroll image gallery: images auto-loop in the direction that
-	 * matches the screen's current orientation — top-to-bottom (images full
-	 * width) on portrait, left-to-right (images full height) on landscape —
-	 * at a configurable speed, with the sequence duplicated once so the loop
-	 * is seamless.
+	 * Sliding image carousel. Portrait zones use full-width images and vertical
+	 * spacing; landscape zones use full-height images and horizontal spacing.
+	 * Enough sequence copies are rendered to cover the viewport continuously,
+	 * including when the source sequence is shorter than the screen.
 	 */
-	function buildInfiniteScrollEl( item ) {
+	function buildSlidingCarouselEl( item ) {
 		var wrap = document.createElement( 'div' );
-		wrap.className = 'ds-infinite-scroll ds-has-timer';
+		wrap.className = 'ds-sliding-carousel ds-has-timer';
 		wrap.style.background = item.bg_color || '#000';
 
-		var portrait = 'portrait' === document.documentElement.getAttribute( 'data-ds-orientation' );
 		var track = document.createElement( 'div' );
-		track.className = 'ds-infinite-scroll-track ' + ( portrait ? 'ds-scroll-vertical' : 'ds-scroll-horizontal' );
-		track.style.gap = ( item.spacing || 20 ) + 'px';
+		track.className = 'ds-sliding-carousel-track';
 		wrap.appendChild( track );
 
 		var images = item.images || [];
@@ -453,34 +461,80 @@
 			return wrap;
 		}
 
-		// Render the sequence twice back-to-back so scrolling by exactly one
-		// copy's length loops with no visible seam, then jump back to 0.
-		[ images, images ].forEach( function ( set ) {
-			set.forEach( function ( src ) {
-				var img = document.createElement( 'img' );
-				img.src = src;
-				img.alt = '';
-				track.appendChild( img );
-			} );
-		} );
-
 		var speed = Math.max( 5, item.speed || 60 ); // px/second
 		var position = 0;
 		var loopLength = 0;
 		var lastFrame = null;
+		var renderedCopies = 0;
+		var portrait = null;
+		var resizeObserver = null;
+		var resizeHandler = null;
+
+		function appendCopy() {
+			images.forEach( function ( src ) {
+				var img = document.createElement( 'img' );
+				img.src = src;
+				img.alt = '';
+				img.addEventListener( 'load', measure, { once: true } );
+				track.appendChild( img );
+			} );
+			renderedCopies++;
+		}
 
 		function measure() {
-			loopLength = portrait ? track.scrollHeight / 2 : track.scrollWidth / 2;
+			var measuredPortrait = wrap.clientHeight > wrap.clientWidth;
+			if ( ! wrap.clientHeight || ! wrap.clientWidth ) {
+				measuredPortrait = 'portrait' === document.documentElement.getAttribute( 'data-ds-orientation' );
+			}
+			if ( portrait !== measuredPortrait ) {
+				portrait = measuredPortrait;
+				position = 0;
+				track.style.transform = 'translate3d(0,0,0)';
+			}
+
+			track.className = 'ds-sliding-carousel-track ' + ( portrait ? 'ds-carousel-vertical' : 'ds-carousel-horizontal' );
+			var spacing = portrait
+				? ( undefined !== item.vertical_spacing ? item.vertical_spacing : item.spacing )
+				: ( undefined !== item.horizontal_spacing ? item.horizontal_spacing : item.spacing );
+			spacing = Math.max( 0, Number( spacing ) || 0 );
+			track.style.gap = spacing + 'px';
+
+			var firstSequence = Array.prototype.slice.call( track.children, 0, images.length );
+			var contentLength = firstSequence.reduce( function ( total, img ) {
+				var rect = img.getBoundingClientRect();
+				return total + ( portrait ? rect.height : rect.width );
+			}, 0 );
+			if ( contentLength <= 0 ) {
+				return;
+			}
+
+			loopLength = contentLength + ( spacing * images.length );
+			var viewportLength = portrait ? wrap.clientHeight : wrap.clientWidth;
+			var requiredCopies = Math.max( 2, Math.ceil( ( viewportLength + loopLength ) / loopLength ) + 1 );
+			while ( renderedCopies < requiredCopies ) {
+				appendCopy();
+			}
 		}
-		// Images load asynchronously; ResizeObserver re-measures whenever the
-		// track's rendered size actually changes, rather than guessing once.
+
+		appendCopy();
+		appendCopy();
+
+		// Re-measure on image load and whenever the zone changes size/orientation.
 		if ( 'ResizeObserver' in window ) {
-			new ResizeObserver( measure ).observe( track );
+			resizeObserver = new ResizeObserver( measure );
+			resizeObserver.observe( wrap );
 		} else {
-			track.querySelectorAll( 'img' ).forEach( function ( img ) {
-				img.addEventListener( 'load', measure );
-			} );
+			resizeHandler = measure;
+			window.addEventListener( 'resize', resizeHandler );
 		}
+		wrap.dsCleanup = function () {
+			if ( resizeObserver ) {
+				resizeObserver.disconnect();
+			}
+			if ( resizeHandler ) {
+				window.removeEventListener( 'resize', resizeHandler );
+			}
+		};
 		measure();
 
 		function frame( now ) {
@@ -591,7 +645,9 @@
 			} );
 		} );
 
-		var previous = container.querySelectorAll( '.ds-slide:not([data-slide-id="' + item.id + '"])' );
+		var previous = Array.prototype.filter.call( container.querySelectorAll( '.ds-slide' ), function ( slideEl ) {
+			return slideEl !== newEl;
+		} );
 		previous.forEach( function ( prevEl ) {
 			prevEl.classList.remove( 'ds-active' );
 			prevEl.classList.add( 'ds-prev' );

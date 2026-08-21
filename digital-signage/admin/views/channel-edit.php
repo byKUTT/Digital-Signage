@@ -19,7 +19,12 @@ $layouts = array(
 );
 $zone_bg        = $id ? ( get_post_meta( $id, 'ds_zone_bg_color', true ) ?: '#000000' ) : '#000000';
 $scroll_bg      = $id ? ( get_post_meta( $id, 'ds_scroll_bg_color', true ) ?: '#000000' ) : '#000000';
-$scroll_spacing = $id ? ( get_post_meta( $id, 'ds_scroll_spacing', true ) ?: 20 ) : 20;
+$transition     = $id ? ( get_post_meta( $id, 'ds_transition', true ) ?: 'default' ) : 'default';
+$legacy_spacing = $id ? get_post_meta( $id, 'ds_scroll_spacing', true ) : '';
+$vertical_spacing_meta = $id ? get_post_meta( $id, 'ds_scroll_vertical_spacing', true ) : '';
+$horizontal_spacing_meta = $id ? get_post_meta( $id, 'ds_scroll_horizontal_spacing', true ) : '';
+$scroll_vertical_spacing = '' !== $vertical_spacing_meta ? absint( $vertical_spacing_meta ) : ( '' !== $legacy_spacing ? absint( $legacy_spacing ) : 20 );
+$scroll_horizontal_spacing = '' !== $horizontal_spacing_meta ? absint( $horizontal_spacing_meta ) : ( '' !== $legacy_spacing ? absint( $legacy_spacing ) : 20 );
 $scroll_speed   = $id ? ( get_post_meta( $id, 'ds_scroll_speed', true ) ?: 60 ) : 60;
 ?>
 <div class="ds-app-wrap">
@@ -80,22 +85,37 @@ $scroll_speed   = $id ? ( get_post_meta( $id, 'ds_scroll_speed', true ) ?: 60 ) 
 			</div>
 
 			<div class="ds-field">
+				<label for="transition"><?php esc_html_e( 'Slide transition', 'digital-signage' ); ?></label>
+				<select id="transition" name="transition" class="ds-input">
+					<option value="default" <?php selected( $transition, 'default' ); ?>><?php esc_html_e( 'Use global default', 'digital-signage' ); ?></option>
+					<?php foreach ( array( 'none', 'fade', 'slide', 'zoom' ) as $transition_option ) : ?>
+						<option value="<?php echo esc_attr( $transition_option ); ?>" <?php selected( $transition, $transition_option ); ?>><?php echo esc_html( ucfirst( $transition_option ) ); ?></option>
+					<?php endforeach; ?>
+				</select>
+				<span class="ds-hint"><?php esc_html_e( 'Applied to every slide in this channel.', 'digital-signage' ); ?></span>
+			</div>
+
+			<div class="ds-field">
 				<label class="ds-checkbox-label">
 					<input type="checkbox" name="is_priority" value="1" <?php checked( $is_priority ); ?> />
 					<?php esc_html_e( 'Emergency / priority channel — takes over ALL screens immediately, ignoring schedules', 'digital-signage' ); ?>
 				</label>
 			</div>
 
-			<h3><?php esc_html_e( 'Infinite Scroll Gallery defaults', 'digital-signage' ); ?></h3>
-			<p class="ds-hint"><?php esc_html_e( 'Applies to every Infinite Scroll Gallery slide in this channel — set once here rather than per slide.', 'digital-signage' ); ?></p>
+			<h3><?php esc_html_e( 'Sliding carousel settings', 'digital-signage' ); ?></h3>
+			<p class="ds-hint"><?php esc_html_e( 'Applied to every Sliding carousel slide in this channel. Portrait carousels use full-width images and vertical spacing; landscape carousels use full-height images and horizontal spacing.', 'digital-signage' ); ?></p>
 			<div class="ds-settings-grid">
 				<div class="ds-field">
 					<label for="scroll_bg_color"><?php esc_html_e( 'Background color', 'digital-signage' ); ?></label>
 					<input type="color" id="scroll_bg_color" name="scroll_bg_color" value="<?php echo esc_attr( $scroll_bg ); ?>" class="ds-color-input" />
 				</div>
 				<div class="ds-field">
-					<label for="scroll_spacing"><?php esc_html_e( 'Spacing between images (px)', 'digital-signage' ); ?></label>
-					<input type="number" min="0" id="scroll_spacing" name="scroll_spacing" value="<?php echo esc_attr( $scroll_spacing ); ?>" class="ds-input ds-input-small" />
+					<label for="scroll_vertical_spacing"><?php esc_html_e( 'Portrait vertical spacing (px)', 'digital-signage' ); ?></label>
+					<input type="number" min="0" id="scroll_vertical_spacing" name="scroll_vertical_spacing" value="<?php echo esc_attr( $scroll_vertical_spacing ); ?>" class="ds-input ds-input-small" />
+				</div>
+				<div class="ds-field">
+					<label for="scroll_horizontal_spacing"><?php esc_html_e( 'Landscape horizontal spacing (px)', 'digital-signage' ); ?></label>
+					<input type="number" min="0" id="scroll_horizontal_spacing" name="scroll_horizontal_spacing" value="<?php echo esc_attr( $scroll_horizontal_spacing ); ?>" class="ds-input ds-input-small" />
 				</div>
 				<div class="ds-field">
 					<label for="scroll_speed"><?php esc_html_e( 'Scroll speed (px/second)', 'digital-signage' ); ?></label>

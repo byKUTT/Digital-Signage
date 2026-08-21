@@ -30,15 +30,21 @@ class DS_CRUD {
 
 		update_post_meta( $post_id, 'ds_layout_template', sanitize_key( $data['layout_template'] ?? 'fullscreen' ) );
 		update_post_meta( $post_id, 'ds_is_priority', empty( $data['is_priority'] ) ? 0 : 1 );
+		$transition = sanitize_key( $data['transition'] ?? 'default' );
+		if ( ! in_array( $transition, array( 'default', 'none', 'fade', 'slide', 'zoom' ), true ) ) {
+			$transition = 'default';
+		}
+		update_post_meta( $post_id, 'ds_transition', $transition );
 
 		$zone_bg = sanitize_hex_color( $data['zone_bg_color'] ?? '' );
 		update_post_meta( $post_id, 'ds_zone_bg_color', $zone_bg ? $zone_bg : '' );
 
-		// Infinite-scroll gallery defaults apply to every such slide in this
+		// Sliding-carousel defaults apply to every such slide in this
 		// channel — one place to tune the look/feel rather than per slide.
 		$scroll_bg = sanitize_hex_color( $data['scroll_bg_color'] ?? '' );
 		update_post_meta( $post_id, 'ds_scroll_bg_color', $scroll_bg ? $scroll_bg : '#000000' );
-		update_post_meta( $post_id, 'ds_scroll_spacing', absint( $data['scroll_spacing'] ?? 20 ) );
+		update_post_meta( $post_id, 'ds_scroll_vertical_spacing', absint( $data['scroll_vertical_spacing'] ?? 20 ) );
+		update_post_meta( $post_id, 'ds_scroll_horizontal_spacing', absint( $data['scroll_horizontal_spacing'] ?? 20 ) );
 		update_post_meta( $post_id, 'ds_scroll_speed', max( 5, absint( $data['scroll_speed'] ?? 60 ) ) );
 
 		return $post_id;
@@ -97,7 +103,12 @@ class DS_CRUD {
 	/* ---------------- Slide ---------------- */
 
 	public static function save_slide( $id, array $data ) {
-		$post_id = self::upsert_post( $id, 'ds_slide', $data['title'] ?? '' );
+		$channel_id = absint( $data['channel_id'] ?? 0 );
+		$title      = trim( sanitize_text_field( $data['title'] ?? '' ) );
+		if ( '' === $title ) {
+			$title = self::next_slide_title( $channel_id, $id );
+		}
+		$post_id = self::upsert_post( $id, 'ds_slide', $title );
 
 		$fields = array(
 			'slide_type'        => array( 'ds_slide_type', 'sanitize_key' ),
@@ -108,7 +119,6 @@ class DS_CRUD {
 			'weather_api_key'   => array( 'ds_weather_api_key', 'sanitize_text_field' ),
 			'video_play_mode'   => array( 'ds_video_play_mode', 'sanitize_key' ),
 			'duration_override' => array( 'ds_duration_override', 'absint' ),
-			'transition_override' => array( 'ds_transition_override', 'sanitize_key' ),
 			'sched_start_date'  => array( 'ds_sched_start_date', 'sanitize_text_field' ),
 			'sched_end_date'    => array( 'ds_sched_end_date', 'sanitize_text_field' ),
 			'sched_start_time'  => array( 'ds_sched_start_time', 'sanitize_text_field' ),
@@ -128,8 +138,10 @@ class DS_CRUD {
 
 		update_post_meta( $post_id, 'ds_content_html', wp_kses_post( $data['content_html'] ?? '' ) );
 		update_post_meta( $post_id, 'ds_sched_days', array_map( 'sanitize_key', (array) ( $data['sched_days'] ?? array() ) ) );
+		delete_post_meta( $post_id, 'ds_transition_override' );
 
-		// Infinite-scroll gallery: an ordered list of attachment IDs.
+		// Sliding carousel: an ordered list of attachment IDs. The legacy
+		// infinite_scroll type key is retained so existing slides stay valid.
 		$scroll_images = array_filter( array_map( 'absint', (array) ( $data['scroll_images'] ?? array() ) ) );
 		update_post_meta( $post_id, 'ds_scroll_images', array_values( $scroll_images ) );
 
@@ -272,6 +284,34 @@ class DS_CRUD {
 	}
 
 	/* ---------------- Shared ---------------- */
+
+	private static function next_slide_title( $channel_id, $exclude_id = 0 ) {
+		$args = array(
+			'post_type'      => 'ds_slide',
+			'post_status'    => 'any',
+			'posts_per_page' => -1,
+			'meta_key'       => 'ds_channel_id',
+			'meta_value'     => absint( $channel_id ),
+			'fields'         => 'ids',
+		);
+		if ( $exclude_id ) {
+			$args['post__not_in'] = array( absint( $exclude_id ) );
+		}
+
+		$used_numbers = array();
+		foreach ( get_posts( $args ) as $slide_id ) {
+			if ( preg_match( '/^Slide ([1-9][0-9]*)$/i', get_the_title( $slide_id ), $matches ) ) {
+				$used_numbers[ absint( $matches[1] ) ] = true;
+			}
+		}
+
+		$number = 1;
+		while ( isset( $used_numbers[ $number ] ) ) {
+			$number++;
+		}
+
+		return sprintf( __( 'Slide %d', 'digital-signage' ), $number );
+	}
 
 	private static function upsert_post( $id, $post_type, $title ) {
 		$title = $title ? sanitize_text_field( $title ) : __( '(untitled)', 'digital-signage' );

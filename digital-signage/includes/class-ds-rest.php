@@ -484,8 +484,15 @@ class DS_REST {
 		$duration_override = get_post_meta( $slide->ID, 'ds_duration_override', true );
 		$duration           = $duration_override ? absint( $duration_override ) : absint( $settings[ 'duration_' . $type ] ?? 10 );
 
-		$transition_override = get_post_meta( $slide->ID, 'ds_transition_override', true );
-		$transition           = ( $transition_override && 'default' !== $transition_override ) ? $transition_override : $settings['transition'];
+		$channel_id        = absint( get_post_meta( $slide->ID, 'ds_channel_id', true ) );
+		$transition        = $channel_id ? sanitize_key( get_post_meta( $channel_id, 'ds_transition', true ) ) : '';
+		$valid_transitions = array( 'none', 'fade', 'slide', 'zoom' );
+		if ( ! in_array( $transition, $valid_transitions, true ) ) {
+			$transition = sanitize_key( $settings['transition'] ?? 'fade' );
+		}
+		if ( ! in_array( $transition, $valid_transitions, true ) ) {
+			$transition = 'fade';
+		}
 
 		$data = array(
 			'id'          => $slide->ID,
@@ -538,12 +545,15 @@ class DS_REST {
 						)
 					)
 				);
-				// Background/spacing/speed are set once per channel (not per slide) so every
-				// Infinite Scroll gallery in that channel shares the same look and feel.
-				$scroll_channel_id = absint( get_post_meta( $slide->ID, 'ds_channel_id', true ) );
-				$data['bg_color']  = $scroll_channel_id ? ( get_post_meta( $scroll_channel_id, 'ds_scroll_bg_color', true ) ?: '#000000' ) : '#000000';
-				$data['spacing']   = $scroll_channel_id ? absint( get_post_meta( $scroll_channel_id, 'ds_scroll_spacing', true ) ?: 20 ) : 20;
-				$data['speed']     = $scroll_channel_id ? absint( get_post_meta( $scroll_channel_id, 'ds_scroll_speed', true ) ?: 60 ) : 60;
+				// Appearance and direction-specific spacing belong to the channel.
+				$legacy_spacing     = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_spacing', true ) : '';
+				$vertical_spacing   = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_vertical_spacing', true ) : '';
+				$horizontal_spacing = $channel_id ? get_post_meta( $channel_id, 'ds_scroll_horizontal_spacing', true ) : '';
+				$data['bg_color']   = $channel_id ? ( get_post_meta( $channel_id, 'ds_scroll_bg_color', true ) ?: '#000000' ) : '#000000';
+				$data['vertical_spacing'] = '' !== $vertical_spacing ? absint( $vertical_spacing ) : ( '' !== $legacy_spacing ? absint( $legacy_spacing ) : 20 );
+				$data['horizontal_spacing'] = '' !== $horizontal_spacing ? absint( $horizontal_spacing ) : ( '' !== $legacy_spacing ? absint( $legacy_spacing ) : 20 );
+				$data['spacing'] = '' !== $legacy_spacing ? absint( $legacy_spacing ) : 20;
+				$data['speed']   = $channel_id ? absint( get_post_meta( $channel_id, 'ds_scroll_speed', true ) ?: 60 ) : 60;
 				break;
 		}
 

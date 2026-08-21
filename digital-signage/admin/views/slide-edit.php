@@ -22,7 +22,6 @@ $weather  = $id ? get_post_meta( $id, 'ds_weather_location', true ) : '';
 $api_key  = $id ? get_post_meta( $id, 'ds_weather_api_key', true ) : '';
 $playmode = $id ? ( get_post_meta( $id, 'ds_video_play_mode', true ) ?: 'fixed_duration' ) : 'fixed_duration';
 $duration = $id ? get_post_meta( $id, 'ds_duration_override', true ) : '';
-$transition = $id ? ( get_post_meta( $id, 'ds_transition_override', true ) ?: 'default' ) : 'default';
 $fit      = $id ? ( get_post_meta( $id, 'ds_fit', true ) ?: 'cover' ) : 'cover';
 $zone     = $id ? ( get_post_meta( $id, 'ds_zone', true ) ?: 'main' ) : 'main';
 $scroll_images  = $id ? array_map( 'absint', (array) get_post_meta( $id, 'ds_scroll_images', true ) ) : array();
@@ -47,7 +46,7 @@ $types = array(
 	'clock'   => __( 'Live clock / date', 'digital-signage' ),
 	'pdf'     => __( 'PDF page / Google Slides embed', 'digital-signage' ),
 	'social'  => __( 'Social media embed', 'digital-signage' ),
-	'infinite_scroll' => __( 'Infinite scroll gallery', 'digital-signage' ),
+	'infinite_scroll' => __( 'Sliding carousel', 'digital-signage' ),
 );
 $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue', 'digital-signage' ), 'wed' => __( 'Wed', 'digital-signage' ), 'thu' => __( 'Thu', 'digital-signage' ), 'fri' => __( 'Fri', 'digital-signage' ), 'sat' => __( 'Sat', 'digital-signage' ), 'sun' => __( 'Sun', 'digital-signage' ) );
 ?>
@@ -87,7 +86,7 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 			<div class="ds-panel">
 				<div class="ds-field">
 					<label for="title"><?php esc_html_e( 'Slide name (for your reference, not shown on screen)', 'digital-signage' ); ?></label>
-					<input type="text" id="title" name="title" class="ds-input" value="<?php echo $id ? esc_attr( $slide->post_title ) : ''; ?>" placeholder="<?php esc_attr_e( 'e.g. Lunch Special', 'digital-signage' ); ?>" required />
+					<input type="text" id="title" name="title" class="ds-input" value="<?php echo $id ? esc_attr( $slide->post_title ) : ''; ?>" placeholder="<?php esc_attr_e( 'Leave blank to generate Slide 1, Slide 2, etc.', 'digital-signage' ); ?>" />
 				</div>
 
 				<div class="ds-field">
@@ -177,7 +176,7 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 							<?php endforeach; ?>
 						</ul>
 					</div>
-					<p class="ds-hint"><?php echo wp_kses_post( sprintf( /* translators: %s: link to the channel edit screen */ __( 'Background color, spacing and scroll speed are set once for the whole channel — see %s. Scrolls top-to-bottom on portrait screens (images full width), left-to-right on landscape (images full height); direction follows the screen\'s orientation automatically.', 'digital-signage' ), '<a href="' . esc_url( admin_url( 'admin.php?page=ds-channel-edit&id=' . $channel_id ) ) . '">' . esc_html__( 'this channel\'s settings', 'digital-signage' ) . '</a>' ) ); ?></p>
+					<p class="ds-hint"><?php echo wp_kses_post( sprintf( /* translators: %s: link to the channel edit screen */ __( 'Background color, portrait/landscape spacing and speed are set once for the whole channel — see %s. Portrait uses full-width images and vertical movement; landscape uses full-height images and horizontal movement.', 'digital-signage' ), '<a href="' . esc_url( admin_url( 'admin.php?page=ds-channel-edit&id=' . $channel_id ) ) . '">' . esc_html__( 'this channel\'s settings', 'digital-signage' ) . '</a>' ) ); ?></p>
 				</div>
 			</div>
 
@@ -198,16 +197,6 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 					<label for="duration_override"><?php esc_html_e( 'Duration override (seconds)', 'digital-signage' ); ?></label>
 					<input type="number" min="0" id="duration_override" name="duration_override" value="<?php echo esc_attr( $duration ); ?>" class="ds-input ds-input-small" />
 					<span class="ds-hint"><?php esc_html_e( 'Blank/0 uses the type default from Settings.', 'digital-signage' ); ?></span>
-				</div>
-
-				<div class="ds-field">
-					<label for="transition_override"><?php esc_html_e( 'Transition', 'digital-signage' ); ?></label>
-					<select id="transition_override" name="transition_override" class="ds-input">
-						<option value="default" <?php selected( $transition, 'default' ); ?>><?php esc_html_e( 'Use global default', 'digital-signage' ); ?></option>
-						<?php foreach ( array( 'none', 'fade', 'slide', 'zoom' ) as $t ) : ?>
-							<option value="<?php echo esc_attr( $t ); ?>" <?php selected( $transition, $t ); ?>><?php echo esc_html( ucfirst( $t ) ); ?></option>
-						<?php endforeach; ?>
-					</select>
 				</div>
 
 				<div class="ds-field">
