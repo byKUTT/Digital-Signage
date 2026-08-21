@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.4.3
+Stable tag: 2.4.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,9 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.4.4 =
+* Raspberry Pi and Windows kiosk installers now also pass `--disable-features=Translate,TranslateUI` to Chromium/Edge — the old `--disable-translate` flag they already had is legacy and no longer suppresses the "Translate this page?" popup on modern Chromium, which was showing up in the corner on kiosk screens.
 
 = 2.4.3 =
 * Kiosk devices (Raspberry Pi and Windows installers, both launching Chromium with `--kiosk`) no longer show a "Tap for fullscreen" / "Click to Start" prompt on the pairing screen or player — that prompt exists only for browsers opened normally, where the Fullscreen API needs a user gesture; a `--kiosk`-launched browser is already OS-level fullscreen with no chrome to hide, and a real kiosk has no mouse/touch/keyboard to click it with anyway. Both installers now open `?kiosk=1`, which the pairing and player pages detect and skip the prompt for entirely. Re-run the installer to pick this up — no `--regenerate` needed.

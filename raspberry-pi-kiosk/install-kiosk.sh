@@ -148,6 +148,7 @@ while true; do
 		--disable-infobars \
 		--disable-session-crashed-bubble \
 		--disable-translate \
+		--disable-features=Translate,TranslateUI \
 		--disable-pinch \
 		--overscroll-history-navigation=0 \
 		--no-first-run \

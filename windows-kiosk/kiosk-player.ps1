@@ -164,6 +164,7 @@ function Start-KioskBrowser {
 		"--noerrdialogs",
 		"--disable-infobars",
 		"--disable-translate",
+		"--disable-features=Translate,TranslateUI",
 		"--disable-session-crashed-bubble",
 		"--overscroll-history-navigation=0",
 		"--autoplay-policy=no-user-gesture-required"
