@@ -250,6 +250,22 @@ for host in translate.google.com translate.googleapis.com translate-pa.googleapi
 	echo "0.0.0.0 ${host} # digital-signage-kiosk: block translate" >> /etc/hosts
 done
 
+# --- One-time cache reset for the 2.8.4 pairing-token recovery release. ---
+# Remove only browser-generated cache directories; profiles, pairing token,
+# preferences and all other kiosk configuration remain intact. The marker
+# makes this destructive cleanup run exactly once on each device.
+CACHE_RESET_MARKER="/var/lib/digital-signage-kiosk-cache-reset-284"
+if [ ! -f "$CACHE_RESET_MARKER" ]; then
+	echo "==> Clearing old kiosk URL caches (one-time 2.8.4 reset)"
+	rm -rf /var/lib/digital-signage-kiosk-firefox-profile/cache2
+	rm -rf /var/lib/digital-signage-kiosk-firefox-profile/startupCache
+	rm -rf /var/lib/digital-signage-kiosk-chromium-profile/Default/Cache
+	rm -rf /var/lib/digital-signage-kiosk-chromium-profile/Default/Code\ Cache
+	rm -rf /var/lib/digital-signage-kiosk-profile/cache2
+	rm -rf /var/lib/digital-signage-kiosk-profile/Default/Cache
+	touch "$CACHE_RESET_MARKER"
+fi
+
 # --- Persistent device token: generate once, reuse forever (until --regenerate). ---
 TOKEN=""
 ROTATION="normal"
@@ -286,7 +302,7 @@ fi
 # ?kiosk=1 tells the player/pairing screens this browser is already OS-level
 # fullscreen (started with --kiosk below) with no chrome to hide and no input
 # device to click a "tap to start" prompt with, so they skip that entirely.
-URL="${SITE_URL}/signage/play/${TOKEN}/?kiosk=1"
+URL="${SITE_URL}/signage/play/${TOKEN}/?kiosk=1&cv=284"
 
 echo "==> Writing config to ${CONF_FILE}"
 cat > "$CONF_FILE" <<EOF
