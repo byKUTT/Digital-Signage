@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.7.4
+Stable tag: 2.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,10 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.8.0 =
+* New: `install-kiosk.sh --browser firefox` switches a Raspberry Pi kiosk from Chromium to Firefox ESR — a real alternative for a device where Chromium's translate popup (or other browser UI) keeps appearing despite every flag, policy and profile-level override already applied against it. Firefox has no equivalent auto-popping "translate this page?" prompt by default. Firefox gets its own `/etc/firefox/policies/policies.json` and a `user.js` in the kiosk profile disabling translations, telemetry, form/password saving, and other first-run prompts. `ds-agent`'s "Restart Browser" command now targets whichever browser is actually configured. Re-run with `--browser chromium` (or without `--browser`) to switch back — the choice persists across reboots either way.
+* Also added a fourth, network-level layer against Chromium's translate popup for anyone staying on Chromium: `translate.google.com`/`translate.googleapis.com`/`translate-pa.googleapis.com` are now black-holed in `/etc/hosts`, so the feature can't reach Google's translate service regardless of whether the flags/policy/profile overrides are being honored.
 
 = 2.7.4 =
 * Raspberry Pi installer: added a third, independent layer against the Chromium translate popup — the kiosk profile's own `Preferences` file now gets `translate.enabled: false` merged in directly on every service start (not just once), so it applies even if the enterprise policy file or the `--disable-features` flag aren't being honored for some reason on a given Chromium build. Also added `--lang=en-US` to reduce the page/browser-language mismatches that trigger a translate offer in the first place.

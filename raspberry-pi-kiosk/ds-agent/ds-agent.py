@@ -248,7 +248,12 @@ def apply_reboot():
 def apply_restart_browser():
 	log("Restarting kiosk browser…")
 	# Killing the browser is enough — ds-kiosk-loop.sh's while-loop relaunches it.
-	run(["pkill", "-f", "chromium"], timeout=5)
+	# Which process name to kill depends on DS_KIOSK_BROWSER (install-kiosk.sh
+	# --browser chromium|firefox); older configs from before that option
+	# existed have no such key, so fall back to chromium.
+	config = read_config()
+	pattern = "firefox" if config.get("DS_KIOSK_BROWSER") == "firefox" else "chromium"
+	run(["pkill", "-f", pattern], timeout=5)
 
 
 def apply_check_updates():

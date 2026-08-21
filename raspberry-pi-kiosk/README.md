@@ -64,6 +64,15 @@ Every step, in order, from a blank SD card:
    ```
    This can also be set later from wp-admin (Screen edit page > Device >
    Custom resolution) without touching the Pi again.
+
+   Chromium's translate popup (or other browser UI) still showing despite
+   everything this installer already does to suppress it? Switch this
+   device to Firefox ESR instead with `--browser firefox`:
+   ```bash
+   sudo bash install-kiosk.sh "https://yourdomain.com" pi --browser firefox
+   ```
+   Firefox has no equivalent auto-popping "translate this page?" prompt.
+   Re-run without `--browser` (or with `--browser chromium`) to switch back.
 7. **Reboot:**
    ```bash
    sudo reboot

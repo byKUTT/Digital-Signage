@@ -33,9 +33,13 @@ rm -f /usr/local/bin/ds-kiosk-loop.sh /etc/digital-signage-kiosk.conf
 rm -f /tmp/ds-kiosk-chromium.log
 rm -rf /var/lib/digital-signage-kiosk-profile
 
-echo "==> Removing Chromium kiosk policy"
+echo "==> Removing Chromium/Firefox kiosk policy"
 rm -f /etc/chromium/policies/managed/digital-signage-kiosk.json
 rm -f /etc/chromium-browser/policies/managed/digital-signage-kiosk.json
+rm -f /etc/firefox/policies/policies.json
+
+echo "==> Unblocking Google Translate in /etc/hosts"
+sed -i '/# digital-signage-kiosk: block translate/d' /etc/hosts
 
 echo "==> Removing device-management agent and setup portal"
 systemctl disable --now ds-agent.service >/dev/null 2>&1 || true
@@ -59,6 +63,6 @@ systemctl daemon-reload
 echo ""
 echo "✅ Fully removed for ${KIOSK_USER}. Reboot to return to a normal console login: sudo reboot"
 echo ""
-echo "(This did not uninstall the apt packages it installed — chromium, xserver-xorg,"
-echo " openbox, etc. — since other things on this system may use them. Remove those"
-echo " yourself with 'sudo apt-get remove <package>' if you want them gone too.)"
+echo "(This did not uninstall the apt packages it installed — chromium or firefox-esr,"
+echo " xserver-xorg, openbox, etc. — since other things on this system may use them."
+echo " Remove those yourself with 'sudo apt-get remove <package>' if you want them gone too.)"

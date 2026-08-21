@@ -22,7 +22,7 @@
 # (e.g. you're re-purposing this SD card for a different physical screen).
 #
 # Usage:
-#   sudo bash install-kiosk.sh https://yourdomain.com [kiosk-user] [--regenerate] [--resolution WIDTHxHEIGHT]
+#   sudo bash install-kiosk.sh https://yourdomain.com [kiosk-user] [--regenerate] [--resolution WIDTHxHEIGHT] [--browser chromium|firefox]
 #
 # --resolution is only needed for an uncommon/stretched display (e.g. a bar-
 # shaped screen like 1920x440) that the Pi's EDID auto-detection gets wrong
@@ -30,12 +30,19 @@
 # they auto-detect correctly. It can also be set later, per-device, from
 # wp-admin (Screen edit page > Device > Custom resolution), no SSH needed.
 #
+# --browser defaults to chromium. Pass "--browser firefox" to use Firefox
+# ESR instead — a genuine alternative for a device where Chromium keeps
+# showing its translate popup / other UI despite every flag, policy and
+# profile-level override this script already applies against it. Firefox
+# has no equivalent built-in "detect language, offer to translate" popup by
+# default, and gets its own set of anti-popup prefs below.
+#
 # Run this ON the Raspberry Pi itself (SSH in, or use a keyboard/monitor).
 
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
-	echo "Please run as root: sudo bash install-kiosk.sh <site-url> [user] [--regenerate] [--resolution WxH]" >&2
+	echo "Please run as root: sudo bash install-kiosk.sh <site-url> [user] [--regenerate] [--resolution WxH] [--browser chromium|firefox]" >&2
 	exit 1
 fi
 
@@ -43,31 +50,42 @@ SITE_URL="${1:-}"
 KIOSK_USER="${2:-${SUDO_USER:-pi}}"
 REGENERATE=0
 RESOLUTION_ARG=""
-prev_was_res_flag=0
+BROWSER_ARG=""
+prev_flag=""
 for arg in "$@"; do
-	if [ "$prev_was_res_flag" -eq 1 ]; then
-		RESOLUTION_ARG="$arg"
-		prev_was_res_flag=0
+	if [ -n "$prev_flag" ]; then
+		case "$prev_flag" in
+			--resolution) RESOLUTION_ARG="$arg" ;;
+			--browser) BROWSER_ARG="$arg" ;;
+		esac
+		prev_flag=""
 		continue
 	fi
 	[ "$arg" = "--regenerate" ] && REGENERATE=1
-	[ "$arg" = "--resolution" ] && prev_was_res_flag=1
+	case "$arg" in
+		--resolution|--browser) prev_flag="$arg" ;;
+	esac
 done
 # A second positional arg that's actually a flag shouldn't be treated as a username.
 case "$KIOSK_USER" in
-	--regenerate|--resolution) KIOSK_USER="${SUDO_USER:-pi}" ;;
+	--regenerate|--resolution|--browser) KIOSK_USER="${SUDO_USER:-pi}" ;;
 esac
 
 if [ -z "$SITE_URL" ]; then
-	echo "Usage: sudo bash install-kiosk.sh <site-url> [kiosk-user] [--regenerate] [--resolution WxH]" >&2
+	echo "Usage: sudo bash install-kiosk.sh <site-url> [kiosk-user] [--regenerate] [--resolution WxH] [--browser chromium|firefox]" >&2
 	echo "Example: sudo bash install-kiosk.sh https://example.com pi" >&2
 	echo "Example with a custom/uncommon resolution: sudo bash install-kiosk.sh https://example.com pi --resolution 1920x440" >&2
+	echo "Example using Firefox instead of Chromium: sudo bash install-kiosk.sh https://example.com pi --browser firefox" >&2
 	exit 1
 fi
 SITE_URL="${SITE_URL%/}"
 
 if [ -n "$RESOLUTION_ARG" ] && ! echo "$RESOLUTION_ARG" | grep -qE '^[0-9]{2,5}x[0-9]{2,5}$'; then
 	echo "Invalid --resolution '${RESOLUTION_ARG}' — expected WIDTHxHEIGHT, e.g. 1920x440." >&2
+	exit 1
+fi
+if [ -n "$BROWSER_ARG" ] && [ "$BROWSER_ARG" != "chromium" ] && [ "$BROWSER_ARG" != "firefox" ]; then
+	echo "Invalid --browser '${BROWSER_ARG}' — expected 'chromium' or 'firefox'." >&2
 	exit 1
 fi
 
@@ -81,52 +99,138 @@ USER_HOME=$(getent passwd "$KIOSK_USER" | cut -d: -f6)
 CONF_FILE="/etc/digital-signage-kiosk.conf"
 WATCHDOG="/usr/local/bin/ds-kiosk-loop.sh"
 
+# --browser wins if given; otherwise reuse whatever this device already used
+# (so re-running the installer for other reasons doesn't silently switch a
+# working Firefox setup back to Chromium), defaulting to chromium if this is
+# a brand-new install.
+BROWSER="chromium"
+if [ -f "$CONF_FILE" ]; then
+	# shellcheck disable=SC1090
+	EXISTING_BROWSER=$(. "$CONF_FILE" 2>/dev/null; echo "${DS_KIOSK_BROWSER:-}")
+	[ -n "$EXISTING_BROWSER" ] && BROWSER="$EXISTING_BROWSER"
+fi
+[ -n "$BROWSER_ARG" ] && BROWSER="$BROWSER_ARG"
+
 echo "==> Installing packages (this can take a few minutes)…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-# chromium package name differs across Raspberry Pi OS releases.
-CHROMIUM_PKG="chromium-browser"
-if ! apt-cache show chromium-browser >/dev/null 2>&1; then
-	CHROMIUM_PKG="chromium"
-fi
-apt-get install -y --no-install-recommends \
-	xserver-xorg xinit x11-xserver-utils openbox unclutter python3 "$CHROMIUM_PKG"
 
-CHROMIUM_BIN=$(command -v chromium-browser || command -v chromium || true)
-if [ -z "$CHROMIUM_BIN" ]; then
-	echo "Could not find a chromium binary after install." >&2
-	exit 1
+if [ "$BROWSER" = "firefox" ]; then
+	apt-get install -y --no-install-recommends \
+		xserver-xorg xinit x11-xserver-utils openbox unclutter python3 firefox-esr
+	BROWSER_BIN=$(command -v firefox-esr || true)
+	if [ -z "$BROWSER_BIN" ]; then
+		echo "Could not find firefox-esr after install." >&2
+		exit 1
+	fi
+
+	# --- Firefox enterprise policy + prefs: the equivalent of the Chromium
+	# section below, in Firefox's own mechanisms. Firefox has no built-in
+	# "detect page language, offer to translate" popup enabled by default the
+	# way Chromium does — its opt-in Translations feature only ever shows an
+	# icon in the (hidden, in kiosk mode) address bar, never an unprompted
+	# overlay — but it's still turned off explicitly here, along with the
+	# other first-run/update/telemetry prompts a kiosk has no use for. ---
+	echo "==> Writing Firefox policy to disable translate/popups"
+	mkdir -p /etc/firefox/policies
+	cat > /etc/firefox/policies/policies.json <<'POLICY'
+{
+	"policies": {
+		"DisableTelemetry": true,
+		"DisableFirefoxAccounts": true,
+		"DisablePocket": true,
+		"DisableFormHistory": true,
+		"OfferToSaveLogins": false,
+		"PasswordManagerEnabled": false,
+		"DontCheckDefaultBrowser": true,
+		"DisableFirefoxStudies": true,
+		"UserMessaging": {
+			"WhatsNew": false,
+			"ExtensionRecommendations": false,
+			"FeatureRecommendations": false
+		}
+	}
+}
+POLICY
+
+	FIREFOX_PROFILE_DIR="/var/lib/digital-signage-kiosk-profile"
+	mkdir -p "$FIREFOX_PROFILE_DIR"
+	cat > "${FIREFOX_PROFILE_DIR}/user.js" <<'USERJS'
+// Digital Signage kiosk profile — belt-and-suspenders against any popup on
+// an unattended screen with no input device to dismiss one with.
+user_pref("browser.translations.enable", false);
+user_pref("browser.translations.automaticallyPopup", false);
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("browser.aboutwelcome.enabled", false);
+user_pref("datareporting.policy.dataSubmissionEnabled", false);
+user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);
+user_pref("signon.rememberSignons", false);
+user_pref("geo.enabled", false);
+user_pref("dom.push.enabled", false);
+user_pref("browser.sessionstore.resume_from_crash", false);
+user_pref("browser.tabs.warnOnClose", false);
+user_pref("app.update.auto", false);
+USERJS
+else
+	# chromium package name differs across Raspberry Pi OS releases.
+	CHROMIUM_PKG="chromium-browser"
+	if ! apt-cache show chromium-browser >/dev/null 2>&1; then
+		CHROMIUM_PKG="chromium"
+	fi
+	apt-get install -y --no-install-recommends \
+		xserver-xorg xinit x11-xserver-utils openbox unclutter python3 "$CHROMIUM_PKG"
+
+	BROWSER_BIN=$(command -v chromium-browser || command -v chromium || true)
+	if [ -z "$BROWSER_BIN" ]; then
+		echo "Could not find a chromium binary after install." >&2
+		exit 1
+	fi
+
+	# --- Chromium enterprise policy: belt-and-suspenders against popups. ---
+	# Command-line flags (--disable-translate etc., below) cover most of this,
+	# but an enterprise policy file always wins regardless of Chromium version
+	# quirks or flag-parsing edge cases — this is the same mechanism managed
+	# corporate/school Chromebooks use, just pointed at a single kiosk device.
+	# The policy directory differs by package name (chromium vs chromium-browser)
+	# and doesn't always match the binary name cleanly across Raspberry Pi OS
+	# releases, so write to both — Chromium only ever reads the one that
+	# actually matches how it was packaged; the other stays inert.
+	echo "==> Writing Chromium policy to disable translate/popups"
+	POLICY_JSON='{
+		"TranslateEnabled": false,
+		"DefaultBrowserSettingEnabled": false,
+		"BrowserSignin": 0,
+		"SyncDisabled": true,
+		"PasswordManagerEnabled": false,
+		"AutofillAddressEnabled": false,
+		"AutofillCreditCardEnabled": false,
+		"PromptForDownloadLocation": false,
+		"BackgroundModeEnabled": false,
+		"DefaultNotificationsSetting": 2,
+		"DefaultGeolocationSetting": 2,
+		"AlternateErrorPagesEnabled": false,
+		"SearchSuggestEnabled": false,
+		"SpellcheckEnabled": false
+	}'
+	for policy_dir in /etc/chromium/policies/managed /etc/chromium-browser/policies/managed; do
+		mkdir -p "$policy_dir"
+		echo "$POLICY_JSON" > "${policy_dir}/digital-signage-kiosk.json"
+	done
 fi
 
-# --- Chromium enterprise policy: belt-and-suspenders against popups. ---
-# Command-line flags (--disable-translate etc., below) cover most of this,
-# but an enterprise policy file always wins regardless of Chromium version
-# quirks or flag-parsing edge cases — this is the same mechanism managed
-# corporate/school Chromebooks use, just pointed at a single kiosk device.
-# The policy directory differs by package name (chromium vs chromium-browser)
-# and doesn't always match the binary name cleanly across Raspberry Pi OS
-# releases, so write to both — Chromium only ever reads the one that
-# actually matches how it was packaged; the other stays inert.
-echo "==> Writing Chromium policy to disable translate/popups"
-POLICY_JSON='{
-	"TranslateEnabled": false,
-	"DefaultBrowserSettingEnabled": false,
-	"BrowserSignin": 0,
-	"SyncDisabled": true,
-	"PasswordManagerEnabled": false,
-	"AutofillAddressEnabled": false,
-	"AutofillCreditCardEnabled": false,
-	"PromptForDownloadLocation": false,
-	"BackgroundModeEnabled": false,
-	"DefaultNotificationsSetting": 2,
-	"DefaultGeolocationSetting": 2,
-	"AlternateErrorPagesEnabled": false,
-	"SearchSuggestEnabled": false,
-	"SpellcheckEnabled": false
-}'
-for policy_dir in /etc/chromium/policies/managed /etc/chromium-browser/policies/managed; do
-	mkdir -p "$policy_dir"
-	echo "$POLICY_JSON" > "${policy_dir}/digital-signage-kiosk.json"
+# --- Fourth, network-level layer: make Google's translate service
+# unreachable outright. TranslateEnabled (policy + Preferences) and
+# --disable-features=Translate,TranslateUI should already be enough on
+# their own, but if a given Chromium build ignores all three of those, it
+# still needs to actually reach translate.google(apis).com to offer/perform
+# a translation — black-holing those hostnames in /etc/hosts makes that
+# impossible regardless of anything Chromium-side. Idempotent: removes any
+# entry this installer wrote before, then re-adds it, so re-running never
+# duplicates lines.
+echo "==> Blocking Google Translate's hostnames in /etc/hosts"
+sed -i '/# digital-signage-kiosk: block translate/d' /etc/hosts
+for host in translate.google.com translate.googleapis.com translate-pa.googleapis.com; do
+	echo "0.0.0.0 ${host} # digital-signage-kiosk: block translate" >> /etc/hosts
 done
 
 # --- Persistent device token: generate once, reuse forever (until --regenerate). ---
@@ -176,10 +280,13 @@ cat > "$CONF_FILE" <<EOF
 # and DS_KIOSK_RESOLUTION are normally managed remotely from wp-admin
 # (Screen edit page > Device) — DS_KIOSK_RESOLUTION is only needed for an
 # uncommon/stretched display; leave it blank for normal auto-detected ones.
+# DS_KIOSK_BROWSER is "chromium" or "firefox" — change it by re-running
+# install-kiosk.sh with --browser, not by editing this line directly.
 DS_KIOSK_TOKEN="${TOKEN}"
 DS_KIOSK_SITE="${SITE_URL}"
 DS_KIOSK_URL="${URL}"
-DS_KIOSK_CHROMIUM="${CHROMIUM_BIN}"
+DS_KIOSK_BROWSER="${BROWSER}"
+DS_KIOSK_BROWSER_BIN="${BROWSER_BIN}"
 DS_KIOSK_ROTATION="${ROTATION}"
 DS_KIOSK_RESOLUTION="${RESOLUTION}"
 EOF
@@ -187,11 +294,12 @@ EOF
 echo "==> Writing watchdog launcher to ${WATCHDOG}"
 cat > "$WATCHDOG" <<'EOF'
 #!/usr/bin/env bash
-# Relaunches Chromium in kiosk mode if it ever exits/crashes, so an
-# unattended screen recovers on its own instead of showing a black screen.
-# Runs as root (ds-kiosk.service — see install-kiosk.sh) so Chromium refuses
-# to start without --no-sandbox; that's fine here since this is a dedicated,
-# single-purpose kiosk device showing one fixed URL, not general browsing.
+# Relaunches the kiosk browser (Chromium or Firefox — see DS_KIOSK_BROWSER
+# below) in kiosk mode if it ever exits/crashes, so an unattended screen
+# recovers on its own instead of showing a black screen. Runs as root
+# (ds-kiosk.service — see install-kiosk.sh), which is why Chromium needs
+# --no-sandbox; that's fine here since this is a dedicated, single-purpose
+# kiosk device showing one fixed URL, not general browsing.
 set -u
 source /etc/digital-signage-kiosk.conf
 
@@ -230,32 +338,49 @@ if [ "${DS_KIOSK_ROTATION:-normal}" != "normal" ]; then
 	done
 fi
 
-# --disable-dev-shm-usage: on a resource-constrained Pi, Chromium's renderer
-# can exhaust the default (often small) /dev/shm shared-memory pool and
-# crash; --kiosk mode auto-reloads the page a few seconds after that, which
-# looks exactly like an unexplained periodic refresh even though the main
-# browser process (and its PID in this log) never actually restarted. This
-# flag makes Chromium fall back to disk-backed temp files instead of
-# /dev/shm, avoiding that crash entirely.
-#
-# --user-data-dir instead of --incognito: incognito keeps its whole profile
-# (cache included) in RAM, adding to the same memory pressure. A small
-# disk-backed profile — fine here, this is a single-purpose kiosk showing
-# one fixed URL, not a shared/general-purpose browser — reduces RAM use.
-#
-# Force translate off directly in that profile's own Preferences file, as a
-# THIRD, independent layer alongside the --disable-features flag and the
-# enterprise policy JSON: this is the same underlying pref those other two
-# are ultimately trying to set, written directly so it takes effect
-# regardless of whether policy file discovery or this exact flag are being
-# honored by this particular Chromium build. Runs on every start (not just
-# once) and merges into whatever Preferences already exists — including one
-# Chromium already created for this profile on an earlier run — rather than
-# only writing a fresh file, since a pre-existing file would otherwise never
-# get this override retrofitted onto it.
 PROFILE_DIR="/var/lib/digital-signage-kiosk-profile"
-mkdir -p "${PROFILE_DIR}/Default"
-python3 - "${PROFILE_DIR}/Default/Preferences" <<'PYEOF' || true
+
+if [ "${DS_KIOSK_BROWSER:-chromium}" = "firefox" ]; then
+	# Firefox ESR kiosk launch. -kiosk gives a chrome-less fullscreen window;
+	# -no-remote forces a genuinely fresh instance each relaunch instead of
+	# trying to hand off to a still-running one; -profile points it at the
+	# disk-backed profile install-kiosk.sh seeded with user.js (translate and
+	# other popups already turned off there and in /etc/firefox/policies).
+	while true; do
+		"$DS_KIOSK_BROWSER_BIN" \
+			-kiosk \
+			-no-remote \
+			-profile "$PROFILE_DIR" \
+			"$DS_KIOSK_URL" \
+			>/tmp/ds-kiosk-chromium.log 2>&1 || true
+		sleep 3
+	done
+else
+	# --disable-dev-shm-usage: on a resource-constrained Pi, Chromium's renderer
+	# can exhaust the default (often small) /dev/shm shared-memory pool and
+	# crash; --kiosk mode auto-reloads the page a few seconds after that, which
+	# looks exactly like an unexplained periodic refresh even though the main
+	# browser process (and its PID in this log) never actually restarted. This
+	# flag makes Chromium fall back to disk-backed temp files instead of
+	# /dev/shm, avoiding that crash entirely.
+	#
+	# --user-data-dir instead of --incognito: incognito keeps its whole profile
+	# (cache included) in RAM, adding to the same memory pressure. A small
+	# disk-backed profile — fine here, this is a single-purpose kiosk showing
+	# one fixed URL, not a shared/general-purpose browser — reduces RAM use.
+	#
+	# Force translate off directly in that profile's own Preferences file, as a
+	# THIRD, independent layer alongside the --disable-features flag and the
+	# enterprise policy JSON: this is the same underlying pref those other two
+	# are ultimately trying to set, written directly so it takes effect
+	# regardless of whether policy file discovery or this exact flag are being
+	# honored by this particular Chromium build. Runs on every start (not just
+	# once) and merges into whatever Preferences already exists — including one
+	# Chromium already created for this profile on an earlier run — rather than
+	# only writing a fresh file, since a pre-existing file would otherwise never
+	# get this override retrofitted onto it.
+	mkdir -p "${PROFILE_DIR}/Default"
+	python3 - "${PROFILE_DIR}/Default/Preferences" <<'PYEOF' || true
 import json, os, sys
 
 path = sys.argv[1]
@@ -274,29 +399,30 @@ with open( path, "w" ) as f:
 	json.dump( data, f )
 PYEOF
 
-while true; do
-	"$DS_KIOSK_CHROMIUM" \
-		--kiosk \
-		--noerrdialogs \
-		--disable-infobars \
-		--disable-session-crashed-bubble \
-		--disable-translate \
-		--disable-features=Translate,TranslateUI \
-		--disable-pinch \
-		--overscroll-history-navigation=0 \
-		--no-first-run \
-		--fast --fast-start \
-		--check-for-update-interval=31536000 \
-		--autoplay-policy=no-user-gesture-required \
-		--user-data-dir="$PROFILE_DIR" \
-		--disable-dev-shm-usage \
-		--disable-gpu-shader-disk-cache \
-		--lang=en-US \
-		--no-sandbox \
-		"$DS_KIOSK_URL" \
-		>/tmp/ds-kiosk-chromium.log 2>&1 || true
-	sleep 3
-done
+	while true; do
+		"$DS_KIOSK_BROWSER_BIN" \
+			--kiosk \
+			--noerrdialogs \
+			--disable-infobars \
+			--disable-session-crashed-bubble \
+			--disable-translate \
+			--disable-features=Translate,TranslateUI \
+			--disable-pinch \
+			--overscroll-history-navigation=0 \
+			--no-first-run \
+			--fast --fast-start \
+			--check-for-update-interval=31536000 \
+			--autoplay-policy=no-user-gesture-required \
+			--user-data-dir="$PROFILE_DIR" \
+			--disable-dev-shm-usage \
+			--disable-gpu-shader-disk-cache \
+			--lang=en-US \
+			--no-sandbox \
+			"$DS_KIOSK_URL" \
+			>/tmp/ds-kiosk-chromium.log 2>&1 || true
+		sleep 3
+	done
+fi
 EOF
 chmod +x "$WATCHDOG"
 
@@ -340,7 +466,7 @@ rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
 echo "==> Installing ds-kiosk.service (runs as root, owns tty1, starts X directly)"
 cat > /etc/systemd/system/ds-kiosk.service <<EOF
 [Unit]
-Description=Digital Signage kiosk (X + Chromium)
+Description=Digital Signage kiosk (X + ${BROWSER})
 After=network-online.target getty@tty1.service
 Wants=network-online.target
 Conflicts=getty@tty1.service
@@ -402,6 +528,7 @@ fi
 
 echo ""
 echo "✅ Installed. Player URL (permanent for this device): ${URL}"
+echo "   Browser:                ${BROWSER} (${BROWSER_BIN})"
 echo "   Kiosk user:            ${KIOSK_USER}"
 echo "   Config file:           ${CONF_FILE}"
 echo "   Watchdog script:       ${WATCHDOG}"
