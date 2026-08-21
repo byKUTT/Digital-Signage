@@ -71,14 +71,31 @@ class DS_Player {
 	 * A screen visits its player URL before it has been claimed in the admin.
 	 * We mint a pairing code/token pair on the fly and show it full-screen so
 	 * staff can read it off the TV and enter it in wp-admin > Pair a Screen.
+	 *
+	 * A fresh code is generated every time this is hit fresh — i.e. every
+	 * full page load, which in practice means every boot/browser (re)start —
+	 * not reused from a previous visit. Between full loads the pairing
+	 * screen's own JS keeps rotating it further every 30s on its own (see
+	 * DS_REST::pair_status()); this is what makes a code minted right before
+	 * boot never linger as a stale, already-displayed one.
 	 */
 	private function render_unpaired_screen( $token ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'ds_pairing_codes';
 		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE token = %s", $token ) );
+		$code  = DS_REST::generate_unique_pairing_code( $table ) ?: strtoupper( substr( str_shuffle( 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' ), 0, 6 ) );
 
-		if ( ! $row ) {
-			$code = strtoupper( substr( str_shuffle( 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' ), 0, 6 ) );
+		if ( $row ) {
+			$wpdb->update(
+				$table,
+				array(
+					'code'       => $code,
+					'created_at' => current_time( 'mysql', true ),
+					'expires_at' => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
+				),
+				array( 'id' => $row->id )
+			);
+		} else {
 			$wpdb->insert(
 				$table,
 				array(
@@ -88,8 +105,6 @@ class DS_Player {
 					'expires_at' => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
 				)
 			);
-		} else {
-			$code = $row->code;
 		}
 
 		$pairing_url = admin_url( 'admin.php?page=ds-pairing&code=' . rawurlencode( $code ) );

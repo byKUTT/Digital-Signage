@@ -412,7 +412,7 @@ class DS_REST {
 	 * of times against the table's UNIQUE KEY on collision (astronomically
 	 * unlikely with ~33^6 combinations, but cheap to guard against anyway).
 	 */
-	private static function generate_unique_pairing_code( $table ) {
+	public static function generate_unique_pairing_code( $table ) {
 		global $wpdb;
 		for ( $attempt = 0; $attempt < 5; $attempt++ ) {
 			$code   = strtoupper( substr( str_shuffle( 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' ), 0, 6 ) );

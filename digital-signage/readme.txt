@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.7.1
+Stable tag: 2.7.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,9 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.7.2 =
+* An unpaired screen now generates a brand-new pairing code on every full page load (i.e. every boot/browser restart), instead of reusing whatever code was already on file for that device's token. Between full loads, the pairing screen's own JS still rotates it further every 30s as before (2.7.0). This also means that if a device's browser is reloading repeatedly for some other reason, the code shown at least always reflects the current one rather than looking stuck.
 
 = 2.7.1 =
 * Raspberry Pi installer now writes the Chromium anti-popup policy (translate, autofill, spellcheck, etc.) to both `/etc/chromium/policies/managed/` and `/etc/chromium-browser/policies/managed/` unconditionally, instead of guessing one from the installed package name — cheap insurance against a package/binary name mismatch across Raspberry Pi OS releases silently leaving the popup enabled. Re-run `install-kiosk.sh` to pick this up.
