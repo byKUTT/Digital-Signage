@@ -192,21 +192,54 @@ class DS_REST {
 
 		$table = $wpdb->prefix . 'ds_heartbeats';
 		$data  = array(
-			'screen_id'          => $screen->ID,
-			'last_seen'          => current_time( 'mysql', true ),
-			'ip_address'         => $this->get_client_ip(),
-			'resolution'         => isset( $params['resolution'] ) ? sanitize_text_field( $params['resolution'] ) : '',
-			'orientation'        => isset( $params['orientation'] ) ? sanitize_key( $params['orientation'] ) : '',
-			'user_agent'         => isset( $params['user_agent'] ) ? sanitize_text_field( mb_substr( $params['user_agent'], 0, 255 ) ) : '',
-			'current_channel_id' => isset( $params['channel_id'] ) ? absint( $params['channel_id'] ) : 0,
-			'app_version'        => isset( $params['app_version'] ) ? sanitize_text_field( $params['app_version'] ) : DS_VERSION,
-			'device_info'        => isset( $params['device'] ) && is_array( $params['device'] ) ? wp_json_encode( self::sanitize_device_info( $params['device'] ) ) : null,
+			'screen_id' => $screen->ID,
+			'last_seen' => current_time( 'mysql', true ),
+			'ip_address' => $this->get_client_ip(),
 		);
+
+		// resolution/orientation/user_agent/channel/app_version are reported by the
+		// browser-based player. ds-agent's own heartbeat (piggybacking device
+		// telemetry — see raspberry-pi-kiosk/ds-agent) hits this same endpoint but
+		// doesn't know any of these, so only fold a field in when this particular
+		// call actually reports something meaningful for it — otherwise the two
+		// heartbeat sources clobber each other's data every ~30s (e.g. the agent's
+		// call would blank out the real resolution, and previously even reported
+		// its own screen-rotation setting — "left"/"right"/"inverted" — into the
+		// same column the player uses for viewport "landscape"/"portrait", which is
+		// why the wp-admin "Orientation reported" field kept flipping between the two).
+		if ( ! empty( $params['resolution'] ) ) {
+			$data['resolution'] = sanitize_text_field( $params['resolution'] );
+		}
+		if ( ! empty( $params['orientation'] ) && in_array( $params['orientation'], array( 'landscape', 'portrait' ), true ) ) {
+			$data['orientation'] = sanitize_key( $params['orientation'] );
+		}
+		if ( ! empty( $params['user_agent'] ) ) {
+			$data['user_agent'] = sanitize_text_field( mb_substr( $params['user_agent'], 0, 255 ) );
+		}
+		if ( ! empty( $params['channel_id'] ) ) {
+			$data['current_channel_id'] = absint( $params['channel_id'] );
+		}
+		if ( ! empty( $params['app_version'] ) && 0 !== strpos( $params['app_version'], 'ds-agent/' ) ) {
+			$data['app_version'] = sanitize_text_field( $params['app_version'] );
+		}
+		if ( isset( $params['device'] ) && is_array( $params['device'] ) ) {
+			$data['device_info'] = wp_json_encode( self::sanitize_device_info( $params['device'] ) );
+		}
 
 		$exists = $wpdb->get_var( $wpdb->prepare( "SELECT screen_id FROM {$table} WHERE screen_id = %d", $screen->ID ) );
 		if ( $exists ) {
 			$wpdb->update( $table, $data, array( 'screen_id' => $screen->ID ) );
 		} else {
+			// A brand-new row needs sensible defaults for whatever this first call
+			// didn't report — later calls (from whichever source) fill them in.
+			$data += array(
+				'resolution'         => '',
+				'orientation'        => '',
+				'user_agent'         => '',
+				'current_channel_id' => 0,
+				'app_version'        => DS_VERSION,
+				'device_info'        => null,
+			);
 			$wpdb->insert( $table, $data );
 		}
 

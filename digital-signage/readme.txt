@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.4.5
+Stable tag: 2.4.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,9 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.4.6 =
+* Fixed remote screen rotation (Screen edit page > Device > Screen rotation) not actually doing anything. Two bugs: (1) `ds-agent`'s own heartbeat call was overwriting the same database row the browser-based player heartbeats write to, including reporting its rotation setting into the column meant for the player's landscape/portrait viewport orientation — the two sources now only update the fields they actually own. (2) rotation was applied by asking the running X session to re-render live via a bare `xrandr` call from a separate systemd service with no X authentication context, which could silently fail; `ds-agent` now restarts `ds-kiosk.service` instead, reusing the exact rotation-apply code that already runs correctly on every normal boot. Update the plugin and re-run `install-kiosk.sh` (or just replace `ds-agent.py` and restart `ds-agent.service`) on each device to get the fix.
 
 = 2.4.5 =
 * The "Click to Start" / "Tap for fullscreen" prompts on the player and pairing screen no longer block playback forever on a screen with no input device. Previously they only got out of the way automatically for browsers launched with the installers' `?kiosk=1` URL flag — a screen still on an older `?kiosk=1`-less URL (plugin updated but the Pi/Windows installer not yet re-run) stayed stuck behind an unclickable overlay. Now both auto-dismiss after 4 seconds regardless, so updating the plugin alone fixes it even before you get around to re-running the installer on-device.

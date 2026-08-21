@@ -151,16 +151,12 @@ def collect_telemetry(config):
 
 def send_heartbeat(site, token, telemetry):
 	url = "%s/wp-json/ds/v1/screen/%s/heartbeat" % (site.rstrip("/"), token)
-	body = json.dumps(
-		{
-			"resolution": "",
-			"orientation": telemetry.get("rotation", "normal"),
-			"user_agent": "ds-agent/%s" % AGENT_VERSION,
-			"channel_id": 0,
-			"app_version": "ds-agent/%s" % AGENT_VERSION,
-			"device": telemetry,
-		}
-	).encode("utf-8")
+	# Only "device" is ours to report here — resolution/orientation/channel/
+	# app_version belong to the browser-based player's own heartbeat call to
+	# this same endpoint; the server now ignores those fields from us
+	# specifically (see class-ds-rest.php post_heartbeat), but not sending
+	# placeholder values for them at all keeps that contract obvious here too.
+	body = json.dumps({"device": telemetry}).encode("utf-8")
 
 	request = urllib.request.Request(
 		url, data=body, headers={"Content-Type": "application/json"}, method="POST"
@@ -193,12 +189,18 @@ def apply_rotation(command):
 		rotation = "normal"
 	log("Applying rotation: %s" % rotation)
 	write_config_value("DS_KIOSK_ROTATION", rotation)
-	# Best-effort immediate apply if an X session is already running; otherwise
-	# the kiosk watchdog picks up DS_KIOSK_ROTATION on its next (re)start.
-	code, outputs = run(["bash", "-c", "DISPLAY=:0 xrandr --listmonitors 2>/dev/null | awk '/ /{print $NF}'"])
-	if code == 0 and outputs:
-		for output_name in outputs.splitlines():
-			run(["bash", "-c", "DISPLAY=:0 xrandr --output %s --rotate %s" % (output_name, rotation)])
+	# Restart the kiosk service rather than trying to xrandr the running X
+	# session live from here: this agent runs as a separate systemd service
+	# from ds-kiosk.service, and a bare "DISPLAY=:0 xrandr ..." call from
+	# outside that session's environment can silently fail to authenticate
+	# against the X server (no XAUTHORITY set for this process) with no
+	# visible error — which is why rotation changes previously seemed to do
+	# nothing at all. Restarting ds-kiosk.service instead runs the exact same
+	# rotation-apply code in ds-kiosk-loop.sh that already runs correctly on
+	# every normal boot, so it's guaranteed to pick up DS_KIOSK_ROTATION.
+	code, out = run(["systemctl", "restart", "ds-kiosk.service"], timeout=15)
+	if code != 0:
+		log("Failed to restart ds-kiosk.service to apply rotation: %s" % out)
 
 
 def apply_reboot():
