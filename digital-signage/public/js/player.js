@@ -179,9 +179,25 @@
 	}
 
 	function handleRemoteCommand( data ) {
-		if ( 'reload' === data.remote_command || 'refresh' === data.remote_command ) {
-			window.location.reload();
+		if ( 'reload' !== data.remote_command && 'refresh' !== data.remote_command ) {
+			return;
 		}
+
+		// A proxy/page cache may repeat the same one-shot command even after the
+		// server consumed it. Persist its timestamp before reloading so one stale
+		// response cannot trap an unattended display in a reload loop.
+		var commandKey = data.remote_command + ':' + ( data.remote_ts || 'legacy' );
+		var storageKey = 'ds-last-remote-command';
+		try {
+			if ( sessionStorage.getItem( storageKey ) === commandKey ) {
+				return;
+			}
+			sessionStorage.setItem( storageKey, commandKey );
+		} catch ( e ) {
+			// Storage can be unavailable in hardened kiosk profiles. The REST
+			// endpoint still consumes commands, so retain the normal behavior.
+		}
+		window.location.reload();
 	}
 
 	/* ---------------------------------------------------------------- */
