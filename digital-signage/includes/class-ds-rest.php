@@ -10,6 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Namespace: ds/v1
  *   GET  /screen/{token}/playlist   Resolved channel + zones + slides for right now
+ *   GET  /screen/{token}/changes    Lightweight channel/revision check for live updates
  *   POST /screen/{token}/heartbeat  "I'm alive" ping (resolution, orientation, IP, channel,
  *                                  optional device telemetry) — response carries any pending
  *                                  device command (WiFi change, rotation, reboot, ...) for
@@ -41,6 +42,16 @@ class DS_REST {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_playlist' ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
+		register_rest_route(
+			'ds/v1',
+			'/screen/(?P<token>[a-zA-Z0-9]+)/changes',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_changes' ),
 				'permission_callback' => '__return_true',
 			)
 		);
@@ -113,10 +124,11 @@ class DS_REST {
 		$zone_bg  = get_post_meta( $channel_id, 'ds_zone_bg_color', true );
 		$settings = DS_Settings::get_all();
 
-		return rest_ensure_response(
+		$response = rest_ensure_response(
 			array(
 				'channel_id'    => $channel_id,
 				'channel_name'  => get_the_title( $channel_id ),
+				'revision'      => $this->get_channel_revision( $channel_id ),
 				'orientation'   => 'auto',
 				'layout'        => $layout,
 				'zone_bg'       => $zone_bg ?: '',
@@ -126,6 +138,8 @@ class DS_REST {
 				'generated_at'  => current_time( 'timestamp' ),
 			)
 		);
+		$response->header( 'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0' );
+		return $response;
 	}
 
 	private function get_screen_by_token( $token ) {
@@ -139,6 +153,41 @@ class DS_REST {
 			)
 		);
 		return $screens ? $screens[0] : null;
+	}
+
+	/**
+	 * Returns the saved content revision, with post modification time as a
+	 * compatibility fallback for channels created before revisions existed.
+	 */
+	private function get_channel_revision( $channel_id ) {
+		$channel_id = absint( $channel_id );
+		if ( ! $channel_id ) {
+			return 'none';
+		}
+
+		$revision = sanitize_text_field( get_post_meta( $channel_id, 'ds_content_revision', true ) );
+		return $revision ? $revision : 'legacy-' . sanitize_text_field( get_post_field( 'post_modified_gmt', $channel_id ) );
+	}
+
+	/**
+	 * Small live-update probe. The token identifies the screen, while the
+	 * response reveals only its currently resolved channel and revision.
+	 */
+	public function get_changes( WP_REST_Request $request ) {
+		$screen = $this->get_screen_by_token( $request['token'] );
+		if ( ! $screen ) {
+			return new WP_Error( 'ds_unknown_screen', __( 'Unknown or unpaired screen.', 'digital-signage' ), array( 'status' => 404 ) );
+		}
+
+		$channel_id = DS_Schedule_Resolver::resolve_channel_id_for_screen( $screen->ID );
+		$response   = rest_ensure_response(
+			array(
+				'channel_id' => $channel_id,
+				'revision'   => $this->get_channel_revision( $channel_id ),
+			)
+		);
+		$response->header( 'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0' );
+		return $response;
 	}
 
 	public function get_playlist( WP_REST_Request $request ) {
@@ -159,13 +208,14 @@ class DS_REST {
 			delete_post_meta( $screen->ID, 'ds_remote_command' );
 		}
 
-		return rest_ensure_response(
+		$response = rest_ensure_response(
 			array(
 				'screen_id'      => $screen->ID,
 				'screen_name'    => $screen->post_title,
 				'orientation'    => get_post_meta( $screen->ID, 'ds_orientation', true ) ?: 'landscape',
 				'channel_id'     => $channel_id,
 				'channel_name'   => $channel_id ? get_the_title( $channel_id ) : '',
+				'revision'       => $this->get_channel_revision( $channel_id ),
 				'layout'         => $layout,
 				'zone_bg'        => $zone_bg ?: '',
 				'zones'          => (object) $zones,
@@ -176,6 +226,8 @@ class DS_REST {
 				'remote_ts'      => $remote_ts,
 			)
 		);
+		$response->header( 'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0' );
+		return $response;
 	}
 
 	public function post_heartbeat( WP_REST_Request $request ) {

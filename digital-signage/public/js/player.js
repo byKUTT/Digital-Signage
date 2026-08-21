@@ -20,9 +20,14 @@
 
 	var state = {
 		playlist: null,
+		revisionKey: '',
 		zones: {}, // zoneName -> { items, index, timer }
 		online: true,
 	};
+	var playlistRequest = null;
+	var changesRequestActive = false;
+	var changesTimer = null;
+	var changesFailures = 0;
 
 	/* ---------------------------------------------------------------- */
 	/* Fullscreen handling                                               */
@@ -154,9 +159,16 @@
 		} catch ( e ) { /* storage full/unavailable — keep playing from memory */ }
 	}
 
+	function playlistRevisionKey( data ) {
+		return String( data && data.channel_id ? data.channel_id : 0 ) + ':' + String( data && data.revision ? data.revision : 'legacy' );
+	}
+
 	function fetchPlaylist() {
+		if ( playlistRequest ) {
+			return playlistRequest;
+		}
 		var path = CONFIG.isPreview ? ( '/preview/' + CONFIG.previewChannelId ) : '/playlist';
-		apiGet( path )
+		playlistRequest = apiGet( path )
 			.then( function ( data ) {
 				setOffline( false );
 				if ( ! CONFIG.isPreview ) {
@@ -175,6 +187,45 @@
 						applyPlaylist( cached );
 					}
 				}
+			} );
+		playlistRequest.then(
+			function () { playlistRequest = null; },
+			function () { playlistRequest = null; }
+		);
+		return playlistRequest;
+	}
+
+	function scheduleChangesCheck( delay ) {
+		if ( CONFIG.isPreview ) {
+			return;
+		}
+		clearTimeout( changesTimer );
+		changesTimer = setTimeout( checkForChanges, delay );
+	}
+
+	function checkForChanges() {
+		if ( changesRequestActive ) {
+			scheduleChangesCheck( 1000 );
+			return;
+		}
+
+		changesRequestActive = true;
+		apiGet( '/changes' )
+			.then( function ( data ) {
+				setOffline( false );
+				changesFailures = 0;
+				if ( playlistRevisionKey( data ) !== state.revisionKey ) {
+					return fetchPlaylist();
+				}
+			} )
+			.catch( function () {
+				changesFailures++;
+				setOffline( true );
+			} )
+			.then( function () {
+				changesRequestActive = false;
+				var retryDelay = changesFailures ? Math.min( 15000, 1000 * Math.pow( 2, changesFailures ) ) : 1000;
+				scheduleChangesCheck( retryDelay );
 			} );
 	}
 
@@ -206,6 +257,7 @@
 
 	function applyPlaylist( data ) {
 		state.playlist = data;
+		state.revisionKey = playlistRevisionKey( data );
 
 		var stage = document.getElementById( 'ds-stage' );
 		stage.className = 'ds-stage ds-layout-' + ( data.layout || 'fullscreen' );
@@ -531,8 +583,25 @@
 		var portrait = null;
 		var resizeObserver = null;
 		var resizeHandler = null;
+		var measureFrame = 0;
+		var compositorAnimation = null;
+		var animationDuration = 0;
+		var fallbackRunning = false;
 		if ( sizeByWidth ) {
 			wrap.classList.add( 'ds-slider-width-sized' );
+		}
+		if ( 'function' === typeof track.animate && ! reduceMotion ) {
+			wrap.classList.add( 'ds-compositor-slider' );
+		}
+
+		function scheduleMeasure() {
+			if ( measureFrame ) {
+				return;
+			}
+			measureFrame = requestAnimationFrame( function () {
+				measureFrame = 0;
+				measure();
+			} );
 		}
 
 		function appendCopy() {
@@ -545,21 +614,67 @@
 					img.style.height = 'auto';
 					img.style.maxHeight = '100%';
 				}
-				img.addEventListener( 'load', measure, { once: true } );
+				img.addEventListener( 'load', scheduleMeasure, { once: true } );
 				img.src = src;
 				track.appendChild( img );
 			} );
 			renderedCopies++;
 		}
 
-		function measure() {
-			var previousLoopLength = loopLength;
-			var progress = 0;
-			if ( previousLoopLength > 0 ) {
-				progress = reverse
-					? ( ( ( ( position + previousLoopLength ) % previousLoopLength ) + previousLoopLength ) % previousLoopLength ) / previousLoopLength
-					: ( ( ( -position % previousLoopLength ) + previousLoopLength ) % previousLoopLength ) / previousLoopLength;
+		function currentProgress() {
+			if ( compositorAnimation && animationDuration > 0 ) {
+				var currentTime = Number( compositorAnimation.currentTime ) || 0;
+				return ( ( currentTime % animationDuration ) + animationDuration ) % animationDuration / animationDuration;
 			}
+			if ( loopLength <= 0 ) {
+				return 0;
+			}
+			return reverse
+				? ( ( ( ( position + loopLength ) % loopLength ) + loopLength ) % loopLength ) / loopLength
+				: ( ( ( -position % loopLength ) + loopLength ) % loopLength ) / loopLength;
+		}
+
+		function transformAt( offset ) {
+			return portrait
+				? 'translate3d(0,' + offset + 'px,0)'
+				: 'translate3d(' + offset + 'px,0,0)';
+		}
+
+		function startMotion( progress ) {
+			position = reverse ? -loopLength + ( progress * loopLength ) : -progress * loopLength;
+			if ( reduceMotion ) {
+				track.style.transform = transformAt( position );
+				wrap.classList.add( 'ds-reduced-motion' );
+				return;
+			}
+
+			if ( 'function' === typeof track.animate ) {
+				if ( compositorAnimation ) {
+					compositorAnimation.cancel();
+				}
+				animationDuration = Math.max( 1, loopLength / speed * 1000 );
+				var startOffset = reverse ? -loopLength : 0;
+				var endOffset = reverse ? 0 : -loopLength;
+				track.style.transform = '';
+				compositorAnimation = track.animate(
+					[ { transform: transformAt( startOffset ) }, { transform: transformAt( endOffset ) } ],
+					{ duration: animationDuration, iterations: Infinity, easing: 'linear' }
+				);
+				compositorAnimation.currentTime = progress * animationDuration;
+				return;
+			}
+
+			if ( ! fallbackRunning ) {
+				fallbackRunning = true;
+				wrap.dataset.dsTimerKind = 'raf';
+				wrap.dataset.dsTimerId = String( requestAnimationFrame( frame ) );
+			}
+		}
+
+		function measure() {
+			var progress = currentProgress();
+			var previousLoopLength = loopLength;
+			var previousPortrait = portrait;
 			var measuredPortrait;
 			if ( 'up' === direction || 'down' === direction ) {
 				measuredPortrait = true;
@@ -590,6 +705,12 @@
 			}
 
 			var firstSequence = Array.prototype.slice.call( track.children, 0, images.length );
+			var sequenceReady = firstSequence.every( function ( img ) {
+				return img.complete && img.naturalWidth > 0;
+			} );
+			if ( ! sequenceReady ) {
+				return;
+			}
 			var contentLength = firstSequence.reduce( function ( total, img ) {
 				var rect = img.getBoundingClientRect();
 				return total + ( portrait ? rect.height : rect.width );
@@ -599,14 +720,13 @@
 			}
 
 			loopLength = contentLength + ( spacing * images.length );
-			position = reverse ? -loopLength + ( progress * loopLength ) : -progress * loopLength;
-			track.style.transform = portrait
-				? 'translate3d(0,' + position + 'px,0)'
-				: 'translate3d(' + position + 'px,0,0)';
 			var viewportLength = portrait ? wrap.clientHeight : wrap.clientWidth;
 			var requiredCopies = Math.max( 2, Math.ceil( ( viewportLength + loopLength ) / loopLength ) + 1 );
 			while ( renderedCopies < requiredCopies ) {
 				appendCopy();
+			}
+			if ( ! compositorAnimation || previousPortrait !== portrait || Math.abs( previousLoopLength - loopLength ) > 0.5 ) {
+				startMotion( progress );
 			}
 			wrap.classList.add( 'ds-slider-ready' );
 		}
@@ -616,13 +736,19 @@
 
 		// Re-measure on image load and whenever the zone changes size/orientation.
 		if ( 'ResizeObserver' in window ) {
-			resizeObserver = new ResizeObserver( measure );
+			resizeObserver = new ResizeObserver( scheduleMeasure );
 			resizeObserver.observe( wrap );
 		} else {
-			resizeHandler = measure;
+			resizeHandler = scheduleMeasure;
 			window.addEventListener( 'resize', resizeHandler );
 		}
 		wrap.dsCleanup = function () {
+			if ( measureFrame ) {
+				cancelAnimationFrame( measureFrame );
+			}
+			if ( compositorAnimation ) {
+				compositorAnimation.cancel();
+			}
 			if ( resizeObserver ) {
 				resizeObserver.disconnect();
 			}
@@ -630,7 +756,7 @@
 				window.removeEventListener( 'resize', resizeHandler );
 			}
 		};
-		measure();
+		scheduleMeasure();
 
 		function frame( now ) {
 			if ( loopLength <= 0 ) {
@@ -659,12 +785,6 @@
 
 			var id = requestAnimationFrame( frame );
 			wrap.dataset.dsTimerId = String( id );
-		}
-		if ( reduceMotion ) {
-			wrap.classList.add( 'ds-reduced-motion' );
-		} else {
-			wrap.dataset.dsTimerKind = 'raf';
-			wrap.dataset.dsTimerId = String( requestAnimationFrame( frame ) );
 		}
 
 		return wrap;
@@ -833,6 +953,7 @@
 		}
 
 		fetchPlaylist();
+		scheduleChangesCheck( 1000 );
 
 		var pollMs = Math.max( 10, CONFIG.pollInterval || 60 ) * 1000;
 		setInterval( fetchPlaylist, pollMs );

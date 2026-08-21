@@ -1,5 +1,18 @@
 # Digital Signage architecture notes
 
+## Live content propagation
+
+- Every channel has an opaque `ds_content_revision`. Channel settings and slide create/update/delete/duplicate/reorder operations replace it through `DS_CRUD::touch_channel()`.
+- A paired player checks `/ds/v1/screen/{token}/changes` once per second. The response contains only the currently resolved channel ID and revision; the full playlist is fetched only when that key changes.
+- Checks are non-overlapping and back off to 15 seconds during network failure. The existing configurable full-playlist poll remains active for schedule-time transitions and recovery.
+- This short revision request is intentional instead of SSE: it avoids reserving a PHP-FPM worker per display and works through hosts/proxies that buffer streaming responses.
+
+## Slider rendering
+
+- Infinite Slider uses the Web Animations API for compositor-owned transforms on supporting browsers. The rAF implementation remains only as a compatibility fallback.
+- Image-load and ResizeObserver notifications are coalesced into a single animation-frame measurement. Motion starts only when every image in the first logical sequence has decoded dimensions.
+- Remeasurement preserves normalized animation progress and custom-width tracks center images on the cross-axis.
+
 ## Channel-owned playback presentation
 
 - A channel owns its slide transition in `ds_transition`. The REST layer resolves that value for every slide in the channel and falls back to the global transition only when the channel has no explicit compatible value.

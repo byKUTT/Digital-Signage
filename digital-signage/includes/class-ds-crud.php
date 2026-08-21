@@ -25,6 +25,18 @@ class DS_CRUD {
 
 	/* ---------------- Channel ---------------- */
 
+	/**
+	 * Changes the opaque revision watched by connected screens.
+	 *
+	 * @param int $channel_id Channel post ID.
+	 */
+	public static function touch_channel( $channel_id ) {
+		$channel_id = absint( $channel_id );
+		if ( $channel_id && 'ds_channel' === get_post_type( $channel_id ) ) {
+			update_post_meta( $channel_id, 'ds_content_revision', wp_generate_uuid4() );
+		}
+	}
+
 	public static function save_channel( $id, array $data ) {
 		$post_id = self::upsert_post( $id, 'ds_channel', $data['title'] ?? '' );
 
@@ -57,6 +69,7 @@ class DS_CRUD {
 		update_post_meta( $post_id, 'ds_scroll_bg_color', $scroll_bg ? $scroll_bg : '#000000' );
 		update_post_meta( $post_id, 'ds_scroll_spacing', absint( $data['scroll_spacing'] ?? 20 ) );
 		update_post_meta( $post_id, 'ds_scroll_speed', max( 5, absint( $data['scroll_speed'] ?? 60 ) ) );
+		self::touch_channel( $post_id );
 
 		return $post_id;
 	}
@@ -107,6 +120,7 @@ class DS_CRUD {
 			}
 			update_post_meta( $new_slide, 'ds_channel_id', $new_id );
 		}
+		self::touch_channel( $new_id );
 
 		return $new_id;
 	}
@@ -115,6 +129,7 @@ class DS_CRUD {
 
 	public static function save_slide( $id, array $data ) {
 		$channel_id = absint( $data['channel_id'] ?? 0 );
+		$old_channel_id = $id ? absint( get_post_meta( $id, 'ds_channel_id', true ) ) : 0;
 		$title      = trim( sanitize_text_field( $data['title'] ?? '' ) );
 		if ( '' === $title ) {
 			$title = self::next_slide_title( $channel_id, $id );
@@ -154,12 +169,18 @@ class DS_CRUD {
 		// Infinite-scroll gallery: an ordered list of attachment IDs.
 		$scroll_images = array_filter( array_map( 'absint', (array) ( $data['scroll_images'] ?? array() ) ) );
 		update_post_meta( $post_id, 'ds_scroll_images', array_values( $scroll_images ) );
+		self::touch_channel( $channel_id );
+		if ( $old_channel_id && $old_channel_id !== $channel_id ) {
+			self::touch_channel( $old_channel_id );
+		}
 
 		return $post_id;
 	}
 
 	public static function delete_slide( $id ) {
+		$channel_id = absint( get_post_meta( $id, 'ds_channel_id', true ) );
 		wp_delete_post( $id, true );
+		self::touch_channel( $channel_id );
 	}
 
 	public static function duplicate_slide( $id ) {
@@ -191,13 +212,20 @@ class DS_CRUD {
 			)
 		);
 		update_post_meta( $new_id, 'ds_order', $last ? absint( get_post_meta( $last[0], 'ds_order', true ) ) + 10 : 10 );
+		self::touch_channel( $channel_id );
 
 		return $new_id;
 	}
 
 	public static function save_slide_order( array $order_map ) {
+		$channel_ids = array();
 		foreach ( $order_map as $slide_id => $order ) {
-			update_post_meta( absint( $slide_id ), 'ds_order', absint( $order ) );
+			$slide_id = absint( $slide_id );
+			update_post_meta( $slide_id, 'ds_order', absint( $order ) );
+			$channel_ids[] = absint( get_post_meta( $slide_id, 'ds_channel_id', true ) );
+		}
+		foreach ( array_unique( array_filter( $channel_ids ) ) as $channel_id ) {
+			self::touch_channel( $channel_id );
 		}
 	}
 

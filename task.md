@@ -1,9 +1,10 @@
-# Infinite Slider direction and width
+# Live screen updates and smooth low-power slider
 
-- [x] Add Auto / Up / Down / Left / Right channel direction.
-- [x] Migrate legacy Vertical and Horizontal values safely.
-- [x] Add full-width or custom screen-width percentage sizing.
-- [x] Pass direction and sizing through CRUD and REST.
-- [x] Implement seamless reverse movement for Down and Right.
-- [x] Verify source and rebuild the version 2.9.3 ZIP.
-- [x] Commit and publish version 2.9.3.
+- [x] Add channel content revisions and invalidate them after every channel/slide change.
+- [x] Add the lightweight token-protected screen changes endpoint.
+- [x] Add non-overlapping one-second revision checks with offline backoff.
+- [x] Move Infinite Slider motion to compositor-backed Web Animations with rAF fallback.
+- [x] Keep custom-width images centered and debounce remeasurement.
+- [x] Bump to 2.9.4 and update architecture/readme notes.
+- [x] Run verification and rebuild the plugin ZIP.
+- [x] Commit and publish the updated ZIP to GitHub.

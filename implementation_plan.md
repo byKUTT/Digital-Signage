@@ -1,4 +1,69 @@
-# Digital Signage Infinite Slider direction and sizing — implementation plan
+# Digital Signage live updates and low-power slider — implementation plan
+
+## 2.9.4 live-update and smooth-motion scope
+
+### Outcome
+
+- Connected screens detect a saved channel/slide change within about one second and fetch the full playlist only when its revision changes.
+- The normal full-playlist poll remains as a slower recovery path for network interruptions and time-driven schedule changes.
+- Infinite Slider movement runs on the browser compositor through the Web Animations API where available, with the existing `requestAnimationFrame` loop retained as a compatibility fallback.
+- Custom-width images stay centered on the cross-axis in both vertical and horizontal movement.
+- Image-load and resize measurements are coalesced into one animation frame so repeated copies cannot cause visible animation restarts.
+
+### Architecture decision
+
+Use a lightweight `GET /ds/v1/screen/{token}/changes` revision endpoint at a one-second cadence. Do not use a permanently open SSE request: a typical WordPress PHP-FPM deployment would reserve one PHP worker per screen, and reverse proxies may buffer or terminate the stream. The revision response contains only the currently resolved channel ID and its opaque content revision, so unchanged screens do not rebuild playlists or restart sliders.
+
+### Files
+
+#### [MODIFY] `digital-signage/includes/class-ds-crud.php`
+
+- Add a channel revision helper using an opaque UUID value.
+- Touch the owning channel after channel settings, slides, duplication, deletion, or ordering changes.
+
+#### [MODIFY] `digital-signage/includes/class-ds-rest.php`
+
+- Register the token-protected `/changes` route.
+- Return the resolved channel ID plus channel revision with explicit no-cache headers.
+- Include the same revision in full playlist and preview payloads.
+
+#### [MODIFY] `digital-signage/public/js/player.js`
+
+- Run one non-overlapping one-second revision check with offline backoff.
+- Fetch/apply the playlist only when channel ID or revision changes; retain the full fallback poll.
+- Replace the normal per-frame transform writer with a compositor-backed Web Animation and preserve normalized progress across remeasurement.
+- Debounce image-load/resize measurements and keep a single fallback rAF loop only when Web Animations is unavailable.
+
+#### [MODIFY] `digital-signage/public/css/player.css`
+
+- Strengthen cross-axis centering for custom-width tracks and keep transforms compositor-ready.
+
+#### [MODIFY] `digital-signage/digital-signage.php`
+
+- Bump the plugin and asset version to 2.9.4.
+
+#### [MODIFY] `digital-signage/readme.txt`
+
+- Document live revision checks, fallback polling, centered custom widths, and low-power compositor motion.
+
+#### [MODIFY] `system_architecture.md`
+
+- Record revision invalidation and the two-tier update transport.
+
+#### [MODIFY] `task.md`
+
+- Track implementation, verification, ZIP rebuild, and GitHub publication.
+
+#### [REBUILD] `digital-signage.zip`
+
+- Rebuild and byte-check the installable archive against the plugin source.
+
+### Verification
+
+- JavaScript syntax and repository diff checks pass.
+- Direction, centering, revision bump, change endpoint, non-overlapping polling, and animation fallback invariants pass.
+- ZIP integrity passes and all 36 plugin source files match the archive byte-for-byte.
+- Publish to `claude/wordpress-digital-signage-plugin-mbfbdt` without force-updating the branch.
 
 ## 2.9.3 direction and screen-width amendment
 

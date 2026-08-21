@@ -119,13 +119,16 @@ html[data-ds-orientation="portrait"] .ds-stage,
 
 /* ---- Infinite Slider + Infinite Scroll Gallery ---- */
 .ds-slide .ds-continuous-slider { width: 100%; height: 100%; overflow: hidden; position: relative; }
-.ds-continuous-slider-track { display: flex; position: absolute; left: 0; top: 0; will-change: transform; backface-visibility: hidden; }
+.ds-continuous-slider-track { display: flex; position: absolute; left: 0; top: 0; will-change: transform; backface-visibility: hidden; transform-style: preserve-3d; }
 .ds-continuous-slider-track.ds-continuous-vertical { flex-direction: column; width: 100%; }
 .ds-continuous-slider-track.ds-continuous-vertical img { width: 100%; height: auto; display: block; flex-shrink: 0; object-fit: contain; }
 .ds-continuous-slider-track.ds-continuous-horizontal { flex-direction: row; height: 100%; }
 .ds-continuous-slider-track.ds-continuous-horizontal img { height: 100%; width: auto; display: block; flex-shrink: 0; object-fit: contain; }
 .ds-slider-width-sized .ds-continuous-slider-track { align-items: center; }
+.ds-slider-width-sized .ds-continuous-slider-track.ds-continuous-vertical { right: 0; margin-inline: auto; }
+.ds-slider-width-sized .ds-continuous-slider-track.ds-continuous-horizontal { bottom: 0; margin-block: auto; }
 .ds-slider-width-sized .ds-continuous-slider-track img { flex: 0 0 auto; object-fit: contain; }
+.ds-compositor-slider .ds-continuous-slider-track { contain: layout paint style; }
 .ds-infinite-slider {
 	opacity: 0;
 	contain: layout paint;

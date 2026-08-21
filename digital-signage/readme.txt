@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.9.3
+Stable tag: 2.9.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,13 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.9.4 =
+* Connected screens now check a lightweight channel revision endpoint every second and fetch a fresh playlist immediately after a real channel or slide change.
+* The normal full-playlist poll remains as a recovery path, while offline revision checks back off automatically and never overlap.
+* Infinite Slider motion now uses compositor-backed Web Animations when supported, reducing main-thread work on Raspberry Pi and other low-powered players.
+* Slider measurement waits for the complete first image sequence and coalesces image-load/resize work to prevent visible restarts and uneven motion.
+* Custom-width images remain centered for Up, Down, Left and Right movement.
 
 = 2.9.3 =
 * Infinite Slider movement can now be set per channel to Auto, Up, Down, Left or Right. Existing Vertical and Horizontal settings migrate automatically to Up and Left.
