@@ -65,16 +65,30 @@ one (e.g. this PC is being re-purposed for a different physical screen):
 
 Windows has no built-in equivalent of a Linux console autologin — a user
 account still has to sign in before anything in their Startup/Run entries
-can run. For an unattended kiosk PC, set up **Windows auto-logon** for a
-dedicated, low-privilege account:
+can run. Pass `-EnableAutoLogon` (from an **elevated** PowerShell — right-click
+PowerShell → *Run as Administrator*, while logged into the kiosk account you
+want auto-signed-in) and the installer configures Windows's built-in
+`AutoAdminLogon` for you:
 
-1. Press `Win+R`, run `netplwiz`.
-2. Uncheck *"Users must enter a user name and password to use this
-   computer"*.
-3. Select the kiosk account and enter its password when prompted.
+```powershell
+.\install-kiosk.ps1 -Site "https://yourdomain.com" -EnableAutoLogon
+```
 
-The PC will now boot straight to the desktop and immediately into the
-kiosk browser.
+You'll be prompted for that account's password (input hidden) unless you
+pass `-AutoLogonPassword` as a `SecureString`. The PC will now boot straight
+to the desktop and immediately into the kiosk browser — no keyboard, mouse,
+or monitor needed after that.
+
+⚠️ **Security note**: `AutoAdminLogon` is a Windows OS feature, not
+something specific to this script — it works by storing the account's
+password in the registry in a form Windows itself can read back in
+cleartext. Only use it on a **dedicated, low-privilege kiosk account** with
+no sensitive access (not your everyday Windows login), on hardware that's
+physically secured. To turn it back off later:
+
+```powershell
+.\uninstall-kiosk.ps1 -DisableAutoLogon   # from an elevated PowerShell
+```
 
 ## What it does
 
@@ -91,7 +105,8 @@ kiosk browser.
   command, so it stays fixed across reboots without re-running the
   installer.
 - `uninstall-kiosk.ps1` — stops any running kiosk session, removes the
-  registry entry and the installed files.
+  registry entry and the installed files; pass `-DisableAutoLogon` (elevated)
+  to also turn off Windows auto sign-in if `-EnableAutoLogon` was used.
 
 ## Closing the kiosk
 

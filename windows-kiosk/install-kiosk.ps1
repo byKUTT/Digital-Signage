@@ -1,14 +1,23 @@
 <#
 .SYNOPSIS
-    Installs the Digital Signage kiosk player to auto-start on Windows sign-in.
+    Installs the Digital Signage kiosk player to auto-start on Windows sign-in,
+    optionally with a fully unattended Windows auto sign-in too.
 
 .DESCRIPTION
     Copies kiosk-player.ps1 into %ProgramData%\DigitalSignageKiosk and adds a
     Run-key entry so it launches automatically, hidden, every time the current
-    Windows user signs in. For a true "boots straight to the signage" kiosk PC,
-    also enable Windows auto-logon for a dedicated kiosk account (instructions
-    printed at the end, and in README.md) — Windows itself has no equivalent
-    of Linux console autologin without a user account signing in first.
+    Windows user signs in.
+
+    Pass -EnableAutoLogon to also make Windows itself sign in to this account
+    automatically on boot (via the built-in AutoAdminLogon mechanism) — with
+    that, the PC boots straight to the kiosk with no keyboard/mouse needed at
+    all, the Windows equivalent of the Raspberry Pi installer's console
+    autologin. This requires an elevated (Administrator) PowerShell and writes
+    this account's password to the registry in a form Windows can read back
+    in cleartext — that's an inherent limitation of AutoAdminLogon, not
+    something this script can avoid, so only use it on a dedicated,
+    low-privilege kiosk account with no sensitive access, physically secured
+    hardware.
 
     This device generates and remembers its own pairing identity: pass -Site
     (your WordPress site's URL) and a permanent device token is created once,
@@ -31,6 +40,21 @@
     is being re-purposed as a different physical screen). Only applies with
     -Site.
 
+.PARAMETER EnableAutoLogon
+    Configure Windows to sign in to this account automatically on every boot,
+    with no password prompt — the PC goes from power-on straight to the
+    kiosk. Requires an elevated PowerShell. Prompts securely for the account
+    password unless -AutoLogonPassword is given.
+
+.PARAMETER AutoLogonUsername
+    The account to auto sign in as. Defaults to the account running this
+    script (recommended: run this script while logged into the dedicated
+    kiosk account you want auto-signed-in).
+
+.PARAMETER AutoLogonPassword
+    SecureString password for -AutoLogonUsername. If -EnableAutoLogon is
+    passed without this, you'll be prompted (input hidden).
+
 .PARAMETER Browser
     "edge" (default) or "chrome".
 
@@ -44,6 +68,10 @@
     .\install-kiosk.ps1 -Site "https://example.com"
 
 .EXAMPLE
+    # Fully unattended kiosk PC: signs in and starts playing with no one touching the keyboard.
+    .\install-kiosk.ps1 -Site "https://example.com" -EnableAutoLogon
+
+.EXAMPLE
     .\install-kiosk.ps1 -Url "https://example.com/signage/play/abc/" -CloseModifiers Ctrl,Alt -CloseKey X
 #>
 
@@ -53,6 +81,12 @@ param(
 	[string]$Url,
 
 	[switch]$Regenerate,
+
+	[switch]$EnableAutoLogon,
+
+	[string]$AutoLogonUsername = $env:USERNAME,
+
+	[System.Security.SecureString]$AutoLogonPassword,
 
 	[ValidateSet('edge', 'chrome')]
 	[string]$Browser = 'edge',
@@ -69,6 +103,13 @@ if ( -not $Site -and -not $Url ) {
 }
 if ( $Site -and $Url ) {
 	throw "Pass only one of -Site or -Url, not both."
+}
+
+if ( $EnableAutoLogon ) {
+	$isElevated = ( [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent() ).IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )
+	if ( -not $isElevated ) {
+		throw "-EnableAutoLogon needs an elevated PowerShell. Right-click PowerShell > 'Run as Administrator' (while logged into the kiosk account you want auto-signed-in) and re-run this command."
+	}
 }
 
 $installDir = Join-Path $env:ProgramData 'DigitalSignageKiosk'
@@ -110,11 +151,32 @@ $runCommand = 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy By
 New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
 	-Name 'DigitalSignageKiosk' -Value $runCommand -PropertyType String -Force | Out-Null
 
+# --- Optional: make Windows itself sign in automatically on boot. ---
+if ( $EnableAutoLogon ) {
+	if ( -not $AutoLogonPassword ) {
+		$AutoLogonPassword = Read-Host -Prompt "Password for '$AutoLogonUsername' (used only to configure auto sign-in)" -AsSecureString
+	}
+	$plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto( [Runtime.InteropServices.Marshal]::SecureStringToBSTR( $AutoLogonPassword ) )
+
+	$winlogonPath = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+	New-ItemProperty -Path $winlogonPath -Name 'AutoAdminLogon' -Value '1' -PropertyType String -Force | Out-Null
+	New-ItemProperty -Path $winlogonPath -Name 'DefaultUserName' -Value $AutoLogonUsername -PropertyType String -Force | Out-Null
+	New-ItemProperty -Path $winlogonPath -Name 'DefaultDomainName' -Value $env:COMPUTERNAME -PropertyType String -Force | Out-Null
+	New-ItemProperty -Path $winlogonPath -Name 'DefaultPassword' -Value $plainPassword -PropertyType String -Force | Out-Null
+	# Not a persistent count limit — 0 here just means "unlimited", i.e. every boot.
+	Remove-ItemProperty -Path $winlogonPath -Name 'AutoLogonCount' -ErrorAction SilentlyContinue
+
+	$plainPassword = $null # Best-effort scrub of the in-memory copy.
+}
+
 Write-Host ""
 Write-Host "✅ Installed. The kiosk will start automatically next time this Windows account signs in." -ForegroundColor Green
 Write-Host "   Player URL:     $Url"
 Write-Host "   Close hotkey:   $modifiersArg+$CloseKey"
 Write-Host "   Installed to:   $scriptPath"
+if ( $EnableAutoLogon ) {
+	Write-Host "   Auto sign-in:   ENABLED for '$AutoLogonUsername' — this PC now boots straight to the kiosk." -ForegroundColor Green
+}
 Write-Host ""
 if ( $Site ) {
 	Write-Host "On first launch this PC will show a pairing code + QR code full-screen —"
@@ -125,11 +187,11 @@ if ( $Site ) {
 Write-Host "To start it right now without rebooting:"
 Write-Host "  Start-Process powershell -ArgumentList '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$scriptPath`" -Url `"$Url`" -Browser $Browser -CloseModifiers $modifiersArg -CloseKey $CloseKey'"
 Write-Host ""
-Write-Host "For a dedicated kiosk PC that boots straight to the signage with nobody" -ForegroundColor Yellow
-Write-Host "needing to sign in, also enable Windows auto-logon for this account:" -ForegroundColor Yellow
-Write-Host "  1. Run: netplwiz"
-Write-Host "  2. Uncheck 'Users must enter a user name and password to use this computer'"
-Write-Host "  3. Enter this account's credentials when prompted"
-Write-Host ""
+if ( -not $EnableAutoLogon ) {
+	Write-Host "For a dedicated kiosk PC that boots straight to the signage with nobody" -ForegroundColor Yellow
+	Write-Host "needing to sign in, re-run this from an elevated PowerShell with -EnableAutoLogon:" -ForegroundColor Yellow
+	Write-Host "  .\install-kiosk.ps1 -Site `"$Site`" -EnableAutoLogon"
+	Write-Host ""
+}
 Write-Host "To re-pair this PC as a different screen: .\install-kiosk.ps1 -Site `"$Site`" -Regenerate"
 Write-Host "To remove: .\uninstall-kiosk.ps1"

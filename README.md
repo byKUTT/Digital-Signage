@@ -45,11 +45,14 @@ the same pairing code/token stays valid across every reboot:
 
 - **[`raspberry-pi-kiosk/`](raspberry-pi-kiosk/)** — one script
   (`install-kiosk.sh`) that turns a Raspberry Pi into a dedicated player:
-  boots straight to a full-screen Chromium kiosk, no desktop needed, with a
-  watchdog that relaunches it if it ever crashes.
+  boots straight to a full-screen Chromium kiosk with **console autologin
+  configured automatically** — no keyboard/mouse needed after install — no
+  desktop needed, with a watchdog that relaunches it if it ever crashes.
 - **[`windows-kiosk/`](windows-kiosk/)** — a PowerShell player
   (`install-kiosk.ps1`) that auto-starts a chrome-less kiosk browser window
   on Windows sign-in, with a configurable global hotkey (default
-  `Ctrl+Alt+Shift+Q`) to close it back to the desktop.
+  `Ctrl+Alt+Shift+Q`) to close it back to the desktop. Pass `-EnableAutoLogon`
+  (elevated) to also configure Windows's own auto sign-in, for the same
+  boots-straight-to-signage experience as the Pi.
 
 See each folder's README for full setup steps.
