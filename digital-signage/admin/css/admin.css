@@ -37,18 +37,6 @@
 }
 .ds-app-footer a { color: #8c8f94; }
 .ds-app-footer a:hover { color: #2271b1; }
-/* The logo asset is white text on a transparent background (by design, for the
-   dark pairing screen) — wrap it in a small dark chip so it stays legible on
-   this footer's light background instead of disappearing. */
-.ds-footer-logo-chip {
-	display: inline-flex;
-	align-items: center;
-	background: #14161c;
-	padding: 3px 8px;
-	border-radius: 4px;
-	vertical-align: middle;
-}
-.ds-footer-logo { width: auto; height: 11px; display: block; }
 
 /* ---- Buttons ---- */
 .ds-btn {
