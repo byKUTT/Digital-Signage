@@ -1,12 +1,14 @@
 # Digital Signage CMS — WordPress Plugin
 
-A WordPress plugin that turns a WordPress install into a full digital signage (CMS) platform: manage channels, screens, playlists/slides and schedules from wp-admin, and drive TVs/kiosks/tablets from a chrome-less, auto-fullscreen frontend player.
+A WordPress plugin that turns a WordPress install into a full digital signage (CMS) platform: manage channels, screens, playlists/slides and schedules from a fully custom wp-admin interface (not WordPress's native post editor), and drive TVs/kiosks/tablets from a chrome-less, auto-fullscreen frontend player.
+
+By **byKUTT**.
 
 The plugin source lives in [`digital-signage/`](digital-signage/) and is also packaged as [`digital-signage.zip`](digital-signage.zip), ready to upload via **Plugins → Add New → Upload Plugin** in wp-admin.
 
 ## What's included
 
-- **Channels, Screens, Slides, Schedules** as custom post types, reusing native WP admin list tables, the media library, REST API and capabilities.
+- **A fully custom admin UI** — custom list and edit pages for Channels, Screens, Slides and Schedules (Channels, Screens, Slides and Schedules are stored as custom post types under the hood, but there's no native WP post-editor screen involved: every page is hand-built and gated by a single `manage_digital_signage` capability).
 - **Custom DB tables** (`ds_heartbeats`, `ds_proof_of_play`, `ds_pairing_codes`) for high-write, append-only data.
 - **Scheduling**: recurring day-of-week/time rules, one-off date overrides, per-slide time windows, and priority/emergency channels that interrupt rotation on all screens instantly.
 - **Slide types**: image, video (full-length or fixed-duration), webpage/iframe, custom HTML/CSS, RSS/Atom ticker, weather widget, live clock, PDF/Google Slides embed, social embed — each with per-slide duration and transition overrides on top of global defaults.

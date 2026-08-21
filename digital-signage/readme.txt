@@ -1,10 +1,11 @@
 === Digital Signage CMS ===
 Contributors: bykutt
+Author: byKUTT
 Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -33,13 +34,19 @@ Digital Signage CMS gives you:
 
 == Architecture notes ==
 
-* Channels, Screens, Slides and Schedules are custom post types (`ds_channel`, `ds_screen`, `ds_slide`, `ds_schedule`) so the native WP admin list tables, media library, REST API and capabilities system are reused rather than reinvented.
+* Channels, Screens, Slides and Schedules are custom post types (`ds_channel`, `ds_screen`, `ds_slide`, `ds_schedule`) used purely as a storage layer — there is no native WordPress post-editor screen for any of them (`show_ui => false`). Every list, create and edit screen is a fully custom admin UI (`includes/class-ds-admin.php` + `admin/views/*.php`) built from scratch, writing through `includes/class-ds-crud.php` and gated by a single `manage_digital_signage` capability rather than WordPress's per-post-type meta capabilities.
 * High-write, append-only data — heartbeats, the proof-of-play log, and pairing codes — live in three custom `$wpdb` tables (`ds_heartbeats`, `ds_proof_of_play`, `ds_pairing_codes`) created on activation via `dbDelta()`.
 * Scheduling housekeeping (expiring pairing codes, trimming the proof-of-play log, clearing stale manual overrides) runs on **WP-Cron**.
 * The wp-admin Screens dashboard uses WordPress's own **Heartbeat API** to live-refresh status badges while an admin has the page open.
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.0.0 =
+* Replaced the WordPress native post-editor screens with a fully custom admin UI (dashboard, channel/screen/schedule list + edit pages, slide editor) — no more post.php/meta boxes.
+* Fixed duplicate menu items and a capability bug that caused saves to redirect incorrectly.
+* Simplified the admin menu; slides are managed from their owning channel instead of a separate tab.
+* Added Raspberry Pi and Windows kiosk installers.
 
 = 1.0.0 =
 * Initial release.

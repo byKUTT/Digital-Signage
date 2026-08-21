@@ -120,7 +120,7 @@ class DS_Import_Export {
 			update_post_meta( $slide_id, 'ds_channel_id', $channel_id );
 		}
 
-		wp_safe_redirect( admin_url( 'post.php?action=edit&post=' . $channel_id ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=ds-channel-edit&id=' . $channel_id . '&ds_saved=1' ) );
 		exit;
 	}
 

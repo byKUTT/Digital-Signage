@@ -3,10 +3,11 @@
  * Plugin Name:       Digital Signage CMS
  * Plugin URI:        https://github.com/bykutt/digital-signage
  * Description:       Turns WordPress into a full digital signage platform — manage channels, screens, playlists and schedules from wp-admin, and drive TVs/kiosks/tablets from a chrome-less fullscreen player.
- * Version:           1.0.0
+ * Version:           2.0.0
  * Requires at least: 5.9
  * Requires PHP:      7.4
- * Author:            Digital Signage CMS
+ * Author:            byKUTT
+ * Author URI:        https://github.com/byKUTT
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       digital-signage
@@ -17,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'DS_VERSION', '1.0.0' );
+define( 'DS_VERSION', '2.0.0' );
 define( 'DS_PLUGIN_FILE', __FILE__ );
 define( 'DS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -43,7 +44,7 @@ require_once DS_PLUGIN_DIR . 'includes/class-ds-cpt.php';
 require_once DS_PLUGIN_DIR . 'includes/class-ds-roles.php';
 require_once DS_PLUGIN_DIR . 'includes/class-ds-settings.php';
 require_once DS_PLUGIN_DIR . 'includes/class-ds-admin.php';
-require_once DS_PLUGIN_DIR . 'includes/class-ds-metaboxes.php';
+require_once DS_PLUGIN_DIR . 'includes/class-ds-crud.php';
 require_once DS_PLUGIN_DIR . 'includes/class-ds-schedule-resolver.php';
 require_once DS_PLUGIN_DIR . 'includes/class-ds-rest.php';
 require_once DS_PLUGIN_DIR . 'includes/class-ds-player.php';
@@ -65,7 +66,7 @@ function ds_bootstrap() {
 	DS_Roles::instance();
 	DS_Settings::instance();
 	DS_Admin::instance();
-	DS_Metaboxes::instance();
+	DS_CRUD::instance();
 	DS_REST::instance();
 	DS_Player::instance();
 	DS_Heartbeat::instance();

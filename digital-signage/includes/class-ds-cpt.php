@@ -4,10 +4,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Registers the custom post types that model the signage data:
- * Channels, Screens, Slides (playlist items) and Schedules.
- * REST is enabled on all of them so the React-ish admin screens and the
- * external REST API (DS_REST) can read/write via wp-json.
+ * Registers the custom post types that store the signage data: Channels,
+ * Screens, Slides (playlist items) and Schedules. These exist purely as a
+ * storage/query layer (get_posts, post meta, WP-CLI/backup compatibility) —
+ * there is no native WP edit screen for any of them ('show_ui' => false).
+ * All create/edit/list UI is fully custom, built by DS_Admin/DS_CRUD and
+ * gated by the single 'manage_digital_signage' capability rather than WP's
+ * per-post-type meta capabilities.
  */
 class DS_CPT {
 
@@ -38,86 +41,19 @@ class DS_CPT {
 	}
 
 	public function register_post_types() {
-
-		register_post_type(
-			'ds_channel',
-			array(
-				'label'        => __( 'Channels', 'digital-signage' ),
-				'labels'       => array(
-					'name'          => __( 'Channels', 'digital-signage' ),
-					'singular_name' => __( 'Channel', 'digital-signage' ),
-					'add_new_item'  => __( 'Add New Channel', 'digital-signage' ),
-				),
-				'public'       => false,
-				'show_ui'      => true,
-				'show_in_menu' => false,
-				'show_in_rest' => true,
-				'rest_base'    => 'ds_channels',
-				'supports'     => array( 'title', 'custom-fields' ),
-				'capability_type' => array( 'ds_channel', 'ds_channels' ),
-				'map_meta_cap' => true,
-			)
+		$common = array(
+			'public'       => false,
+			'show_ui'      => false,
+			'show_in_menu' => false,
+			'show_in_rest' => false,
+			'supports'     => array( 'title' ),
+			'map_meta_cap' => false,
 		);
 
-		register_post_type(
-			'ds_screen',
-			array(
-				'label'        => __( 'Screens', 'digital-signage' ),
-				'labels'       => array(
-					'name'          => __( 'Screens', 'digital-signage' ),
-					'singular_name' => __( 'Screen', 'digital-signage' ),
-					'add_new_item'  => __( 'Add New Screen', 'digital-signage' ),
-				),
-				'public'       => false,
-				'show_ui'      => true,
-				'show_in_menu' => false,
-				'show_in_rest' => true,
-				'rest_base'    => 'ds_screens',
-				'supports'     => array( 'title', 'custom-fields' ),
-				'capability_type' => array( 'ds_screen', 'ds_screens' ),
-				'map_meta_cap' => true,
-			)
-		);
-
-		register_post_type(
-			'ds_slide',
-			array(
-				'label'        => __( 'Slides', 'digital-signage' ),
-				'labels'       => array(
-					'name'          => __( 'Slides', 'digital-signage' ),
-					'singular_name' => __( 'Slide', 'digital-signage' ),
-					'add_new_item'  => __( 'Add New Slide', 'digital-signage' ),
-				),
-				'public'       => false,
-				'show_ui'      => true,
-				'show_in_menu' => false,
-				'show_in_rest' => true,
-				'rest_base'    => 'ds_slides',
-				'supports'     => array( 'title', 'custom-fields' ),
-				'capability_type' => array( 'ds_slide', 'ds_slides' ),
-				'map_meta_cap' => true,
-			)
-		);
-
-		register_post_type(
-			'ds_schedule',
-			array(
-				'label'        => __( 'Schedules', 'digital-signage' ),
-				'labels'       => array(
-					'name'          => __( 'Schedules', 'digital-signage' ),
-					'singular_name' => __( 'Schedule', 'digital-signage' ),
-					'add_new_item'  => __( 'Add New Schedule', 'digital-signage' ),
-				),
-				'public'       => false,
-				'show_ui'      => true,
-				'show_in_menu' => false,
-				'show_in_rest' => true,
-				'rest_base'    => 'ds_schedules',
-				'supports'     => array( 'title', 'custom-fields' ),
-				'capability_type' => array( 'ds_schedule', 'ds_schedules' ),
-				'map_meta_cap' => true,
-			)
-		);
+		register_post_type( 'ds_channel', array_merge( $common, array( 'label' => __( 'Channels', 'digital-signage' ) ) ) );
+		register_post_type( 'ds_screen', array_merge( $common, array( 'label' => __( 'Screens', 'digital-signage' ) ) ) );
+		register_post_type( 'ds_slide', array_merge( $common, array( 'label' => __( 'Slides', 'digital-signage' ) ) ) );
+		register_post_type( 'ds_schedule', array_merge( $common, array( 'label' => __( 'Schedules', 'digital-signage' ) ) ) );
 	}
 
 	public function register_taxonomies() {
@@ -128,9 +64,9 @@ class DS_CPT {
 			array(
 				'label'             => __( 'Locations', 'digital-signage' ),
 				'hierarchical'      => true,
-				'show_ui'           => true,
-				'show_admin_column' => true,
-				'show_in_rest'      => true,
+				'show_ui'           => false,
+				'show_admin_column' => false,
+				'show_in_rest'      => false,
 				'public'            => false,
 			)
 		);
