@@ -86,7 +86,15 @@ if [ -f "$CONF_FILE" ] && [ "$REGENERATE" -eq 0 ]; then
 	ROTATION="${DS_KIOSK_ROTATION:-normal}"
 fi
 if [ -z "$TOKEN" ]; then
+	# pipefail note: `head -c 40` closes the pipe as soon as it has enough
+	# bytes, which sends tr a SIGPIPE while it's still trying to write into
+	# /dev/urandom's endless stream. With pipefail on, that counts as the
+	# pipeline failing (even though $TOKEN comes out correct) and set -e
+	# would silently kill the whole script right here. Disable pipefail for
+	# just this one line.
+	set +o pipefail
 	TOKEN=$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 40)
+	set -o pipefail
 	echo "==> Generated a new device token (this screen's permanent identity)."
 else
 	echo "==> Reusing existing device token from ${CONF_FILE}."

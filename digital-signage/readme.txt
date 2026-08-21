@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.4.1
+Stable tag: 2.4.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,6 +41,9 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.4.2 =
+* Fixed the real cause of `install-kiosk.sh` silently dying before it ever created `ds-kiosk.service` (reported as "Unit ds-kiosk.service could not be found"): the device-token generation line (`tr ... | head -c 40`) tripped a classic `pipefail` + `head` interaction — `head` closes the pipe as soon as it has 40 bytes, `tr` gets `SIGPIPE`, and with `pipefail` on that counted as the whole pipeline failing even though the token came out correct, so `set -e` aborted the script right there with no error message. `pipefail` is now disabled for just that one line.
 
 = 2.4.1 =
 * Infinite Scroll Gallery: background color, image spacing and scroll speed are now set once per channel (new "Infinite Scroll Gallery defaults" section on the Channel edit page) instead of per slide, so every gallery slide in a channel shares the same look automatically.
