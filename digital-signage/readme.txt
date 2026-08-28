@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.10.0
+Stable tag: 2.10.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,9 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.10.1 =
+* Fixed `/signage/tv/` showing the WordPress 404 page when a host did not flush permalink rewrite rules after updating the plugin. The TV launcher now also recognizes its request path directly.
 
 = 2.10.0 =
 * Added a private VIDAA 9 smart-TV launcher at `/signage/tv/` with persistent device identity, rotating six-character pairing, automatic reconnect and a long-press OK reset.

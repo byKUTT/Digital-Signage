@@ -26,14 +26,14 @@ class DS_Player {
 	}
 
 	public function hide_admin_bar( $show ) {
-		if ( get_query_var( 'ds_screen_token' ) || get_query_var( 'ds_preview_channel' ) || get_query_var( 'ds_tv_launcher' ) ) {
+		if ( get_query_var( 'ds_screen_token' ) || get_query_var( 'ds_preview_channel' ) || $this->is_tv_launcher_request() ) {
 			return false;
 		}
 		return $show;
 	}
 
 	public function maybe_render_player() {
-		if ( get_query_var( 'ds_tv_launcher' ) ) {
+		if ( $this->is_tv_launcher_request() ) {
 			$this->render_tv_launcher();
 			return;
 		}
@@ -70,6 +70,26 @@ class DS_Player {
 
 		$this->render_player( $screens[0], $token );
 		exit;
+	}
+
+	/**
+	 * Recognize the stable TV launcher even when a host fails to flush saved
+	 * WordPress rewrite rules during an in-place plugin update.
+	 */
+	private function is_tv_launcher_request() {
+		if ( get_query_var( 'ds_tv_launcher' ) ) {
+			return true;
+		}
+
+		$request_uri  = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$request_path = trim( (string) wp_parse_url( $request_uri, PHP_URL_PATH ), '/' );
+		$home_path    = trim( (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ), '/' );
+
+		if ( $home_path && 0 === strpos( $request_path, $home_path . '/' ) ) {
+			$request_path = substr( $request_path, strlen( $home_path ) + 1 );
+		}
+
+		return 'signage/tv' === trim( $request_path, '/' );
 	}
 
 	/**

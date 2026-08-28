@@ -3,6 +3,7 @@
 ## VIDAA/private smart-TV bootstrap
 
 - `/signage/tv/` is a stable browser entry point; it creates a pairing identity through `/ds/v1/pair/request`, stores the opaque token in localStorage (with a URL-fragment fallback), and checks `/ds/v1/pair/status/{token}` until paired.
+- The launcher is recognized both by its normal WordPress rewrite query variable and by an exact request-path fallback, so an in-place update cannot leave it behind a stale permalink-rule 404.
 - Once paired, the launcher redirects to the existing `/signage/play/{token}/` renderer. VIDAA, Raspberry Pi and Windows therefore share the same playlist, transition, heartbeat and live-revision code paths.
 - Holding OK/Enter for five seconds on the launcher clears only that browser's stored identity and requests a new one. Firmware-level power-on launch remains outside the web player's control.
 - VIDAA detection is progressive enhancement only: remote OK activation, TV focus styling, resume recovery and the `vidaa-web/{version}` heartbeat label. Playback must continue on unknown smart-TV user agents.
