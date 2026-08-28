@@ -46,8 +46,8 @@ $orientation   = $is_preview ? 'auto' : ( get_post_meta( $screen->ID, 'ds_orient
 			<div class="ds-start-inner">
 				<p class="ds-start-title"><?php esc_html_e( 'Digital Signage Player', 'digital-signage' ); ?></p>
 				<p class="ds-start-sub"><?php echo esc_html( $screen->post_title ); ?></p>
-				<button id="ds-start-button" type="button"><?php esc_html_e( 'Click to Start', 'digital-signage' ); ?></button>
-				<p class="ds-start-hint"><?php esc_html_e( 'Required once to enable fullscreen playback on this browser.', 'digital-signage' ); ?></p>
+				<button id="ds-start-button" type="button" autofocus><?php esc_html_e( 'Press OK to Start', 'digital-signage' ); ?></button>
+				<p class="ds-start-hint"><?php esc_html_e( 'Required once to enable fullscreen playback on this TV or browser.', 'digital-signage' ); ?></p>
 			</div>
 		</div>
 	<?php endif; ?>
@@ -73,7 +73,8 @@ $orientation   = $is_preview ? 'auto' : ( get_post_meta( $screen->ID, 'ds_orient
 			heartbeatInterval: <?php echo (int) DS_Settings::get( 'heartbeat_interval', 30 ); ?>,
 			isPreview: <?php echo $is_preview ? 'true' : 'false'; ?>,
 			previewChannelId: <?php echo (int) $preview_id; ?>,
-			nonce: <?php echo wp_json_encode( $preview_nonce ); ?>
+			nonce: <?php echo wp_json_encode( $preview_nonce ); ?>,
+			appVersion: <?php echo wp_json_encode( DS_VERSION ); ?>
 		};
 	</script>
 	<script src="<?php echo esc_url( DS_PLUGIN_URL . 'public/js/player.js' ); ?>?v=<?php echo esc_attr( DS_VERSION ); ?>"></script>

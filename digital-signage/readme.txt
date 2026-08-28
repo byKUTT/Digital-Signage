@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.9.7
+Stable tag: 2.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -32,6 +32,8 @@ Digital Signage CMS gives you:
 4. Go to **Digital Signage → Pair a Screen**, open the generated player URL on the target TV/tablet/browser, then either scan the QR code it displays with your phone or enter the code manually to link the device.
 5. Create a **Channel**, add **Slides** to it, then assign the channel to a **Screen** (or schedule it via **Schedules**).
 
+For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in the TV browser. The launcher creates a persistent TV identity and shows a six-character pairing code. Pair it in WordPress, bookmark the launcher, and use any Browser/App Auto Start option provided by the TV. Consumer VIDAA firmware may still require opening the bookmark after a cold boot. Press **OK** once if the browser asks to start fullscreen playback. For widest TV compatibility, use MP4 video encoded as H.264 with AAC audio; playback starts muted because TV browsers enforce autoplay rules.
+
 == Architecture notes ==
 
 * Channels, Screens, Slides and Schedules are custom post types (`ds_channel`, `ds_screen`, `ds_slide`, `ds_schedule`) used purely as a storage layer — there is no native WordPress post-editor screen for any of them (`show_ui => false`). Every list, create and edit screen is a fully custom admin UI (`includes/class-ds-admin.php` + `admin/views/*.php`) built from scratch, writing through `includes/class-ds-crud.php` and gated by a single `manage_digital_signage` capability rather than WordPress's per-post-type meta capabilities.
@@ -41,6 +43,11 @@ Digital Signage CMS gives you:
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 2.10.0 =
+* Added a private VIDAA 9 smart-TV launcher at `/signage/tv/` with persistent device identity, rotating six-character pairing, automatic reconnect and a long-press OK reset.
+* Added VIDAA/Hisense remote OK handling, TV-scale focus styling, fullscreen activation, resume recovery and distinct heartbeat reporting.
+* Documented VIDAA browser setup, power-on limitations and H.264/AAC media compatibility.
 
 = 2.9.7 =
 * Optimized Infinite Slider at the JS/CSS layer: repeated cached image copies no longer register redundant load/measurement work, images decode asynchronously, and duplicate sequences are hidden from accessibility traversal.

@@ -38,6 +38,21 @@ Once a screen is paired in wp-admin, point the display's browser at its
 player URL (`/signage/play/{token}/`) in kiosk/full-screen mode. Two
 ready-made installers are included for the common cases:
 
+### VIDAA 9 TV without external hardware
+
+Open `https://your-site.example/signage/tv/` in the VIDAA browser. The stable
+launcher creates and remembers the TV's identity, displays a six-character
+pairing code, and opens the normal player automatically as soon as that code
+is claimed in WordPress. Bookmark the launcher rather than the generated
+token URL. Hold the remote **OK** button for five seconds on the launcher to
+reset its pairing identity.
+
+The first playback session can require one **OK** press for fullscreen and
+autoplay permission. Consumer VIDAA firmware may also require reopening the
+browser/bookmark after a cold boot unless the model exposes Browser/App Auto
+Start or a hotel/signage setting. MP4 with H.264 video and AAC audio is the
+compatibility target; other containers/codecs depend on the individual TV.
+
 Both installers now generate and remember **the device's own pairing
 identity** — point them at your site URL (not a pre-paired player URL) and
 the same pairing code/token stays valid across every reboot:

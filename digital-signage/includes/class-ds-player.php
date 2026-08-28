@@ -26,13 +26,18 @@ class DS_Player {
 	}
 
 	public function hide_admin_bar( $show ) {
-		if ( get_query_var( 'ds_screen_token' ) || get_query_var( 'ds_preview_channel' ) ) {
+		if ( get_query_var( 'ds_screen_token' ) || get_query_var( 'ds_preview_channel' ) || get_query_var( 'ds_tv_launcher' ) ) {
 			return false;
 		}
 		return $show;
 	}
 
 	public function maybe_render_player() {
+		if ( get_query_var( 'ds_tv_launcher' ) ) {
+			$this->render_tv_launcher();
+			return;
+		}
+
 		$preview_channel = get_query_var( 'ds_preview_channel' );
 		if ( $preview_channel ) {
 			$this->maybe_render_preview( absint( $preview_channel ) );
@@ -64,6 +69,23 @@ class DS_Player {
 		}
 
 		$this->render_player( $screens[0], $token );
+		exit;
+	}
+
+	/**
+	 * Render the stable browser entry point used by VIDAA and other smart TVs.
+	 * It owns only device identity/bootstrap; all playback remains in the normal
+	 * token player so TV, Pi and Windows screens share one renderer.
+	 */
+	private function render_tv_launcher() {
+		nocache_headers();
+
+		$pair_request_url = esc_url_raw( rest_url( 'ds/v1/pair/request' ) );
+		$pair_status_base = esc_url_raw( rest_url( 'ds/v1/pair/status/' ) );
+		$player_base      = esc_url_raw( home_url( '/signage/play/' ) );
+		$site_name        = get_bloginfo( 'name' );
+
+		include DS_PLUGIN_DIR . 'public/templates/vidaa-launcher.php';
 		exit;
 	}
 

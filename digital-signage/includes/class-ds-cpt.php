@@ -33,12 +33,16 @@ class DS_CPT {
 	public function register_query_vars( $vars ) {
 		$vars[] = 'ds_screen_token';
 		$vars[] = 'ds_preview_channel';
+		$vars[] = 'ds_tv_launcher';
 		return $vars;
 	}
 
 	public function register_rewrite_rules() {
 		// yourdomain.com/signage/play/{token} — the real, unauthenticated player URL.
 		add_rewrite_rule( '^signage/play/([^/]+)/?$', 'index.php?ds_screen_token=$matches[1]', 'top' );
+		// yourdomain.com/signage/tv/ — stable smart-TV entry point that creates and
+		// remembers a pairing identity before forwarding to the token player.
+		add_rewrite_rule( '^signage/tv/?$', 'index.php?ds_tv_launcher=1', 'top' );
 		// yourdomain.com/signage/preview/{channel_id} — wp-admin-only live preview, same
 		// chrome-less renderer, gated by login + capability in DS_Player.
 		add_rewrite_rule( '^signage/preview/([0-9]+)/?$', 'index.php?ds_preview_channel=$matches[1]', 'top' );

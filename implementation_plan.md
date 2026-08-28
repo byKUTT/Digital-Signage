@@ -1,3 +1,78 @@
+# VIDAA 9 private TV player — implementation plan
+
+## Confirmed approach
+
+Build a private, hosted VIDAA-friendly web player inside the existing WordPress plugin. The TV opens one stable URL (`/signage/tv/`) in the built-in VIDAA browser. The launcher creates and persists its own device token, shows the existing six-character pairing flow, and redirects to the normal player after pairing. This reuses the tested player and REST API instead of depending on unavailable VIDAA Store or partner tooling.
+
+This approach does not promise firmware-level launch-on-power: consumer VIDAA 9 may require opening the browser/bookmark after a cold boot. The first session may also require one remote-control **OK** press because fullscreen and media autoplay remain browser-controlled.
+
+## Files
+
+### [MODIFY] `digital-signage/includes/class-ds-cpt.php`
+
+- Register a `ds_tv_launcher` query variable and `/signage/tv/` rewrite rule.
+- Keep the existing paired player and preview URLs unchanged.
+
+### [MODIFY] `digital-signage/includes/class-ds-player.php`
+
+- Route `/signage/tv/` to a chrome-less launcher template before token-player resolution.
+- Hide the WordPress admin bar on the launcher.
+- Pass same-origin pairing and player base URLs to the launcher without exposing credentials.
+
+### [NEW] `digital-signage/public/templates/vidaa-launcher.php`
+
+- Use ES5-compatible JavaScript suitable for VIDAA's embedded browser.
+- Reuse a stored device token when present; otherwise call `POST /wp-json/ds/v1/pair/request` once and persist the returned token.
+- Poll pairing status with cache busting, update the rotating six-character code, and redirect to the paired player URL.
+- Provide clear TV/remote-focused loading, offline, retry, and pairing states with no dependency on an external QR service.
+- Add a manual reset action reachable by holding the remote **OK/Enter** key, so the TV can be paired again without clearing all browser data.
+
+### [MODIFY] `digital-signage/public/templates/player-template.php`
+
+- Mark the player as VIDAA-capable and expose the plugin version to JavaScript.
+- Adjust the start overlay copy for remote-control **OK**, while preserving ordinary browser behavior.
+
+### [MODIFY] `digital-signage/public/js/player.js`
+
+- Detect VIDAA/Hisense user agents without making playback depend on detection.
+- Let **OK/Enter/Space** dismiss the start overlay and request fullscreen.
+- On visibility return, online recovery, or VIDAA app/browser resume, refresh playlist state and resume the active muted video safely.
+- Report a distinct VIDAA web-player app version in heartbeat data.
+- Keep the existing one-second revision probe, normal fallback poll, compositor animation paths, and bounded video preloading.
+
+### [MODIFY] `digital-signage/public/css/player.css`
+
+- Add TV-safe focus and pairing/start-overlay styling for 1080p and 4K viewports.
+- Avoid heavy filters, gradients, and animations on VIDAA; preserve compositor-only slide/slider transforms.
+
+### [MODIFY] `digital-signage/digital-signage.php`
+
+- Bump the plugin version so WordPress refreshes rewrite rules and TV browser asset URLs.
+
+### [MODIFY] `digital-signage/readme.txt`, `README.md`
+
+- Document the VIDAA 9 private setup: update plugin, open `/signage/tv/`, pair the code, bookmark the launcher, and enable any available browser/app auto-start setting.
+- Document supported media guidance: MP4 with H.264 video and AAC audio is the compatibility target; autoplay is muted; unsupported codecs must be converted before upload.
+- State the power-on limitation clearly.
+
+### [MODIFY] `system_architecture.md`, `task.md`
+
+- Record the launcher identity lifecycle and VIDAA compatibility rules.
+- Track the implementation and verification checklist.
+
+### [REBUILD] `digital-signage.zip`
+
+- Package the updated plugin from `digital-signage/` and verify the archive contains the launcher and changed player assets.
+
+## Verification
+
+- Run `php -l` on every modified/new PHP file.
+- Run `node --check` on `public/js/player.js` and extract/check the launcher JavaScript.
+- Verify the rewrite rule and query variable statically, and confirm activation/version upgrade schedules a rewrite flush.
+- Test first-run token creation, stored-token reuse, rotating pairing codes, successful redirect, reset, retry after network failure, and no redirect loop.
+- Test keyboard/remote Enter behavior, fullscreen fallback, visibility resume, live channel revision refresh, image transitions, infinite sliders, fixed-duration video, and full-length video in a desktop compatibility harness.
+- Rebuild and inspect `digital-signage.zip`; verify Git status contains only intended files before committing.
+
 # Digital Signage Raspberry Pi 3 performance — implementation plan
 
 ## 2.9.5 Pi 3 acceleration and playback scope

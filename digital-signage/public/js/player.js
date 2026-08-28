@@ -17,7 +17,12 @@
 
 	var CONFIG = window.DS_PLAYER || {};
 	var CACHE_KEY = 'ds_playlist_cache_' + CONFIG.screenId;
+	var USER_AGENT = navigator.userAgent || '';
+	var IS_VIDAA = /VIDAA|Hisense/i.test( USER_AGENT );
 	var LOW_POWER_PROFILE = /(?:^|[?&])profile=pi3(?:-safe)?(?:&|$)/.test( window.location.search );
+	if ( IS_VIDAA ) {
+		document.documentElement.classList.add( 'ds-vidaa' );
+	}
 	if ( LOW_POWER_PROFILE ) {
 		document.documentElement.classList.add( 'ds-low-power' );
 	}
@@ -68,6 +73,18 @@
 	function initFullscreen() {
 		var overlay = document.getElementById( 'ds-start-overlay' );
 		var button  = document.getElementById( 'ds-start-button' );
+		var startFromRemote = function ( event ) {
+			var key = event.key || '';
+			var code = event.keyCode || event.which;
+			if ( 'Enter' !== key && 'OK' !== key && ' ' !== key && 13 !== code && 32 !== code ) {
+				return;
+			}
+			requestFullscreen();
+			if ( overlay ) { overlay.classList.add( 'ds-hidden' ); }
+			resumeActiveVideo();
+		};
+
+		document.addEventListener( 'keydown', startFromRemote );
 
 		if ( isKioskBrowser() ) {
 			if ( overlay ) { overlay.classList.add( 'ds-hidden' ); }
@@ -104,6 +121,23 @@
 				overlay.classList.add( 'ds-hidden' );
 			}
 		} );
+	}
+
+	function resumeActiveVideo() {
+		var activeVideo = document.querySelector( '.ds-slide.ds-active video' );
+		var result;
+		if ( ! activeVideo ) { return; }
+		activeVideo.muted = true;
+		result = activeVideo.play();
+		if ( result && result.catch ) { result.catch( function () {} ); }
+	}
+
+	function resumePlayer() {
+		setOffline( false );
+		fetchPlaylist();
+		scheduleChangesCheck( 100 );
+		resumeActiveVideo();
+		if ( ! CONFIG.isPreview ) { sendHeartbeat(); }
 	}
 
 	/* ---------------------------------------------------------------- */
@@ -989,7 +1023,7 @@
 			orientation: detectOrientation(),
 			user_agent: navigator.userAgent,
 			channel_id: state.playlist ? state.playlist.channel_id : 0,
-			app_version: 'player-js',
+			app_version: ( IS_VIDAA ? 'vidaa-web/' : 'player-js/' ) + ( CONFIG.appVersion || 'unknown' ),
 		} );
 	}
 
@@ -1020,8 +1054,14 @@
 			setInterval( sendHeartbeat, hbMs );
 		}
 
-		window.addEventListener( 'online', function () { setOffline( false ); fetchPlaylist(); } );
+		window.addEventListener( 'online', resumePlayer );
 		window.addEventListener( 'offline', function () { setOffline( true ); } );
+		document.addEventListener( 'visibilitychange', function () {
+			if ( ! document.hidden ) { resumePlayer(); }
+		} );
+		window.addEventListener( 'pageshow', function ( event ) {
+			if ( event.persisted ) { resumePlayer(); }
+		} );
 		window.addEventListener( 'resize', function () {
 			if ( state.playlist && ( ! state.playlist.orientation || 'auto' === state.playlist.orientation ) ) {
 				document.documentElement.setAttribute( 'data-ds-orientation', detectOrientation() );

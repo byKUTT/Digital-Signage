@@ -35,7 +35,18 @@ html, body {
 	color: #fff;
 	cursor: pointer;
 }
+#ds-start-button:focus {
+	outline: 4px solid #fff;
+	outline-offset: 6px;
+}
 .ds-start-hint { color: #556; margin-top: 1em; font-size: min(13px, 2.4vh, 2.8vw); }
+
+/* TV-safe focus and scale for VIDAA's D-pad driven browser. */
+.ds-vidaa .ds-start-overlay { background: #050505; }
+.ds-vidaa .ds-start-title { font-size: clamp(40px, 4vw, 76px); font-weight: 600; }
+.ds-vidaa .ds-start-sub { font-size: clamp(22px, 2vw, 36px); color: #aaa; }
+.ds-vidaa #ds-start-button { min-width: 320px; font-size: clamp(24px, 2vw, 38px); background: #fff; color: #050505; }
+.ds-vidaa .ds-start-hint { font-size: clamp(17px, 1.25vw, 24px); color: #888; }
 
 /* ---- "No channel selected" placeholder (screen paired but nothing assigned) ---- */
 .ds-no-channel {

@@ -1,9 +1,8 @@
-# Safe Raspberry Pi JS/CSS slider optimization
+# VIDAA 9 private TV player
 
-- [x] Add a Pi 3-safe player profile without graphics-driver overrides.
-- [x] Reduce duplicate slider image work, layers and layout measurements.
-- [x] Add a 30 fps fallback only when compositor Web Animations are unavailable.
-- [x] Bound Firefox memory/process use while retaining the last working renderer settings.
-- [x] Bump to 2.9.7 and update Raspberry/plugin documentation.
-- [x] Verify and rebuild both ZIP packages.
-- [x] Publish the plugin and Raspberry updates to GitHub.
+- [x] Add the `/signage/tv/` launcher route and persistent device pairing.
+- [x] Add VIDAA remote, fullscreen, resume and heartbeat compatibility.
+- [x] Update plugin version, architecture notes and setup documentation.
+- [x] Run available JavaScript/static checks and browser-flow tests (PHP CLI unavailable in this runtime).
+- [x] Rebuild and inspect `digital-signage.zip`.
+- [x] Commit and publish the VIDAA update to GitHub.
