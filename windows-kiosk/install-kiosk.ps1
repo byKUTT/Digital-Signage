@@ -8,13 +8,16 @@
     Run-key entry so it launches automatically, hidden, every time the current
     Windows user signs in.
 
-    Pass -EnableAutoLogon to also make Windows itself sign in to this account
-    automatically on boot (via the built-in AutoAdminLogon mechanism) — with
-    that, the PC boots straight to the kiosk with no keyboard/mouse needed at
-    all, the Windows equivalent of the Raspberry Pi installer's console
-    autologin. This requires an elevated (Administrator) PowerShell and writes
-    this account's password to the registry in a form Windows can read back
-    in cleartext — that's an inherent limitation of AutoAdminLogon, not
+    Windows auto sign-in (via the built-in AutoAdminLogon mechanism) is
+    turned on by default — the PC boots straight to the kiosk with no
+    keyboard/mouse needed at all, the Windows equivalent of the Raspberry Pi
+    installer's console autologin. This needs an elevated (Administrator)
+    PowerShell; if the shell running this script isn't already elevated, it
+    automatically relaunches itself with a UAC prompt — approve it and enter
+    this account's password when asked. Pass -EnableAutoLogon:$false to skip
+    auto sign-in entirely and stay unelevated. Enabling it writes this
+    account's password to the registry in a form Windows can read back in
+    cleartext — that's an inherent limitation of AutoAdminLogon, not
     something this script can avoid, so only use it on a dedicated,
     low-privilege kiosk account with no sensitive access, physically secured
     hardware.
@@ -43,7 +46,9 @@
 .PARAMETER EnableAutoLogon
     Configure Windows to sign in to this account automatically on every boot,
     with no password prompt — the PC goes from power-on straight to the
-    kiosk. Requires an elevated PowerShell. Prompts securely for the account
+    kiosk. Enabled by default; pass -EnableAutoLogon:$false to turn it off.
+    Requires an elevated PowerShell — the script self-elevates (UAC prompt)
+    if it isn't already running elevated. Prompts securely for the account
     password unless -AutoLogonPassword is given.
 
 .PARAMETER AutoLogonUsername
@@ -65,11 +70,12 @@
     Hotkey key to close the kiosk. Default: Q
 
 .EXAMPLE
+    # Fully unattended kiosk PC by default: signs in and starts playing with no one touching the keyboard.
     .\install-kiosk.ps1 -Site "https://example.com"
 
 .EXAMPLE
-    # Fully unattended kiosk PC: signs in and starts playing with no one touching the keyboard.
-    .\install-kiosk.ps1 -Site "https://example.com" -EnableAutoLogon
+    # Skip auto sign-in and stay unelevated — just the kiosk app on normal sign-in.
+    .\install-kiosk.ps1 -Site "https://example.com" -EnableAutoLogon:$false
 
 .EXAMPLE
     .\install-kiosk.ps1 -Url "https://example.com/signage/play/abc/" -CloseModifiers Ctrl,Alt -CloseKey X
@@ -82,7 +88,7 @@ param(
 
 	[switch]$Regenerate,
 
-	[switch]$EnableAutoLogon,
+	[switch]$EnableAutoLogon = $true,
 
 	[switch]$MultiDisplay,
 
@@ -109,11 +115,40 @@ if ( $Site -and $Url ) {
 	throw "Pass only one of -Site or -Url, not both."
 }
 
-if ( $EnableAutoLogon ) {
-	$isElevated = ( [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent() ).IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )
-	if ( -not $isElevated ) {
-		throw "-EnableAutoLogon needs an elevated PowerShell. Right-click PowerShell > 'Run as Administrator' (while logged into the kiosk account you want auto-signed-in) and re-run this command."
+# MultiDisplay and (the now-default-on) EnableAutoLogon both need an elevated
+# PowerShell. Rather than making the caller remember to run one, self-elevate:
+# relaunch this exact script with a UAC prompt, forward every parameter that
+# was actually passed in, and let the elevated copy do the real work.
+$isElevated = ( [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent() ).IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )
+
+if ( ( $EnableAutoLogon -or $MultiDisplay ) -and -not $isElevated ) {
+	$why = if ( $MultiDisplay ) { '-MultiDisplay' } else { 'auto sign-in (on by default — pass -EnableAutoLogon:$false to skip it and stay unelevated)' }
+	Write-Host "==> $why needs Administrator — a UAC prompt will appear; approve it to continue." -ForegroundColor Yellow
+
+	$forward = New-Object System.Collections.Generic.List[string]
+	foreach ( $key in $PSBoundParameters.Keys ) {
+		$val = $PSBoundParameters[$key]
+		if ( $val -is [System.Management.Automation.SwitchParameter] ) {
+			$forward.Add( "-{0}:`${1}" -f $key, $val.IsPresent )
+		}
+		elseif ( $val -is [System.Security.SecureString] ) {
+			# Can't hand a password to another process securely — the elevated
+			# copy will just prompt for it itself.
+			continue
+		}
+		elseif ( $val -is [array] ) {
+			$forward.Add( "-$key" )
+			$forward.Add( ($val -join ',') )
+		}
+		else {
+			$forward.Add( "-$key" )
+			$forward.Add( "`"$val`"" )
+		}
 	}
+
+	$argLine = '-NoProfile -ExecutionPolicy Bypass -File "{0}" {1}' -f $MyInvocation.MyCommand.Path, ($forward -join ' ')
+	Start-Process -FilePath 'powershell.exe' -ArgumentList $argLine -Verb RunAs -Wait
+	exit $LASTEXITCODE
 }
 
 $installDir = Join-Path $env:ProgramData 'DigitalSignageKiosk'
@@ -225,9 +260,9 @@ Write-Host "To start it right now without rebooting:"
 Write-Host "  Start-Process powershell -ArgumentList '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$scriptPath`" -Url `"$Url`" -Browser $Browser -CloseModifiers $modifiersArg -CloseKey $CloseKey'"
 Write-Host ""
 if ( -not $EnableAutoLogon ) {
-	Write-Host "For a dedicated kiosk PC that boots straight to the signage with nobody" -ForegroundColor Yellow
-	Write-Host "needing to sign in, re-run this from an elevated PowerShell with -EnableAutoLogon:" -ForegroundColor Yellow
-	Write-Host "  .\install-kiosk.ps1 -Site `"$Site`" -EnableAutoLogon"
+	Write-Host "Auto sign-in is OFF for this install. To make this a dedicated kiosk PC" -ForegroundColor Yellow
+	Write-Host "that boots straight to the signage with nobody needing to sign in:" -ForegroundColor Yellow
+	Write-Host "  .\install-kiosk.ps1 -Site `"$Site`""
 	Write-Host ""
 }
 Write-Host "To re-pair this PC as a different screen: .\install-kiosk.ps1 -Site `"$Site`" -Regenerate"

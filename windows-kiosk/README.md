@@ -20,8 +20,7 @@ Works with **Microsoft Edge** (built into Windows 10/11, default) or
 GitHub and no folder to copy at install time. Get this one file onto the
 kiosk PC however you like (USB stick, network share, email attachment,
 `scp`, ...), then paste this single line into `cmd` (or PowerShell) and
-press Enter (**Administrator is NOT required** — it installs for the
-current user only):
+press Enter:
 
 ```cmd
 powershell -ExecutionPolicy Bypass -File .\install-standalone.ps1
@@ -30,11 +29,25 @@ powershell -ExecutionPolicy Bypass -File .\install-standalone.ps1
 That's the whole install. It writes the embedded scripts out locally and
 runs them against **`https://test.kutt.ee`** (the default site baked into
 `install-kiosk.ps1`) — the only network access this needs, before or after
-install, is to that signage site itself. Sign out and back in (or reboot)
-and the kiosk starts automatically. On first launch it shows a pairing code
-and QR code full-screen; scan the QR (or enter the code manually in
-**Digital Signage → Pair a Screen**) and it links up. The same identity
-persists across every reboot.
+install, is to that signage site itself.
+
+**Windows auto sign-in is turned on by default** (see [section
+2](#2-windows-auto-sign-in-on-by-default) below), so this needs
+Administrator: a **UAC prompt appears automatically** — approve it, then
+type the current account's password when asked (used only to configure
+Windows's sign-in, nothing is sent anywhere). The PC then boots straight to
+the desktop and into the kiosk on every restart, no keyboard/mouse needed.
+Don't want that? Add `-EnableAutoLogon:$false` and it installs unelevated,
+just launching the kiosk after whoever signs in normally:
+
+```cmd
+powershell -ExecutionPolicy Bypass -File .\install-standalone.ps1 -EnableAutoLogon:$false
+```
+
+Either way, sign out and back in (or reboot) and the kiosk starts. On first
+launch it shows a pairing code and QR code full-screen; scan the QR (or
+enter the code manually in **Digital Signage → Pair a Screen**) and it links
+up. The same identity persists across every reboot.
 
 Pass options through exactly like `install-kiosk.ps1` — they're forwarded
 as-is:
@@ -72,13 +85,17 @@ irm https://raw.githubusercontent.com/byKUTT/Digital-Signage/claude/wonderful-fe
 
 This device generates and remembers **its own pairing identity** — no need
 to pre-create a screen in wp-admin first. Copy this `windows-kiosk` folder
-to the PC (**Administrator is NOT required** — it installs for the current
-user only) and run:
+to the PC and run:
 
 ```powershell
 cd path\to\windows-kiosk
 powershell -ExecutionPolicy Bypass -File .\install-kiosk.ps1 -Site "https://yourdomain.com"
 ```
+
+Auto sign-in is on by default (see [section
+2](#2-windows-auto-sign-in-on-by-default)), so this triggers a UAC prompt —
+approve it and enter the account password when asked. Add
+`-EnableAutoLogon:$false` to skip that and install unelevated instead.
 
 That's it — sign out and back in (or reboot) and the kiosk starts
 automatically, hidden, with no console window. On first launch it shows a
@@ -119,23 +136,27 @@ one (e.g. this PC is being re-purposed for a different physical screen):
 .\install-kiosk.ps1 -Site "https://yourdomain.com" -Regenerate
 ```
 
-## 2. (Optional) True "boots straight to signage" kiosk PC
+## 2. Windows auto sign-in (on by default)
 
 Windows has no built-in equivalent of a Linux console autologin — a user
 account still has to sign in before anything in their Startup/Run entries
-can run. Pass `-EnableAutoLogon` (from an **elevated** PowerShell — right-click
-PowerShell → *Run as Administrator*, while logged into the kiosk account you
-want auto-signed-in) and the installer configures Windows's built-in
-`AutoAdminLogon` for you:
+can run. So **every install above turns this on automatically**, using
+Windows's built-in `AutoAdminLogon`: the PC boots straight to the desktop
+and immediately into the kiosk browser — no keyboard, mouse, or monitor
+needed after that.
+
+This needs Administrator, which the installer gets itself — if it isn't
+already running elevated, it relaunches itself with a **UAC prompt**;
+approve it, then enter the current account's password when asked (unless
+you passed `-AutoLogonPassword` as a `SecureString`).
+
+Don't want auto sign-in? Pass `-EnableAutoLogon:$false` and the installer
+stays unelevated — the kiosk still launches automatically, just after
+whoever signs in normally:
 
 ```powershell
-.\install-kiosk.ps1 -Site "https://yourdomain.com" -EnableAutoLogon
+.\install-kiosk.ps1 -Site "https://yourdomain.com" -EnableAutoLogon:$false
 ```
-
-You'll be prompted for that account's password (input hidden) unless you
-pass `-AutoLogonPassword` as a `SecureString`. The PC will now boot straight
-to the desktop and immediately into the kiosk browser — no keyboard, mouse,
-or monitor needed after that.
 
 ⚠️ **Security note**: `AutoAdminLogon` is a Windows OS feature, not
 something specific to this script — it works by storing the account's
