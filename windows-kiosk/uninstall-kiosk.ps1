@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Removes the Digital Signage Windows kiosk auto-start and installed files.
 

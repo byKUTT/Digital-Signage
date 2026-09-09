@@ -1,4 +1,4 @@
-<# Digital Signage 3.0.0 multi-display controller for Windows 10/11. #>
+﻿<# Digital Signage 3.0.0 multi-display controller for Windows 10/11. #>
 param(
 	[Parameter(Mandatory = $true)][string]$Site,
 	[ValidateSet('edge', 'chrome')][string]$Browser = 'edge'

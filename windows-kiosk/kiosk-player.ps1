@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Digital Signage kiosk player for Windows.
 

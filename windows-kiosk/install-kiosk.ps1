@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Installs the Digital Signage kiosk player to auto-start on Windows sign-in,
     optionally with a fully unattended Windows auto sign-in too.

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     One-line remote installer for the Digital Signage Windows kiosk player.
 

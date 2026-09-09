@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Regenerates install-standalone.ps1 from the real .ps1 source files.
 
@@ -82,5 +82,9 @@ foreach ( $name in $payloads.Keys ) {
 '@
 
 $outPath = Join-Path $root 'install-standalone.ps1'
-( $header, ($payloadLines -join "`n"), $footer ) -join "`n" | Set-Content -Path $outPath -NoNewline
+# -Encoding UTF8 (with BOM, on Windows PowerShell) matters here: this file and
+# the payloads it embeds contain non-ASCII characters (em dashes, etc.), and
+# without a BOM Windows PowerShell falls back to the system codepage to read
+# it back, mangling those bytes into a parse error.
+( $header, ($payloadLines -join "`n"), $footer ) -join "`n" | Set-Content -Path $outPath -NoNewline -Encoding UTF8
 Write-Host "Regenerated $outPath" -ForegroundColor Green
