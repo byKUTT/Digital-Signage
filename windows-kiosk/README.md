@@ -12,6 +12,34 @@ Works with **Microsoft Edge** (built into Windows 10/11, default) or
 
 ## 1. Install
 
+### One-line install (recommended)
+
+No download, no cloning, no folder to copy — paste this single line into
+`cmd` (or PowerShell) on the kiosk PC and press Enter (**Administrator is
+NOT required** — it installs for the current user only):
+
+```cmd
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/byKUTT/Digital-Signage/claude/wonderful-feynman-bm3zws/windows-kiosk/bootstrap.ps1 | iex"
+```
+
+This fetches the kiosk scripts straight from GitHub and installs against
+**`https://test.kutt.ee`** (the default site baked into the installer) — sign
+out and back in (or reboot) and the kiosk starts automatically. On first
+launch it shows a pairing code and QR code full-screen; scan the QR (or
+enter the code manually in **Digital Signage → Pair a Screen**) and it links
+up. The same identity persists across every reboot.
+
+To install against a different site or pass other options (e.g.
+`-MultiDisplay`), download `bootstrap.ps1` first and call it with arguments
+instead of piping straight into `iex`:
+
+```powershell
+irm https://raw.githubusercontent.com/byKUTT/Digital-Signage/claude/wonderful-feynman-bm3zws/windows-kiosk/bootstrap.ps1 -OutFile bootstrap.ps1
+.\bootstrap.ps1 -Site "https://yourdomain.com"
+```
+
+### Manual install (from a local copy)
+
 This device generates and remembers **its own pairing identity** — no need
 to pre-create a screen in wp-admin first. Copy this `windows-kiosk` folder
 to the PC (**Administrator is NOT required** — it installs for the current

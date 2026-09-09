@@ -20,6 +20,7 @@ Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
 
 Write-Host "==> Removing auto-start registry entry…"
 Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'DigitalSignageKiosk'
+Unregister-ScheduledTask -TaskName 'DigitalSignageController' -Confirm:$false -ErrorAction SilentlyContinue
 
 Write-Host "==> Removing installed files…"
 $installDir = Join-Path $env:ProgramData 'DigitalSignageKiosk'

@@ -84,6 +84,8 @@ param(
 
 	[switch]$EnableAutoLogon,
 
+	[switch]$MultiDisplay,
+
 	[string]$AutoLogonUsername = $env:USERNAME,
 
 	[System.Security.SecureString]$AutoLogonPassword,
@@ -99,7 +101,9 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if ( -not $Site -and -not $Url ) {
-	throw "Pass either -Site 'https://yourdomain.com' (recommended — the device remembers its own identity) or -Url 'https://yourdomain.com/signage/play/TOKEN/' (a screen already paired in wp-admin)."
+	# No -Site/-Url given (e.g. run via the one-line bootstrap install) — default
+	# to the site this deployment is paired to.
+	$Site = 'https://test.kutt.ee'
 }
 if ( $Site -and $Url ) {
 	throw "Pass only one of -Site or -Url, not both."
@@ -116,7 +120,32 @@ $installDir = Join-Path $env:ProgramData 'DigitalSignageKiosk'
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 
 Copy-Item -Path (Join-Path $PSScriptRoot 'kiosk-player.ps1') -Destination $installDir -Force
+Copy-Item -Path (Join-Path $PSScriptRoot 'ds-controller-agent.ps1') -Destination $installDir -Force
 $scriptPath = Join-Path $installDir 'kiosk-player.ps1'
+
+if ( $MultiDisplay ) {
+	if ( -not $Site ) {
+		throw '-MultiDisplay requires -Site.'
+	}
+	if ( $Site -notmatch '^https://' ) {
+		throw '-MultiDisplay requires an HTTPS WordPress site.'
+	}
+	$isElevated = ( [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent() ).IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )
+	if ( -not $isElevated ) {
+		throw '-MultiDisplay must be installed from an elevated PowerShell.'
+	}
+	$controllerScript = Join-Path $installDir 'ds-controller-agent.ps1'
+	$controllerArgs = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Site "{1}" -Browser {2}' -f $controllerScript, $Site.TrimEnd('/'), $Browser
+	$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $controllerArgs
+	$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+	$principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Highest
+	$settings = New-ScheduledTaskSettingsSet -RestartCount 99 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+	Register-ScheduledTask -TaskName 'DigitalSignageController' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+	Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'DigitalSignageKiosk' -ErrorAction SilentlyContinue
+	Write-Host 'Installed Digital Signage Windows multi-display controller 3.0.0.' -ForegroundColor Green
+	Write-Host 'Sign out and back in. Every connected monitor will receive its own Screen after pairing.'
+	exit 0
+}
 
 if ( $Site ) {
 	$Site = $Site.TrimEnd('/')
