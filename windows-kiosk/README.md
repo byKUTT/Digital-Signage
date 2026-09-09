@@ -33,12 +33,15 @@ install, is to that signage site itself.
 
 **Windows auto sign-in is turned on by default** (see [section
 2](#2-windows-auto-sign-in-on-by-default) below), so this needs
-Administrator: a **UAC prompt appears automatically** — approve it, then
-type the current account's password when asked (used only to configure
-Windows's sign-in, nothing is sent anywhere). The PC then boots straight to
-the desktop and into the kiosk on every restart, no keyboard/mouse needed.
-Don't want that? Add `-EnableAutoLogon:$false` and it installs unelevated,
-just launching the kiosk after whoever signs in normally:
+Administrator: a **UAC prompt appears automatically** — approving it is the
+only thing to click. No password prompt: it assumes the account has no
+password (the normal setup for a dedicated kiosk account) and configures
+auto sign-in with a blank one; if the account *does* have a password, pass
+`-AutoLogonPassword` yourself (see `install-kiosk.ps1`'s parameter docs). The
+PC then boots straight to the desktop and into the kiosk on every restart —
+no keyboard, mouse, or monitor needed after the one-time install. Don't want
+that? Add `-EnableAutoLogon:$false` and it installs unelevated, just
+launching the kiosk after whoever signs in normally:
 
 ```cmd
 powershell -ExecutionPolicy Bypass -File .\install-standalone.ps1 -EnableAutoLogon:$false
@@ -94,8 +97,10 @@ powershell -ExecutionPolicy Bypass -File .\install-kiosk.ps1 -Site "https://your
 
 Auto sign-in is on by default (see [section
 2](#2-windows-auto-sign-in-on-by-default)), so this triggers a UAC prompt —
-approve it and enter the account password when asked. Add
-`-EnableAutoLogon:$false` to skip that and install unelevated instead.
+approve it, no password prompt follows (a passwordless account gets a blank
+AutoAdminLogon password automatically; pass `-AutoLogonPassword` if the
+account has a real one). Add `-EnableAutoLogon:$false` to skip that and
+install unelevated instead.
 
 That's it — sign out and back in (or reboot) and the kiosk starts
 automatically, hidden, with no console window. On first launch it shows a
@@ -147,8 +152,11 @@ needed after that.
 
 This needs Administrator, which the installer gets itself — if it isn't
 already running elevated, it relaunches itself with a **UAC prompt**;
-approve it, then enter the current account's password when asked (unless
-you passed `-AutoLogonPassword` as a `SecureString`).
+approving it is the only click needed. There's no password prompt: an
+account with no password (the normal setup for a dedicated kiosk account)
+gets a blank AutoAdminLogon password, which is exactly what it needs — pass
+`-AutoLogonPassword` as a `SecureString` yourself if the account has a real
+password.
 
 Don't want auto sign-in? Pass `-EnableAutoLogon:$false` and the installer
 stays unelevated — the kiosk still launches automatically, just after

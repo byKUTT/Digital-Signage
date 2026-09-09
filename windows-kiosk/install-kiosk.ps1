@@ -13,12 +13,16 @@
     keyboard/mouse needed at all, the Windows equivalent of the Raspberry Pi
     installer's console autologin. This needs an elevated (Administrator)
     PowerShell; if the shell running this script isn't already elevated, it
-    automatically relaunches itself with a UAC prompt — approve it and enter
-    this account's password when asked. Pass -EnableAutoLogon:$false to skip
+    automatically relaunches itself with a UAC prompt — that one click is the
+    only interaction this installer needs. No password prompt: if the account
+    already has no password (typical for a dedicated kiosk account), nothing
+    further is asked and an empty password is written, which is exactly what
+    AutoAdminLogon needs for a passwordless account; pass -AutoLogonPassword
+    for an account that does have one. Pass -EnableAutoLogon:$false to skip
     auto sign-in entirely and stay unelevated. Enabling it writes this
-    account's password to the registry in a form Windows can read back in
-    cleartext — that's an inherent limitation of AutoAdminLogon, not
-    something this script can avoid, so only use it on a dedicated,
+    account's password (or a blank one) to the registry in a form Windows can
+    read back in cleartext — that's an inherent limitation of AutoAdminLogon,
+    not something this script can avoid, so only use it on a dedicated,
     low-privilege kiosk account with no sensitive access, physically secured
     hardware.
 
@@ -44,12 +48,13 @@
     -Site.
 
 .PARAMETER EnableAutoLogon
-    Configure Windows to sign in to this account automatically on every boot,
-    with no password prompt — the PC goes from power-on straight to the
-    kiosk. Enabled by default; pass -EnableAutoLogon:$false to turn it off.
-    Requires an elevated PowerShell — the script self-elevates (UAC prompt)
-    if it isn't already running elevated. Prompts securely for the account
-    password unless -AutoLogonPassword is given.
+    Configure Windows to sign in to this account automatically on every boot
+    — the PC goes from power-on straight to the kiosk. Enabled by default;
+    pass -EnableAutoLogon:$false to turn it off. Requires an elevated
+    PowerShell — the script self-elevates (UAC prompt) if it isn't already
+    running elevated. Fully unattended otherwise: no password prompt: an
+    account with no password gets an empty AutoAdminLogon password (which is
+    what it needs), or pass -AutoLogonPassword for an account that has one.
 
 .PARAMETER AutoLogonUsername
     The account to auto sign in as. Defaults to the account running this
@@ -57,8 +62,9 @@
     kiosk account you want auto-signed-in).
 
 .PARAMETER AutoLogonPassword
-    SecureString password for -AutoLogonUsername. If -EnableAutoLogon is
-    passed without this, you'll be prompted (input hidden).
+    SecureString password for -AutoLogonUsername, for an account that
+    actually has one. Omit it for a passwordless account (the default
+    assumption) — no prompt either way, this installer never asks.
 
 .PARAMETER Browser
     "edge" (default) or "chrome".
@@ -225,10 +231,15 @@ New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
 
 # --- Optional: make Windows itself sign in automatically on boot. ---
 if ( $EnableAutoLogon ) {
-	if ( -not $AutoLogonPassword ) {
-		$AutoLogonPassword = Read-Host -Prompt "Password for '$AutoLogonUsername' (used only to configure auto sign-in)" -AsSecureString
+	# No prompt: this installer runs fully unattended. Pass -AutoLogonPassword
+	# for an account that actually has one; with no password on the account
+	# (the common case for a dedicated kiosk account), leave it out and an
+	# empty password is written, which is what AutoAdminLogon needs anyway.
+	if ( $AutoLogonPassword ) {
+		$plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto( [Runtime.InteropServices.Marshal]::SecureStringToBSTR( $AutoLogonPassword ) )
+	} else {
+		$plainPassword = ''
 	}
-	$plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto( [Runtime.InteropServices.Marshal]::SecureStringToBSTR( $AutoLogonPassword ) )
 
 	$winlogonPath = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
 	New-ItemProperty -Path $winlogonPath -Name 'AutoAdminLogon' -Value '1' -PropertyType String -Force | Out-Null
