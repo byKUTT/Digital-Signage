@@ -12,22 +12,52 @@ Works with **Microsoft Edge** (built into Windows 10/11, default) or
 
 ## 1. Install
 
-### One-line install (recommended)
+### Fully local / offline install (recommended)
 
-No download, no cloning, no folder to copy — paste this single line into
-`cmd` (or PowerShell) on the kiosk PC and press Enter (**Administrator is
-NOT required** — it installs for the current user only):
+`install-standalone.ps1` is a **single self-contained file** — it has
+`install-kiosk.ps1`, `kiosk-player.ps1`, `ds-controller-agent.ps1` and
+`uninstall-kiosk.ps1` embedded inside it, so there's nothing to fetch from
+GitHub and no folder to copy at install time. Get this one file onto the
+kiosk PC however you like (USB stick, network share, email attachment,
+`scp`, ...), then paste this single line into `cmd` (or PowerShell) and
+press Enter (**Administrator is NOT required** — it installs for the
+current user only):
+
+```cmd
+powershell -ExecutionPolicy Bypass -File .\install-standalone.ps1
+```
+
+That's the whole install. It writes the embedded scripts out locally and
+runs them against **`https://test.kutt.ee`** (the default site baked into
+`install-kiosk.ps1`) — the only network access this needs, before or after
+install, is to that signage site itself. Sign out and back in (or reboot)
+and the kiosk starts automatically. On first launch it shows a pairing code
+and QR code full-screen; scan the QR (or enter the code manually in
+**Digital Signage → Pair a Screen**) and it links up. The same identity
+persists across every reboot.
+
+Pass options through exactly like `install-kiosk.ps1` — they're forwarded
+as-is:
+
+```powershell
+.\install-standalone.ps1 -Site "https://yourdomain.com"
+.\install-standalone.ps1 -Site "https://yourdomain.com" -MultiDisplay
+```
+
+If you edit `install-kiosk.ps1`, `kiosk-player.ps1`,
+`ds-controller-agent.ps1` or `uninstall-kiosk.ps1`, regenerate the embedded
+copy with `.\build-standalone.ps1` before redistributing
+`install-standalone.ps1` — don't hand-edit its base64 blobs.
+
+### Remote one-line install (needs internet access to GitHub)
+
+If the kiosk PC has internet access and you'd rather not carry a file over,
+this fetches the same scripts straight from GitHub instead of embedding
+them:
 
 ```cmd
 powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/byKUTT/Digital-Signage/claude/wonderful-feynman-bm3zws/windows-kiosk/bootstrap.ps1 | iex"
 ```
-
-This fetches the kiosk scripts straight from GitHub and installs against
-**`https://test.kutt.ee`** (the default site baked into the installer) — sign
-out and back in (or reboot) and the kiosk starts automatically. On first
-launch it shows a pairing code and QR code full-screen; scan the QR (or
-enter the code manually in **Digital Signage → Pair a Screen**) and it links
-up. The same identity persists across every reboot.
 
 To install against a different site or pass other options (e.g.
 `-MultiDisplay`), download `bootstrap.ps1` first and call it with arguments
@@ -135,6 +165,13 @@ physically secured. To turn it back off later:
 - `uninstall-kiosk.ps1` — stops any running kiosk session, removes the
   registry entry and the installed files; pass `-DisableAutoLogon` (elevated)
   to also turn off Windows auto sign-in if `-EnableAutoLogon` was used.
+- `ds-controller-agent.ps1` — the `-MultiDisplay` controller: detects every
+  connected monitor and opens an isolated kiosk browser profile on each one.
+- `install-standalone.ps1` — single-file, offline version of the install
+  above with all four scripts embedded (base64); regenerate it with
+  `build-standalone.ps1` after editing any of them.
+- `bootstrap.ps1` — fetches the four scripts from GitHub and runs
+  `install-kiosk.ps1`, for the remote one-line install.
 
 ## Closing the kiosk
 
