@@ -18,8 +18,13 @@ $is_preview    = $is_preview ?? false;
 $preview_id    = $preview_id ?? 0;
 $preview_nonce = $preview_nonce ?? '';
 $orientation   = $is_preview ? 'auto' : ( get_post_meta( $screen->ID, 'ds_orientation', true ) ?: 'landscape' );
+$rotation      = $is_preview ? 0 : absint( get_post_meta( $screen->ID, 'ds_content_rotation', true ) );
+$rendered_orientation = $orientation;
+if ( in_array( $rotation, array( 90, 270 ), true ) && in_array( $orientation, array( 'landscape', 'portrait' ), true ) ) {
+	$rendered_orientation = 'landscape' === $orientation ? 'portrait' : 'landscape';
+}
 ?><!DOCTYPE html>
-<html lang="<?php echo esc_attr( get_locale() ); ?>" <?php echo is_rtl() ? 'dir="rtl"' : ''; ?> data-ds-orientation="<?php echo esc_attr( $orientation ); ?>">
+<html lang="<?php echo esc_attr( get_locale() ); ?>" <?php echo is_rtl() ? 'dir="rtl"' : ''; ?> data-ds-orientation="<?php echo esc_attr( $rendered_orientation ); ?>" data-ds-rotation="<?php echo esc_attr( $rotation ); ?>">
 <head>
 	<meta charset="<?php bloginfo( 'charset' ); ?>" />
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
@@ -69,6 +74,7 @@ $orientation   = $is_preview ? 'auto' : ( get_post_meta( $screen->ID, 'ds_orient
 			screenId: <?php echo (int) $screen->ID; ?>,
 			token: <?php echo wp_json_encode( $token ); ?>,
 			orientation: <?php echo wp_json_encode( $orientation ); ?>,
+			rotation: <?php echo (int) $rotation; ?>,
 			pollInterval: <?php echo (int) DS_Settings::get( 'poll_interval', 60 ); ?>,
 			heartbeatInterval: <?php echo (int) DS_Settings::get( 'heartbeat_interval', 30 ); ?>,
 			isPreview: <?php echo $is_preview ? 'true' : 'false'; ?>,

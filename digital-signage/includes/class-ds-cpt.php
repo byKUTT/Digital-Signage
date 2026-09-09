@@ -34,6 +34,9 @@ class DS_CPT {
 		$vars[] = 'ds_screen_token';
 		$vars[] = 'ds_preview_channel';
 		$vars[] = 'ds_tv_launcher';
+		$vars[] = 'ds_short_code';
+		$vars[] = 'ds_controller_id';
+		$vars[] = 'ds_controller_output';
 		return $vars;
 	}
 
@@ -43,6 +46,11 @@ class DS_CPT {
 		// yourdomain.com/signage/tv/ — stable smart-TV entry point that creates and
 		// remembers a pairing identity before forwarding to the token player.
 		add_rewrite_rule( '^signage/tv/?$', 'index.php?ds_tv_launcher=1', 'top' );
+		// Short, opt-in player address for typing with a TV remote.
+		add_rewrite_rule( '^s/([A-Za-z0-9]{6})/?$', 'index.php?ds_short_code=$matches[1]', 'top' );
+		// Bootstrap page opened by each physical output while its controller is
+		// waiting to be paired and assigned a Screen in wp-admin.
+		add_rewrite_rule( '^signage/controller/([a-f0-9-]{36})/([A-Za-z0-9_-]{1,100})/?$', 'index.php?ds_controller_id=$matches[1]&ds_controller_output=$matches[2]', 'top' );
 		// yourdomain.com/signage/preview/{channel_id} — wp-admin-only live preview, same
 		// chrome-less renderer, gated by login + capability in DS_Player.
 		add_rewrite_rule( '^signage/preview/([0-9]+)/?$', 'index.php?ds_preview_channel=$matches[1]', 'top' );

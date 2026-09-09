@@ -33,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<?php wp_nonce_field( 'ds_bulk_assign_channel' ); ?>
 
 			<div class="ds-table-wrap">
-				<table class="ds-table">
+				<table class="ds-table ds-screens-table">
 					<thead>
 						<tr>
 							<th></th>
@@ -41,6 +41,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 							<th><?php esc_html_e( 'Status', 'digital-signage' ); ?></th>
 							<th><?php esc_html_e( 'Channel', 'digital-signage' ); ?></th>
 							<th><?php esc_html_e( 'Orientation', 'digital-signage' ); ?></th>
+							<th><?php esc_html_e( 'Controller / output', 'digital-signage' ); ?></th>
 							<th><?php esc_html_e( 'Last heartbeat', 'digital-signage' ); ?></th>
 							<th><?php esc_html_e( 'Player URL', 'digital-signage' ); ?></th>
 						</tr>
@@ -52,16 +53,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 							$status      = ( $hb && ( time() - strtotime( $hb->last_seen . ' UTC' ) ) <= $offline_after ) ? 'online' : ( $hb ? 'offline' : 'never' );
 							$channel_id  = get_post_meta( $screen->ID, 'ds_channel_id', true );
 							$orientation = get_post_meta( $screen->ID, 'ds_orientation', true ) ?: 'landscape';
+							$rotation    = absint( get_post_meta( $screen->ID, 'ds_content_rotation', true ) );
 							$token       = get_post_meta( $screen->ID, 'ds_pairing_token', true );
+							$player_url  = DS_Player::get_player_url( $screen );
+							$controller_id = absint( get_post_meta( $screen->ID, 'ds_controller_id', true ) );
+							$controller = $controller_id ? DS_Controllers::get( $controller_id ) : null;
+							$output_key = sanitize_text_field( get_post_meta( $screen->ID, 'ds_controller_output', true ) );
 							?>
 							<tr>
 								<td><input type="checkbox" name="screen_ids[]" value="<?php echo esc_attr( $screen->ID ); ?>" /></td>
 								<td><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-screen-edit&id=' . $screen->ID ) ); ?>"><?php echo esc_html( $screen->post_title ); ?></a></td>
 								<td><span class="ds-badge ds-badge-<?php echo esc_attr( $status ); ?>"><?php echo esc_html( ucfirst( $status ) ); ?></span></td>
 								<td><?php echo $channel_id ? esc_html( get_the_title( $channel_id ) ) : '—'; ?></td>
-								<td><?php echo esc_html( ucfirst( $orientation ) ); ?></td>
+								<td><?php echo esc_html( ucfirst( $orientation ) . ' · ' . $rotation . '°' ); ?></td>
+								<td><?php if ( $controller ) : ?><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-controller-edit&id=' . $controller_id ) ); ?>"><?php echo esc_html( ( $controller->name ?: $controller->hostname ) . ' · ' . $output_key ); ?></a><?php else : ?>—<?php endif; ?></td>
 								<td><?php echo $hb ? esc_html( human_time_diff( strtotime( $hb->last_seen . ' UTC' ) ) . ' ago' ) : esc_html__( 'never', 'digital-signage' ); ?></td>
-								<td><?php if ( $token ) : ?><a href="<?php echo esc_url( home_url( '/signage/play/' . $token . '/' ) ); ?>" target="_blank">↗</a><?php else : ?>—<?php endif; ?></td>
+								<td><?php if ( $token ) : ?><a href="<?php echo esc_url( $player_url ); ?>" target="_blank">↗</a><?php else : ?>—<?php endif; ?></td>
 							</tr>
 						<?php endforeach; ?>
 					</tbody>

@@ -11,9 +11,15 @@ $s = DS_Settings::get_all();
 			<p class="ds-app-subtitle"><?php esc_html_e( 'Global defaults — every value below can still be overridden per slide.', 'digital-signage' ); ?></p>
 		</div>
 	</div>
+	<?php if ( isset( $_GET['ds_saved'] ) ) : ?>
+		<div class="ds-notice ds-notice-success"><?php esc_html_e( 'Settings saved.', 'digital-signage' ); ?></div>
+	<?php elseif ( isset( $_GET['ds_team_saved'] ) ) : ?>
+		<div class="ds-notice ds-notice-success"><?php esc_html_e( 'Digital Signage Team updated.', 'digital-signage' ); ?></div>
+	<?php endif; ?>
 
-	<form method="post" action="options.php">
-		<?php settings_fields( 'ds_settings_group' ); ?>
+	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+		<input type="hidden" name="action" value="ds_save_settings" />
+		<?php wp_nonce_field( 'ds_save_settings' ); ?>
 
 		<div class="ds-panel">
 			<h2><?php esc_html_e( 'Default slide durations (seconds)', 'digital-signage' ); ?></h2>
@@ -75,6 +81,26 @@ $s = DS_Settings::get_all();
 
 		<button type="submit" class="ds-btn ds-btn-primary ds-btn-large"><?php esc_html_e( 'Save Settings', 'digital-signage' ); ?></button>
 	</form>
+
+	<?php if ( $can_manage_team ) : ?>
+		<div class="ds-panel">
+			<h2><?php esc_html_e( 'Digital Signage Team', 'digital-signage' ); ?></h2>
+			<p class="ds-hint"><?php esc_html_e( 'Selected users share every channel, screen, slide, schedule, calendar, analytics page and Digital Signage setting. This does not make them WordPress administrators.', 'digital-signage' ); ?></p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="ds_save_team" />
+				<?php wp_nonce_field( 'ds_save_team' ); ?>
+				<div class="ds-settings-grid">
+					<?php foreach ( $team_users as $user ) : ?>
+						<label class="ds-field">
+							<span><input type="checkbox" name="team_user_ids[]" value="<?php echo esc_attr( $user->ID ); ?>" <?php checked( in_array( (int) $user->ID, $team_member_ids, true ) ); ?> /> <?php echo esc_html( $user->display_name ); ?></span>
+							<span class="ds-hint"><?php echo esc_html( $user->user_email ); ?></span>
+						</label>
+					<?php endforeach; ?>
+				</div>
+				<button type="submit" class="ds-btn ds-btn-primary"><?php esc_html_e( 'Save Team', 'digital-signage' ); ?></button>
+			</form>
+		</div>
+	<?php endif; ?>
 
 	<div class="ds-panel">
 		<h2><?php esc_html_e( 'Data tools', 'digital-signage' ); ?></h2>

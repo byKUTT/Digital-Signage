@@ -233,9 +233,24 @@ class DS_CRUD {
 
 	public static function save_screen( $id, array $data ) {
 		$post_id = self::upsert_post( $id, 'ds_screen', $data['title'] ?? '' );
+		$rotation = absint( $data['content_rotation'] ?? 0 );
+		if ( ! in_array( $rotation, array( 0, 90, 180, 270 ), true ) ) {
+			$rotation = 0;
+		}
 
 		update_post_meta( $post_id, 'ds_channel_id', absint( $data['channel_id'] ?? 0 ) );
 		update_post_meta( $post_id, 'ds_orientation', sanitize_key( $data['orientation'] ?? 'landscape' ) );
+		update_post_meta( $post_id, 'ds_content_rotation', $rotation );
+
+		$short_enabled = ! empty( $data['short_url_enabled'] );
+		$short_code    = sanitize_text_field( get_post_meta( $post_id, 'ds_short_code', true ) );
+		if ( $short_enabled && ! $short_code ) {
+			$short_code = self::generate_screen_short_code();
+			if ( $short_code ) {
+				update_post_meta( $post_id, 'ds_short_code', $short_code );
+			}
+		}
+		update_post_meta( $post_id, 'ds_short_url_enabled', ( $short_enabled && $short_code ) ? 1 : 0 );
 
 		if ( ! empty( $data['location'] ) ) {
 			wp_set_post_terms( $post_id, array( absint( $data['location'] ) ), 'ds_location' );
@@ -244,6 +259,37 @@ class DS_CRUD {
 		}
 
 		return $post_id;
+	}
+
+	/**
+	 * Generate a stable, easy-to-type code without ambiguous 0/O/1/I symbols.
+	 */
+	public static function generate_screen_short_code() {
+		$alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+		$max      = strlen( $alphabet ) - 1;
+
+		for ( $attempt = 0; $attempt < 10; $attempt++ ) {
+			$code = '';
+			for ( $i = 0; $i < 6; $i++ ) {
+				$code .= $alphabet[ wp_rand( 0, $max ) ];
+			}
+
+			$existing = get_posts(
+				array(
+					'post_type'      => 'ds_screen',
+					'post_status'    => 'any',
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+					'meta_key'       => 'ds_short_code',
+					'meta_value'     => $code,
+				)
+			);
+			if ( ! $existing ) {
+				return $code;
+			}
+		}
+
+		return '';
 	}
 
 	public static function delete_screen( $id ) {
@@ -265,6 +311,9 @@ class DS_CRUD {
 		$wpdb->delete( $wpdb->prefix . 'ds_pairing_codes', array( 'screen_id' => $id ), array( '%d' ) );
 		if ( $token ) {
 			$wpdb->delete( $wpdb->prefix . 'ds_pairing_codes', array( 'token' => $token ), array( '%s' ) );
+		}
+		if ( class_exists( 'DS_Controllers' ) ) {
+			DS_Controllers::unlink_screen( $id );
 		}
 		wp_delete_post( $id, true );
 	}

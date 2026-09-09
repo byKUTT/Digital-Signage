@@ -60,6 +60,30 @@ html, body {
 /* ---- Stage & zones ---- */
 .ds-stage { position: absolute; inset: 0; width: 100%; height: 100%; }
 
+/* Per-screen browser rotation. Quarter turns swap the logical canvas dimensions
+   so the rotated content fills the physical viewport without being cropped. */
+html[data-ds-rotation="90"] .ds-stage,
+html[data-ds-rotation="90"] .ds-no-channel,
+html[data-ds-rotation="270"] .ds-stage,
+html[data-ds-rotation="270"] .ds-no-channel {
+	inset: auto;
+	top: 50%; left: 50%;
+	width: 100vh; height: 100vw;
+	transform-origin: center;
+}
+html[data-ds-rotation="90"] .ds-stage,
+html[data-ds-rotation="90"] .ds-no-channel { transform: translate(-50%, -50%) rotate(90deg); }
+html[data-ds-rotation="270"] .ds-stage,
+html[data-ds-rotation="270"] .ds-no-channel { transform: translate(-50%, -50%) rotate(270deg); }
+html[data-ds-rotation="180"] .ds-stage,
+html[data-ds-rotation="180"] .ds-no-channel {
+	inset: auto;
+	top: 50%; left: 50%;
+	width: 100vw; height: 100vh;
+	transform: translate(-50%, -50%) rotate(180deg);
+	transform-origin: center;
+}
+
 .ds-zone { position: absolute; overflow: hidden; background: var(--ds-zone-bg, #000); }
 .ds-zone-main { inset: 0; }
 .ds-zone-secondary, .ds-zone-ticker, .ds-zone-corner { display: none; }

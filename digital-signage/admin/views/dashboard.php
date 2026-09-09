@@ -63,9 +63,48 @@ foreach ( $screens as $s ) {
 	<div class="ds-card-grid ds-stat-grid">
 		<div class="ds-stat-card"><span class="ds-stat-num"><?php echo esc_html( $channel_count ); ?></span><span class="ds-stat-label"><?php esc_html_e( 'Channels', 'digital-signage' ); ?></span></div>
 		<div class="ds-stat-card"><span class="ds-stat-num"><?php echo count( $screens ); ?></span><span class="ds-stat-label"><?php esc_html_e( 'Screens', 'digital-signage' ); ?></span></div>
+		<div class="ds-stat-card"><span class="ds-stat-num"><?php echo esc_html( count( $controllers ) ); ?></span><span class="ds-stat-label"><?php esc_html_e( 'Controllers', 'digital-signage' ); ?></span></div>
 		<div class="ds-stat-card"><span class="ds-stat-num ds-text-online"><?php echo esc_html( $online ); ?></span><span class="ds-stat-label"><?php esc_html_e( 'Online', 'digital-signage' ); ?></span></div>
 		<div class="ds-stat-card"><span class="ds-stat-num ds-text-offline"><?php echo esc_html( count( $screens ) - $online ); ?></span><span class="ds-stat-label"><?php esc_html_e( 'Offline / Unknown', 'digital-signage' ); ?></span></div>
 	</div>
+
+	<?php if ( $controllers ) : ?>
+		<div class="ds-panel">
+			<div class="ds-panel-header">
+				<h2><?php esc_html_e( 'Controller computers', 'digital-signage' ); ?></h2>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-controllers' ) ); ?>" class="ds-btn ds-btn-small"><?php esc_html_e( 'Manage Fleet', 'digital-signage' ); ?></a>
+			</div>
+			<div class="ds-controller-grid">
+				<?php foreach ( array_slice( $controllers, 0, 6 ) as $controller ) : ?>
+					<?php
+					$displays          = $controller_displays[ $controller->id ] ?? array();
+					$controller_online = $controller->last_seen && ( time() - strtotime( $controller->last_seen . ' UTC' ) ) <= $offline_after;
+					$telemetry         = json_decode( (string) $controller->telemetry, true );
+					$telemetry         = is_array( $telemetry ) ? $telemetry : array();
+					$connected_displays = array_filter( $displays, function ( $display ) { return ! empty( $display->is_connected ); } );
+					?>
+					<a class="ds-controller-card" data-controller-id="<?php echo esc_attr( $controller->id ); ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=ds-controller-edit&id=' . absint( $controller->id ) ) ); ?>">
+						<div class="ds-controller-card-head">
+							<strong><?php echo esc_html( $controller->name ?: $controller->hostname ?: __( 'Unpaired controller', 'digital-signage' ) ); ?></strong>
+							<span class="ds-badge ds-badge-<?php echo $controller_online ? 'online' : 'offline'; ?>"><?php echo esc_html( $controller_online ? __( 'Online', 'digital-signage' ) : __( 'Offline', 'digital-signage' ) ); ?></span>
+						</div>
+						<p><?php echo esc_html( sprintf( _n( '%d display connected right now', '%d displays connected right now', count( $connected_displays ), 'digital-signage' ), count( $connected_displays ) ) ); ?></p>
+						<ul>
+							<?php foreach ( $displays as $display ) : ?>
+								<?php $display_hb = $display->screen_id ? ( $heartbeats[ $display->screen_id ] ?? null ) : null; $display_online = $display_hb && ( time() - strtotime( $display_hb->last_seen . ' UTC' ) ) <= $offline_after; ?>
+								<li><span><?php echo esc_html( $display->label ?: $display->connector ?: $display->output_key ); ?></span><strong><?php echo esc_html( $display->screen_id ? get_the_title( $display->screen_id ) . ' · ' . ( $display_online ? __( 'running', 'digital-signage' ) : __( 'not reporting', 'digital-signage' ) ) : __( 'Unassigned', 'digital-signage' ) ); ?></strong></li>
+							<?php endforeach; ?>
+						</ul>
+						<div class="ds-controller-metrics">
+							<span><?php echo esc_html( ucfirst( $controller->platform ) ); ?></span>
+							<span><?php echo esc_html( $controller->software_version ?: '—' ); ?></span>
+							<span><?php echo isset( $telemetry['cpu_load_percent'] ) ? esc_html( round( (float) $telemetry['cpu_load_percent'] ) . '% CPU' ) : '—'; ?></span>
+						</div>
+					</a>
+				<?php endforeach; ?>
+			</div>
+		</div>
+	<?php endif; ?>
 
 	<div class="ds-panel">
 		<div class="ds-panel-header">
@@ -75,7 +114,7 @@ foreach ( $screens as $s ) {
 
 		<?php if ( $screens ) : ?>
 			<div class="ds-table-wrap">
-				<table class="ds-table">
+				<table class="ds-table ds-screens-table">
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Screen', 'digital-signage' ); ?></th>

@@ -8,7 +8,7 @@ $prefilled_code = isset( $_GET['code'] ) ? strtoupper( sanitize_text_field( wp_u
 	<div class="ds-app-header">
 		<div>
 			<p class="ds-breadcrumb"><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-screens' ) ); ?>">&larr; <?php esc_html_e( 'Screens', 'digital-signage' ); ?></a></p>
-			<h1><?php esc_html_e( 'Pair a Screen', 'digital-signage' ); ?></h1>
+			<h1><?php esc_html_e( 'Pair a Screen or Controller', 'digital-signage' ); ?></h1>
 		</div>
 	</div>
 
@@ -20,21 +20,22 @@ $prefilled_code = isset( $_GET['code'] ) ? strtoupper( sanitize_text_field( wp_u
 
 	<div class="ds-two-col">
 		<div class="ds-panel">
-			<h2><?php esc_html_e( '1. Open the player URL on the display', 'digital-signage' ); ?></h2>
+			<h2><?php esc_html_e( '1. Open a player or install a controller', 'digital-signage' ); ?></h2>
 			<p><?php esc_html_e( 'On the TV/tablet/kiosk browser, navigate to any unused player URL, e.g.:', 'digital-signage' ); ?></p>
 			<code class="ds-code-block"><?php echo esc_html( home_url( '/signage/play/{random-token}/' ) ); ?></code>
 			<p><?php esc_html_e( 'The screen will show a 6-character pairing code full-screen. If you don\'t have a token yet, generate one below and open it on the display.', 'digital-signage' ); ?></p>
+			<p><?php esc_html_e( 'For a Linux or Windows PC, install the controller package instead. It detects every connected display and shows one pairing code while creating an independent Screen for each output.', 'digital-signage' ); ?></p>
 			<button type="button" class="ds-btn" id="ds-generate-token"><?php esc_html_e( 'Generate a Player URL', 'digital-signage' ); ?></button>
 			<p id="ds-generated-url"></p>
 		</div>
 
 		<div class="ds-panel">
-			<h2><?php esc_html_e( '2. Enter the code shown on the screen', 'digital-signage' ); ?></h2>
+			<h2><?php esc_html_e( '2. Enter the code shown on the display', 'digital-signage' ); ?></h2>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="ds_pair_screen" />
 				<?php wp_nonce_field( 'ds_pair_screen' ); ?>
 				<div class="ds-field">
-					<label for="ds_screen_name"><?php esc_html_e( 'Screen name', 'digital-signage' ); ?></label>
+					<label for="ds_screen_name"><?php esc_html_e( 'Screen or controller name', 'digital-signage' ); ?></label>
 					<input type="text" id="ds_screen_name" name="screen_name" class="ds-input" placeholder="<?php esc_attr_e( 'e.g. Lobby TV', 'digital-signage' ); ?>" required <?php echo $prefilled_code ? 'autofocus' : ''; ?> />
 				</div>
 				<div class="ds-field">
@@ -45,7 +46,7 @@ $prefilled_code = isset( $_GET['code'] ) ? strtoupper( sanitize_text_field( wp_u
 					</div>
 					<span class="ds-hint" id="ds-scan-hint"></span>
 				</div>
-				<button type="submit" class="ds-btn ds-btn-primary"><?php esc_html_e( 'Pair Screen', 'digital-signage' ); ?></button>
+				<button type="submit" class="ds-btn ds-btn-primary"><?php esc_html_e( 'Pair Device', 'digital-signage' ); ?></button>
 			</form>
 		</div>
 	</div>

@@ -65,6 +65,14 @@ class DS_Heartbeat {
 		}
 
 		$response['ds_screen_statuses'] = $out;
+		$controller_statuses = array();
+		foreach ( DS_Controllers::get_all() as $controller ) {
+			$controller_statuses[ $controller->id ] = array(
+				'status'    => $controller->last_seen && ( time() - strtotime( $controller->last_seen . ' UTC' ) ) <= DS_Controllers::ONLINE_SECONDS ? 'online' : 'offline',
+				'last_seen' => $controller->last_seen,
+			);
+		}
+		$response['ds_controller_statuses'] = $controller_statuses;
 		return $response;
 	}
 }

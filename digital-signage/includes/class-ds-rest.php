@@ -182,8 +182,10 @@ class DS_REST {
 		$channel_id = DS_Schedule_Resolver::resolve_channel_id_for_screen( $screen->ID );
 		$response   = rest_ensure_response(
 			array(
-				'channel_id' => $channel_id,
-				'revision'   => $this->get_channel_revision( $channel_id ),
+				'channel_id'  => $channel_id,
+				'revision'    => $this->get_channel_revision( $channel_id ),
+				'orientation' => get_post_meta( $screen->ID, 'ds_orientation', true ) ?: 'landscape',
+				'rotation'    => absint( get_post_meta( $screen->ID, 'ds_content_rotation', true ) ),
 			)
 		);
 		$response->header( 'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0' );
@@ -213,6 +215,7 @@ class DS_REST {
 				'screen_id'      => $screen->ID,
 				'screen_name'    => $screen->post_title,
 				'orientation'    => get_post_meta( $screen->ID, 'ds_orientation', true ) ?: 'landscape',
+				'rotation'       => absint( get_post_meta( $screen->ID, 'ds_content_rotation', true ) ),
 				'channel_id'     => $channel_id,
 				'channel_name'   => $channel_id ? get_the_title( $channel_id ) : '',
 				'revision'       => $this->get_channel_revision( $channel_id ),
@@ -297,9 +300,12 @@ class DS_REST {
 
 		// Deliver any pending device command (WiFi change, rotation, reboot, ...) in the
 		// same round trip — ds-agent polls via heartbeat rather than a separate endpoint.
-		$command = get_post_meta( $screen->ID, 'ds_device_command', true );
-		if ( $command ) {
-			delete_post_meta( $screen->ID, 'ds_device_command' );
+		$command = null;
+		if ( isset( $params['device'] ) && is_array( $params['device'] ) ) {
+			$command = get_post_meta( $screen->ID, 'ds_device_command', true );
+			if ( $command ) {
+				delete_post_meta( $screen->ID, 'ds_device_command' );
+			}
 		}
 
 		return rest_ensure_response(
@@ -487,10 +493,11 @@ class DS_REST {
 		}
 		$rotates_in = max( 1, self::PAIRING_CODE_ROTATE_SECONDS - $age );
 
+		$paired_screen = ! empty( $row->paired_at ) ? $this->get_screen_by_token( $row->token ) : null;
 		return rest_ensure_response(
 			array(
 				'paired'      => ! empty( $row->paired_at ),
-				'player_url'  => ! empty( $row->paired_at ) ? home_url( '/signage/play/' . $row->token . '/' ) : null,
+				'player_url'  => $paired_screen ? DS_Player::get_player_url( $paired_screen ) : null,
 				'expired'     => strtotime( $row->expires_at . ' UTC' ) < time(),
 				'code'        => $row->code,
 				'rotates_in'  => $rotates_in,

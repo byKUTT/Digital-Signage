@@ -18,10 +18,15 @@ if ( ! apply_filters( 'ds_uninstall_remove_data', defined( 'DS_REMOVE_DATA_ON_UN
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}ds_heartbeats" );
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}ds_proof_of_play" );
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}ds_pairing_codes" );
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}ds_controller_commands" );
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}ds_controller_displays" );
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}ds_controllers" );
 
 delete_option( 'ds_settings' );
 delete_option( 'ds_db_version' );
 delete_option( 'ds_flush_rewrite_rules' );
+delete_option( 'ds_github_updater' );
+delete_option( 'ds_github_release_cache' );
 
 foreach ( array( 'ds_channel', 'ds_screen', 'ds_slide', 'ds_schedule' ) as $post_type ) {
 	$posts = get_posts( array( 'post_type' => $post_type, 'posts_per_page' => -1, 'post_status' => 'any', 'fields' => 'ids' ) );

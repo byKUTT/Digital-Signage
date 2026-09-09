@@ -320,6 +320,29 @@
 
 .ds-quick-links { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
 
+/* ---- Controller fleet ---- */
+.ds-controller-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap: 14px; margin-top: 16px; }
+.ds-controller-card { display: block; padding: 16px; border: 1px solid #dcdcde; border-radius: 8px; color: #1d2327; text-decoration: none; background: #fff; }
+.ds-controller-card:hover { border-color: #8c8f94; box-shadow: 0 3px 12px rgba(0,0,0,.06); color: #1d2327; }
+.ds-controller-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ds-controller-card p { margin: 10px 0; color: #646970; }
+.ds-controller-card ul { margin: 0 0 12px; padding: 0; list-style: none; }
+.ds-controller-card li { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #f0f0f1; font-size: 12px; }
+.ds-controller-card li strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-controller-metrics { display: flex; justify-content: space-between; gap: 8px; color: #646970; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+.ds-controller-summary { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 20px; }
+.ds-controller-summary > * { margin: 0; }
+.ds-controller-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ds-weekday-grid { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 10px 0; }
+.ds-weekday-grid label { font-weight: 500; }
+.ds-version-pair { display: grid; grid-template-columns: repeat(2,minmax(140px,1fr)); gap: 12px; margin: 16px 0; }
+.ds-version-pair > div { padding: 14px; border: 1px solid #dcdcde; border-radius: 6px; }
+.ds-command-queued,.ds-command-delivered,.ds-command-running { color: #996800; }
+.ds-command-succeeded { color: #008a20; }
+.ds-command-failed { color: #b32d2e; }
+.ds-weekdays { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 12px 0 18px; }
+.ds-release-notes { max-height: 260px; overflow: auto; padding: 12px; background: #f6f7f7; border-radius: 6px; white-space: pre-wrap; }
+
 /* ---- Media picker ---- */
 .ds-media-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .ds-media-preview img { max-width: 100%; max-height: 220px; border-radius: 6px; border: 1px solid #dcdcde; }

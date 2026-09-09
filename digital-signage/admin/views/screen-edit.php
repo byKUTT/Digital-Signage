@@ -4,6 +4,7 @@
  * @var WP_Post|null $screen
  * @var int          $channel_id
  * @var string       $orientation
+ * @var int          $content_rotation
  * @var string       $token
  * @var WP_Post[]    $channels
  * @var WP_Term[]    $locations
@@ -18,6 +19,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $offline_after = (int) DS_Settings::get( 'offline_status_sec', 120 );
 $status        = ( $heartbeat && ( time() - strtotime( $heartbeat->last_seen . ' UTC' ) ) <= $offline_after ) ? 'online' : ( $heartbeat ? 'offline' : 'never' );
+$parent_controller_id = $id ? absint( get_post_meta( $id, 'ds_controller_id', true ) ) : 0;
+$parent_output = $id ? sanitize_text_field( get_post_meta( $id, 'ds_controller_output', true ) ) : '';
+$parent_controller = $parent_controller_id ? DS_Controllers::get( $parent_controller_id ) : null;
 ?>
 <div class="ds-app-wrap">
 	<div class="ds-app-header">
@@ -45,6 +49,13 @@ $status        = ( $heartbeat && ( time() - strtotime( $heartbeat->last_seen . '
 		<div class="ds-notice ds-notice-error"><?php esc_html_e( 'Enter a network name (SSID) to connect to.', 'digital-signage' ); ?></div>
 	<?php elseif ( isset( $_GET['ds_error'] ) && 'resolution' === $_GET['ds_error'] ) : ?>
 		<div class="ds-notice ds-notice-error"><?php esc_html_e( 'Enter a resolution as WIDTHxHEIGHT (e.g. 1920x440), or leave it blank to auto-detect.', 'digital-signage' ); ?></div>
+	<?php endif; ?>
+
+	<?php if ( $parent_controller ) : ?>
+		<div class="ds-notice">
+			<?php echo esc_html( sprintf( __( 'This Screen runs on output %1$s of controller %2$s.', 'digital-signage' ), $parent_output, $parent_controller->name ?: $parent_controller->hostname ) ); ?>
+			<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-controller-edit&id=' . $parent_controller_id ) ); ?>"><?php esc_html_e( 'Manage controller and display mapping', 'digital-signage' ); ?></a>
+		</div>
 	<?php endif; ?>
 
 	<div class="ds-two-col">
@@ -80,6 +91,21 @@ $status        = ( $heartbeat && ( time() - strtotime( $heartbeat->last_seen . '
 				</div>
 
 				<div class="ds-field">
+					<label for="content_rotation"><?php esc_html_e( 'Content rotation', 'digital-signage' ); ?></label>
+					<select id="content_rotation" name="content_rotation" class="ds-input">
+						<?php foreach ( array( 0, 90, 180, 270 ) as $degrees ) : ?>
+							<option value="<?php echo esc_attr( $degrees ); ?>" <?php selected( $content_rotation, $degrees ); ?>><?php echo esc_html( $degrees . '°' ); ?></option>
+						<?php endforeach; ?>
+					</select>
+					<span class="ds-hint"><?php esc_html_e( 'Rotates the player content on any TV or browser. Changes appear on a running screen automatically.', 'digital-signage' ); ?></span>
+				</div>
+
+				<div class="ds-field">
+					<label><input type="checkbox" name="short_url_enabled" value="1" <?php checked( $short_url_enabled ); ?> /> <?php esc_html_e( 'Enable short player URL', 'digital-signage' ); ?></label>
+					<span class="ds-hint"><?php esc_html_e( 'Creates a stable six-character address that is easier to type on a TV. It is also easier to guess than the private long URL.', 'digital-signage' ); ?></span>
+				</div>
+
+				<div class="ds-field">
 					<label for="location"><?php esc_html_e( 'Location', 'digital-signage' ); ?></label>
 					<select id="location" name="location" class="ds-input">
 						<option value="0"><?php esc_html_e( '— None —', 'digital-signage' ); ?></option>
@@ -111,9 +137,12 @@ $status        = ( $heartbeat && ( time() - strtotime( $heartbeat->last_seen . '
 				<?php if ( $token ) : ?>
 					<h3><?php esc_html_e( 'Player URL', 'digital-signage' ); ?></h3>
 					<div class="ds-url-box">
-						<code><?php echo esc_html( home_url( '/signage/play/' . $token . '/' ) ); ?></code>
-						<a href="<?php echo esc_url( home_url( '/signage/play/' . $token . '/' ) ); ?>" target="_blank" class="ds-btn ds-btn-small"><?php esc_html_e( 'Open', 'digital-signage' ); ?></a>
+						<code><?php echo esc_html( $player_url ); ?></code>
+						<a href="<?php echo esc_url( $player_url ); ?>" target="_blank" class="ds-btn ds-btn-small"><?php esc_html_e( 'Open', 'digital-signage' ); ?></a>
 					</div>
+					<?php if ( $short_url_enabled && $short_code ) : ?>
+						<p class="ds-hint"><?php esc_html_e( 'Private long URL (still works):', 'digital-signage' ); ?> <code><?php echo esc_html( $long_player_url ); ?></code></p>
+					<?php endif; ?>
 				<?php else : ?>
 					<div class="ds-notice"><?php esc_html_e( 'Not paired yet.', 'digital-signage' ); ?> <a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-pairing' ) ); ?>"><?php esc_html_e( 'Pair this screen', 'digital-signage' ); ?></a></div>
 				<?php endif; ?>

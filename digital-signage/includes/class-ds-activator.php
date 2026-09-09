@@ -68,6 +68,9 @@ class DS_Activator {
 		$heartbeats = $wpdb->prefix . 'ds_heartbeats';
 		$pop        = $wpdb->prefix . 'ds_proof_of_play';
 		$pairing    = $wpdb->prefix . 'ds_pairing_codes';
+		$controllers = $wpdb->prefix . 'ds_controllers';
+		$displays    = $wpdb->prefix . 'ds_controller_displays';
+		$commands    = $wpdb->prefix . 'ds_controller_commands';
 
 		$sql = "CREATE TABLE {$heartbeats} (
 			screen_id BIGINT UNSIGNED NOT NULL,
@@ -107,6 +110,65 @@ class DS_Activator {
 			PRIMARY KEY  (id),
 			UNIQUE KEY code (code),
 			KEY token (token)
+		) {$charset_collate};
+
+		CREATE TABLE {$controllers} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			public_id VARCHAR(40) NOT NULL,
+			token_hash CHAR(64) NOT NULL,
+			pairing_code VARCHAR(10) NOT NULL,
+			pairing_code_expires DATETIME DEFAULT NULL,
+			name VARCHAR(190) DEFAULT '',
+			hostname VARCHAR(190) DEFAULT '',
+			platform VARCHAR(20) DEFAULT '',
+			os_version VARCHAR(190) DEFAULT '',
+			agent_version VARCHAR(30) DEFAULT '',
+			software_version VARCHAR(30) DEFAULT '',
+			ip_address VARCHAR(45) DEFAULT '',
+			telemetry LONGTEXT NULL,
+			power_schedule LONGTEXT NULL,
+			created_at DATETIME NOT NULL,
+			paired_at DATETIME DEFAULT NULL,
+			last_seen DATETIME DEFAULT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY public_id (public_id),
+			UNIQUE KEY token_hash (token_hash),
+			UNIQUE KEY pairing_code (pairing_code),
+			KEY last_seen (last_seen)
+		) {$charset_collate};
+
+		CREATE TABLE {$displays} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			controller_id BIGINT UNSIGNED NOT NULL,
+			output_key VARCHAR(100) NOT NULL,
+			connector VARCHAR(100) DEFAULT '',
+			label VARCHAR(190) DEFAULT '',
+			geometry VARCHAR(80) DEFAULT '',
+			resolution VARCHAR(30) DEFAULT '',
+			is_primary TINYINT(1) DEFAULT 0,
+			is_connected TINYINT(1) DEFAULT 1,
+			screen_id BIGINT UNSIGNED DEFAULT 0,
+			last_seen DATETIME DEFAULT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY controller_output (controller_id,output_key),
+			KEY screen_id (screen_id)
+		) {$charset_collate};
+
+		CREATE TABLE {$commands} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			controller_id BIGINT UNSIGNED NOT NULL,
+			command_type VARCHAR(50) NOT NULL,
+			payload LONGTEXT NULL,
+			status VARCHAR(20) NOT NULL DEFAULT 'queued',
+			attempts SMALLINT UNSIGNED DEFAULT 0,
+			result LONGTEXT NULL,
+			created_by BIGINT UNSIGNED DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			delivered_at DATETIME DEFAULT NULL,
+			completed_at DATETIME DEFAULT NULL,
+			PRIMARY KEY  (id),
+			KEY controller_status (controller_id,status),
+			KEY created_at (created_at)
 		) {$charset_collate};";
 
 		dbDelta( $sql );

@@ -223,7 +223,7 @@
 
 		/* ---- Live screen status refresh via WP Heartbeat API ---- */
 		$( document ).on( 'heartbeat-send', function ( e, data ) {
-			if ( $( '.ds-screens-table' ).length ) {
+			if ( $( '.ds-screens-table, .ds-controller-card' ).length ) {
 				data.ds_dashboard = true;
 			}
 		} );
@@ -240,6 +240,13 @@
 					.attr( 'class', 'ds-badge ds-badge-' + row.status )
 					.text( row.status.charAt( 0 ).toUpperCase() + row.status.slice( 1 ) );
 			} );
+			if ( data.ds_controller_statuses ) {
+				$.each( data.ds_controller_statuses, function ( controllerId, row ) {
+					var $badge = $( '.ds-controller-card[data-controller-id="' + controllerId + '"] .ds-badge' ).first();
+					$badge.attr( 'class', 'ds-badge ds-badge-' + row.status )
+						.text( row.status.charAt( 0 ).toUpperCase() + row.status.slice( 1 ) );
+				} );
+			}
 		} );
 
 	} );

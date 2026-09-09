@@ -26,13 +26,18 @@ class DS_Player {
 	}
 
 	public function hide_admin_bar( $show ) {
-		if ( get_query_var( 'ds_screen_token' ) || get_query_var( 'ds_preview_channel' ) || $this->is_tv_launcher_request() ) {
+		if ( get_query_var( 'ds_screen_token' ) || get_query_var( 'ds_preview_channel' ) || $this->get_short_request_code() || $this->is_tv_launcher_request() || $this->get_controller_request() ) {
 			return false;
 		}
 		return $show;
 	}
 
 	public function maybe_render_player() {
+		$controller_request = $this->get_controller_request();
+		if ( $controller_request ) {
+			$this->render_controller_pairing( $controller_request['public_id'], $controller_request['output_key'] );
+			return;
+		}
 		if ( $this->is_tv_launcher_request() ) {
 			$this->render_tv_launcher();
 			return;
@@ -41,6 +46,12 @@ class DS_Player {
 		$preview_channel = get_query_var( 'ds_preview_channel' );
 		if ( $preview_channel ) {
 			$this->maybe_render_preview( absint( $preview_channel ) );
+			return;
+		}
+
+		$short_code = $this->get_short_request_code();
+		if ( $short_code ) {
+			$this->render_short_player( $short_code );
 			return;
 		}
 
@@ -72,6 +83,17 @@ class DS_Player {
 		exit;
 	}
 
+	private function get_relative_request_path() {
+		$request_uri  = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$request_path = trim( (string) wp_parse_url( $request_uri, PHP_URL_PATH ), '/' );
+		$home_path    = trim( (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ), '/' );
+
+		if ( $home_path && 0 === strpos( $request_path, $home_path . '/' ) ) {
+			$request_path = substr( $request_path, strlen( $home_path ) + 1 );
+		}
+		return trim( $request_path, '/' );
+	}
+
 	/**
 	 * Recognize the stable TV launcher even when a host fails to flush saved
 	 * WordPress rewrite rules during an in-place plugin update.
@@ -81,15 +103,80 @@ class DS_Player {
 			return true;
 		}
 
-		$request_uri  = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
-		$request_path = trim( (string) wp_parse_url( $request_uri, PHP_URL_PATH ), '/' );
-		$home_path    = trim( (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ), '/' );
+		return 'signage/tv' === $this->get_relative_request_path();
+	}
 
-		if ( $home_path && 0 === strpos( $request_path, $home_path . '/' ) ) {
-			$request_path = substr( $request_path, strlen( $home_path ) + 1 );
+	private function get_short_request_code() {
+		$code = get_query_var( 'ds_short_code' );
+		if ( $code ) {
+			return strtoupper( sanitize_text_field( $code ) );
+		}
+		$path = $this->get_relative_request_path();
+		return preg_match( '#^s/([A-Za-z0-9]{6})$#', $path, $matches ) ? strtoupper( $matches[1] ) : '';
+	}
+
+	/**
+	 * Resolve a controller/output bootstrap URL, including a direct path fallback
+	 * for hosts whose rewrite rules have not yet been flushed after upgrading.
+	 */
+	private function get_controller_request() {
+		$public_id  = sanitize_text_field( get_query_var( 'ds_controller_id' ) );
+		$output_key = sanitize_key( get_query_var( 'ds_controller_output' ) );
+		if ( $public_id && $output_key ) {
+			return array( 'public_id' => $public_id, 'output_key' => $output_key );
 		}
 
-		return 'signage/tv' === trim( $request_path, '/' );
+		$path = $this->get_relative_request_path();
+		if ( preg_match( '#^signage/controller/([a-f0-9-]{36})/([A-Za-z0-9_-]{1,100})$#', $path, $matches ) ) {
+			return array( 'public_id' => $matches[1], 'output_key' => sanitize_key( $matches[2] ) );
+		}
+		return null;
+	}
+
+	private function render_controller_pairing( $public_id, $output_key ) {
+		nocache_headers();
+		$status_url = esc_url_raw( rest_url( 'ds/v1/controller/public/' . rawurlencode( $public_id ) . '/' . rawurlencode( $output_key ) ) );
+		$site_name  = get_bloginfo( 'name' );
+		include DS_PLUGIN_DIR . 'public/templates/controller-pairing.php';
+		exit;
+	}
+
+	private function render_short_player( $code ) {
+		$screens = get_posts(
+			array(
+				'post_type'      => 'ds_screen',
+				'posts_per_page' => 1,
+				'meta_query'     => array(
+					array( 'key' => 'ds_short_code', 'value' => $code ),
+					array( 'key' => 'ds_short_url_enabled', 'value' => '1' ),
+				),
+				'post_status'    => 'any',
+			)
+		);
+		nocache_headers();
+		if ( ! $screens ) {
+			wp_die( esc_html__( 'Short player URL not found or disabled.', 'digital-signage' ), '', array( 'response' => 404 ) );
+		}
+		$token = get_post_meta( $screens[0]->ID, 'ds_pairing_token', true );
+		if ( ! $token ) {
+			wp_die( esc_html__( 'This screen has not been paired.', 'digital-signage' ), '', array( 'response' => 404 ) );
+		}
+		$this->render_player( $screens[0], $token );
+		exit;
+	}
+
+	public static function get_player_url( $screen ) {
+		$screen_id = is_object( $screen ) ? absint( $screen->ID ) : absint( $screen );
+		if ( ! $screen_id ) {
+			return '';
+		}
+		$enabled = '1' === (string) get_post_meta( $screen_id, 'ds_short_url_enabled', true );
+		$code    = strtoupper( sanitize_text_field( get_post_meta( $screen_id, 'ds_short_code', true ) ) );
+		if ( $enabled && preg_match( '/^[A-Z0-9]{6}$/', $code ) ) {
+			return home_url( '/s/' . $code . '/' );
+		}
+		$token = sanitize_text_field( get_post_meta( $screen_id, 'ds_pairing_token', true ) );
+		return $token ? home_url( '/signage/play/' . $token . '/' ) : '';
 	}
 
 	/**

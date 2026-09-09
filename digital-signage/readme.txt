@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 2.10.1
+Stable tag: 3.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,13 +16,15 @@ Turn WordPress into a full digital signage (CMS) platform for managing content o
 Digital Signage CMS gives you:
 
 * **Channels** — named playlists of content ("Lobby Menu", "Cafeteria Board") assignable to one or more screens.
-* **Screens** — registered displays, paired via an unguessable token / pairing code, each with orientation, location and live online/offline status.
+* **Screens** — registered displays with orientation, 0°/90°/180°/270° content rotation, optional short player URLs, location and live online/offline status.
 * **Slides** — images, videos, webpages (iframe), custom HTML/CSS, RSS/Atom tickers, weather, live clock, PDF/Google Slides embeds, social embeds and multi-image sliding carousels, with per-slide duration and channel-level transitions.
 * **Schedules** — recurring day-of-week/time rules and one-off date overrides per screen, plus priority/emergency channels that interrupt normal rotation everywhere instantly.
 * **Fullscreen player** — a chrome-less, auto-fullscreen frontend at `/signage/play/{token}/` that polls for updates, preloads the next slide, keeps playing from a local cache when offline, and supports multi-zone layouts (main + ticker + corner clock, split screen, grid).
 * **Admin dashboard** — live screen status, pairing flow, bulk channel assignment, drag-and-drop playlist reordering, a weekly calendar view, proof-of-play analytics with CSV export, JSON import/export, and remote refresh/reload commands.
 * **REST API** (`/wp-json/ds/v1/...`) for the player and for external kiosk hardware such as a Raspberry Pi running a browser in kiosk mode.
-* A **Signage Manager** role for non-technical staff who need content control without full wp-admin access.
+* A shared **Digital Signage Team** and **Signage Manager** role for people who need access to all signage content and settings without full WordPress administrator access.
+* **Multi-display controllers** — one generic Linux or Windows PC can drive several connected displays, with a different Screen, channel, schedule and rotation on every output.
+* **Fleet management** — grouped controller health, detailed telemetry, output mapping, command history, verified signage updates, OS update commands and Linux wake/sleep schedules.
 
 == Installation ==
 
@@ -43,6 +45,27 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 3.1.0 =
+* Fixed public GitHub Release updates by validating complete release assets and falling back to the published SHA256SUMS manifest when GitHub does not expose asset digests.
+* Added controller fleet updating from Digital Signage > Updates: update selected controllers, reinstall a selected current controller, or update every outdated Linux/Windows controller.
+* Added queued/offline delivery, duplicate update prevention, downgrade protection and per-controller update command status.
+* Improved release diagnostics so a missing GitHub Release is distinguished from a branch-only ZIP, incomplete assets, rate limiting and checksum failures.
+
+= 3.0.1 =
+* Added a one-click Windows controller installer that asks only for the WordPress domain, requests administrator permission, starts immediately and can be re-run to update/reinstall while preserving the controller identity.
+
+= 3.0.0 =
+* Added Linux and Windows multi-display controllers. Every connected output receives an independent Screen and isolated browser player while the admin groups them under one controller computer.
+* Added controller pairing, authenticated heartbeats, display reconciliation, detailed telemetry, durable remote commands and command acknowledgements.
+* Added verified GitHub Release updates for the WordPress plugin and device software, pinned to the project repository and protected by SHA-256 release digests.
+* Added configurable Linux suspend and hardware RTC wake schedules with capability reporting and a two-minute wake test.
+* Added controller fleet, controller detail and Updates pages, plus controller/output links on managed Screens.
+
+= 2.11.0 =
+* Added an administrator-managed Digital Signage Team. Selected WordPress users share all channels, screens, slides, schedules, analytics and signage settings without receiving unrelated administrator permissions.
+* Added per-screen 0°, 90°, 180° and 270° browser content rotation with live updates on every player type.
+* Added opt-in stable six-character player URLs under `/s/{code}/`, with the private long token URL retained as a fallback.
 
 = 2.10.1 =
 * Fixed `/signage/tv/` showing the WordPress 404 page when a host did not flush permalink rewrite rules after updating the plugin. The TV launcher now also recognizes its request path directly.

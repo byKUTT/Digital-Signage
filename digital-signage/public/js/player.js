@@ -198,7 +198,11 @@
 	}
 
 	function playlistRevisionKey( data ) {
-		return String( data && data.channel_id ? data.channel_id : 0 ) + ':' + String( data && data.revision ? data.revision : 'legacy' );
+		var orientation = data && data.orientation ? data.orientation : ( CONFIG.orientation || 'auto' );
+		var rotation = data && undefined !== data.rotation ? data.rotation : CONFIG.rotation;
+		return String( data && data.channel_id ? data.channel_id : 0 ) + ':' +
+			String( data && data.revision ? data.revision : 'legacy' ) + ':' +
+			String( orientation ) + ':' + String( normalizeRotation( rotation ) );
 	}
 
 	function fetchPlaylist() {
@@ -303,9 +307,11 @@
 			stage.style.setProperty( '--ds-zone-bg', data.zone_bg );
 		}
 
+		var rotation = normalizeRotation( undefined !== data.rotation ? data.rotation : CONFIG.rotation );
+		document.documentElement.setAttribute( 'data-ds-rotation', String( rotation ) );
 		document.documentElement.setAttribute(
 			'data-ds-orientation',
-			data.orientation && 'auto' !== data.orientation ? data.orientation : detectOrientation()
+			resolveContentOrientation( data.orientation || CONFIG.orientation, rotation )
 		);
 
 		var zones = data.zones || {};
@@ -332,8 +338,29 @@
 		}
 	}
 
-	function detectOrientation() {
-		return window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+	function normalizeRotation( value ) {
+		var rotation = parseInt( value, 10 );
+		return 90 === rotation || 180 === rotation || 270 === rotation ? rotation : 0;
+	}
+
+	function detectOrientation( rotation ) {
+		var portrait = window.innerHeight > window.innerWidth;
+		rotation = normalizeRotation( undefined === rotation ? document.documentElement.getAttribute( 'data-ds-rotation' ) : rotation );
+		if ( 90 === rotation || 270 === rotation ) {
+			portrait = ! portrait;
+		}
+		return portrait ? 'portrait' : 'landscape';
+	}
+
+	function resolveContentOrientation( orientation, rotation ) {
+		rotation = normalizeRotation( rotation );
+		if ( ! orientation || 'auto' === orientation ) {
+			return detectOrientation( rotation );
+		}
+		if ( ( 90 === rotation || 270 === rotation ) && ( 'landscape' === orientation || 'portrait' === orientation ) ) {
+			return 'landscape' === orientation ? 'portrait' : 'landscape';
+		}
+		return orientation;
 	}
 
 	function zoneEl( zoneName ) {
