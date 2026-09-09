@@ -166,6 +166,29 @@ whoever signs in normally:
 .\install-kiosk.ps1 -Site "https://yourdomain.com" -EnableAutoLogon:$false
 ```
 
+### No keyboard or mouse, ever
+
+Enabling auto sign-in also hardens the PC for running with **no input
+device attached at all** — since there's nobody there to click through
+anything, nothing on the machine should be able to end up waiting for a
+click:
+
+- Sleep, hibernate, and display-off are all disabled (`powercfg`) — nothing
+  needs to be woken up.
+- The screen saver is turned off, so it can never leave the kiosk behind a
+  lock/sign-in screen nobody can dismiss.
+- Windows Error Reporting's "this program has stopped working" dialog is
+  suppressed.
+- A pending Windows Update won't pop an interactive "we're restarting, save
+  your work" prompt — it still updates and reboots on its own schedule,
+  straight back into the kiosk via `AutoAdminLogon`.
+- Windows Spotlight / "suggested content" / tips overlays (the occasional
+  full-screen takeover after sign-in or a feature update) are disabled.
+
+These are one-way conveniences applied alongside `AutoAdminLogon`;
+`.\uninstall-kiosk.ps1 -DisableAutoLogon` reverts them together with auto
+sign-in itself.
+
 ⚠️ **Security note**: `AutoAdminLogon` is a Windows OS feature, not
 something specific to this script — it works by storing the account's
 password in the registry in a form Windows itself can read back in

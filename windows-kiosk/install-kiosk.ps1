@@ -26,6 +26,14 @@
     low-privilege kiosk account with no sensitive access, physically secured
     hardware.
 
+    Enabling auto sign-in also hardens the PC for running with no keyboard or
+    mouse ever attached: sleep/hibernate/monitor-off are disabled, the screen
+    saver is turned off, Windows Error Reporting's crash dialog is
+    suppressed, a pending Windows Update won't pop an interactive "restart
+    now?" prompt, and Windows Spotlight/suggested-content overlays are
+    disabled — none of these need someone to click through them for the
+    kiosk to keep running.
+
     This device generates and remembers its own pairing identity: pass -Site
     (your WordPress site's URL) and a permanent device token is created once,
     saved to %ProgramData%\DigitalSignageKiosk\device-token.txt, and reused on
@@ -250,6 +258,59 @@ if ( $EnableAutoLogon ) {
 	Remove-ItemProperty -Path $winlogonPath -Name 'AutoLogonCount' -ErrorAction SilentlyContinue
 
 	$plainPassword = $null # Best-effort scrub of the in-memory copy.
+
+	# --- Harden this PC as a true unattended kiosk: no keyboard/mouse is -----
+	# --- ever going to be there to click through anything, so nothing on ----
+	# --- this machine should be able to end up waiting for input. -----------
+	Write-Host "==> Configuring power, lock-screen and update settings for unattended kiosk operation..." -ForegroundColor Cyan
+
+	# Never sleep, never blank the display, no hibernate file — there's no
+	# input device to wake it back up with.
+	$powercfgRuns = @(
+		, @('/change', 'monitor-timeout-ac', '0')
+		, @('/change', 'monitor-timeout-dc', '0')
+		, @('/change', 'standby-timeout-ac', '0')
+		, @('/change', 'standby-timeout-dc', '0')
+		, @('/change', 'hibernate-timeout-ac', '0')
+		, @('/change', 'hibernate-timeout-dc', '0')
+		, @('/hibernate', 'off')
+	)
+	foreach ( $pcArgs in $powercfgRuns ) {
+		Start-Process -FilePath 'powercfg.exe' -ArgumentList $pcArgs -Wait -WindowStyle Hidden
+	}
+
+	# Disable the screen saver outright — with AutoAdminLogon there's normally
+	# no lock screen to begin with, but a screen saver set to "on resume,
+	# display logon screen" would otherwise strand the kiosk behind one nobody
+	# can dismiss.
+	Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'ScreenSaveActive' -Value '0' -Force
+	Remove-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'SCRNSAVE.EXE' -ErrorAction SilentlyContinue
+
+	# Suppress Windows Error Reporting's "<program> has stopped working"
+	# dialog — there's nobody to click "Close program" on it, and left open
+	# it blocks whatever's behind it.
+	New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting' -Force | Out-Null
+	Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting' -Name 'Disabled' -Value 1 -Type DWord -Force
+
+	# Don't let a pending Windows Update pop a "we're going to restart, save
+	# your work" dialog while someone (nobody) is expected to respond to it.
+	# Updates still install and the PC still reboots on its own schedule —
+	# straight back into the kiosk, thanks to AutoAdminLogon — this only
+	# removes the interactive nag beforehand.
+	$auPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU'
+	New-Item -Path $auPath -Force | Out-Null
+	Set-ItemProperty -Path $auPath -Name 'NoAutoRebootWithLoggedOnUsers' -Value 1 -Type DWord -Force
+
+	# Turn off Windows Spotlight / "suggested content" / tips overlays, which
+	# occasionally take over the full screen after sign-in or a feature
+	# update and wait for a click to dismiss.
+	$cdmPath = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+	New-Item -Path $cdmPath -Force | Out-Null
+	foreach ( $name in 'SubscribedContent-338387Enabled', 'SubscribedContent-338388Enabled',
+		'SubscribedContent-338389Enabled', 'SubscribedContent-353694Enabled',
+		'SubscribedContent-353696Enabled', 'RotatingLockScreenEnabled', 'RotatingLockScreenOverlayEnabled' ) {
+		Set-ItemProperty -Path $cdmPath -Name $name -Value 0 -Type DWord -Force -ErrorAction SilentlyContinue
+	}
 }
 
 Write-Host ""
@@ -259,6 +320,8 @@ Write-Host "   Close hotkey:   $modifiersArg+$CloseKey"
 Write-Host "   Installed to:   $scriptPath"
 if ( $EnableAutoLogon ) {
 	Write-Host "   Auto sign-in:   ENABLED for '$AutoLogonUsername' — this PC now boots straight to the kiosk." -ForegroundColor Green
+	Write-Host "   Kiosk hardening: sleep/hibernate/screen saver disabled, crash and update" -ForegroundColor Green
+	Write-Host "                    dialogs suppressed — nothing here waits on input." -ForegroundColor Green
 }
 Write-Host ""
 if ( $Site ) {

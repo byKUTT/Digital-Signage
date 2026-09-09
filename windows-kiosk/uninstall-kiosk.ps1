@@ -3,8 +3,10 @@
     Removes the Digital Signage Windows kiosk auto-start and installed files.
 
 .PARAMETER DisableAutoLogon
-    Also turn off Windows auto sign-in (AutoAdminLogon), if install-kiosk.ps1
-    -EnableAutoLogon set it up. Requires an elevated PowerShell.
+    Also turn off Windows auto sign-in (AutoAdminLogon) and revert the
+    unattended-kiosk power/screen-saver/error-reporting/update settings, if
+    install-kiosk.ps1 -EnableAutoLogon set them up. Requires an elevated
+    PowerShell.
 #>
 
 param(
@@ -35,6 +37,15 @@ if ( $DisableAutoLogon ) {
 		$winlogonPath = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
 		Set-ItemProperty -Path $winlogonPath -Name 'AutoAdminLogon' -Value '0'
 		Remove-ItemProperty -Path $winlogonPath -Name 'DefaultPassword'
+
+		Write-Host "==> Reverting unattended-kiosk power/lock/update settings…"
+		powercfg /change monitor-timeout-ac 10
+		powercfg /change monitor-timeout-dc 5
+		powercfg /change standby-timeout-ac 30
+		powercfg /change standby-timeout-dc 15
+		Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'ScreenSaveActive' -Value '1'
+		Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting' -Name 'Disabled'
+		Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -Name 'NoAutoRebootWithLoggedOnUsers'
 	}
 }
 
