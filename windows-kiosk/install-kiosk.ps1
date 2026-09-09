@@ -4,9 +4,12 @@
     optionally with a fully unattended Windows auto sign-in too.
 
 .DESCRIPTION
-    Copies kiosk-player.ps1 into %ProgramData%\DigitalSignageKiosk and adds a
-    Run-key entry so it launches automatically, hidden, every time the current
-    Windows user signs in.
+    Copies kiosk-player.ps1 into %ProgramData%\DigitalSignageKiosk. By
+    default (-ReplaceShell) it's installed as this account's Windows shell,
+    replacing explorer.exe entirely: on sign-in there is no desktop, no
+    taskbar, no Start menu, nothing but the kiosk browser — just a Run-key
+    entry that launches it alongside the normal desktop instead, if
+    -ReplaceShell:$false is passed.
 
     Windows auto sign-in (via the built-in AutoAdminLogon mechanism) is
     turned on by default — the PC boots straight to the kiosk with no
@@ -64,6 +67,19 @@
     account with no password gets an empty AutoAdminLogon password (which is
     what it needs), or pass -AutoLogonPassword for an account that has one.
 
+.PARAMETER ReplaceShell
+    Make the kiosk this account's Windows shell (HKCU ...\Winlogon\Shell)
+    instead of explorer.exe, so sign-in goes straight to the kiosk with no
+    desktop, taskbar, or Start menu ever reachable. Enabled by default; pass
+    -ReplaceShell:$false to keep the normal desktop and launch the kiosk via
+    the Run key on top of it instead (useful while testing, or for
+    maintenance access). Doesn't need elevation on its own (HKCU), but is
+    only really useful paired with -EnableAutoLogon. Emergency recovery if
+    something's wrong with the kiosk: Ctrl+Shift+Esc still opens Task
+    Manager (a raw Windows hotkey, independent of the shell) — File > Run
+    new task > explorer.exe (or powershell.exe) gets you back to a normal
+    desktop without uninstalling anything.
+
 .PARAMETER AutoLogonUsername
     The account to auto sign in as. Defaults to the account running this
     script (recommended: run this script while logged into the dedicated
@@ -103,6 +119,8 @@ param(
 	[switch]$Regenerate,
 
 	[switch]$EnableAutoLogon = $true,
+
+	[switch]$ReplaceShell = $true,
 
 	[switch]$MultiDisplay,
 
@@ -234,8 +252,21 @@ $modifiersArg = ($CloseModifiers -join ',')
 $runCommand = 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Url "{1}" -Browser {2} -CloseModifiers {3} -CloseKey {4}' -f `
 	$scriptPath, $Url, $Browser, $modifiersArg, $CloseKey
 
-New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
-	-Name 'DigitalSignageKiosk' -Value $runCommand -PropertyType String -Force | Out-Null
+if ( $ReplaceShell ) {
+	# Make the kiosk this account's Windows shell instead of explorer.exe:
+	# on sign-in there is no desktop, taskbar, or Start menu — just the kiosk
+	# browser. Per-user, no elevation needed. It doesn't also need a Run-key
+	# entry since it's now what launches on sign-in in the first place.
+	Write-Host "==> Setting the kiosk as this account's shell (no desktop, taskbar, or Start menu will ever appear)..." -ForegroundColor Cyan
+	$shellWinlogonPath = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon'
+	New-Item -Path $shellWinlogonPath -Force | Out-Null
+	New-ItemProperty -Path $shellWinlogonPath -Name 'Shell' -Value $runCommand -PropertyType String -Force | Out-Null
+	Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'DigitalSignageKiosk' -ErrorAction SilentlyContinue
+} else {
+	New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
+		-Name 'DigitalSignageKiosk' -Value $runCommand -PropertyType String -Force | Out-Null
+	Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon' -Name 'Shell' -ErrorAction SilentlyContinue
+}
 
 # --- Optional: make Windows itself sign in automatically on boot. ---
 if ( $EnableAutoLogon ) {
@@ -322,6 +353,11 @@ if ( $EnableAutoLogon ) {
 	Write-Host "   Auto sign-in:   ENABLED for '$AutoLogonUsername' — this PC now boots straight to the kiosk." -ForegroundColor Green
 	Write-Host "   Kiosk hardening: sleep/hibernate/screen saver disabled, crash and update" -ForegroundColor Green
 	Write-Host "                    dialogs suppressed — nothing here waits on input." -ForegroundColor Green
+}
+if ( $ReplaceShell ) {
+	Write-Host "   Shell:          REPLACED — no desktop, taskbar, or Start menu, just the kiosk." -ForegroundColor Green
+	Write-Host "                    Recovery: Ctrl+Shift+Esc > Task Manager > File > Run new task" -ForegroundColor Green
+	Write-Host "                    > explorer.exe gets a normal desktop back if you ever need one." -ForegroundColor Green
 }
 Write-Host ""
 if ( $Site ) {

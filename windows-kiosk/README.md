@@ -2,15 +2,42 @@
 
 Turns a Windows PC into a Digital Signage player: on sign-in it automatically
 opens your player URL full-screen in a chrome-less kiosk browser window — no
-address bar, no tabs, no taskbar interaction. Since a kiosk browser normally
+address bar, no tabs, no taskbar interaction, and by default (see
+[section 2](#2-windows-auto-sign-in-on-by-default)) **no desktop at all** —
+the kiosk *is* the account's Windows shell. Since a kiosk browser normally
 can't be closed by a mouse/keyboard user (no window chrome, Alt+F4 is
 suppressed by kiosk mode), a **global keyboard shortcut** (default
-`Ctrl+Alt+Shift+Q`) closes it back down to the desktop.
+`Ctrl+Alt+Shift+Q`) closes it — which, with no desktop underneath, ends the
+Windows session and (with auto sign-in on) immediately restarts the kiosk,
+i.e. it's a "restart the kiosk" hotkey rather than a way out to a desktop.
 
 Works with **Microsoft Edge** (built into Windows 10/11, default) or
 **Google Chrome**. No installer/build step — it's PowerShell, run directly.
 
-## 1. Install
+## 0. One-click .exe installer
+
+`DigitalSignageKioskSetup.exe` bundles all four scripts into a single
+double-clickable Windows installer (built from `installer.nsi` with
+[NSIS](https://nsis.sourceforge.io/)). Copy it to the kiosk PC and
+double-click it:
+
+1. One UAC prompt appears — approve it.
+2. A small progress window shows `install-kiosk.ps1` running live, against
+   the default site with auto sign-in and kiosk shell replacement all on.
+3. It closes itself when done. Sign out and back in (or reboot) and the
+   kiosk starts — with no desktop ever showing, per
+   [section 2](#2-windows-auto-sign-in-on-by-default).
+
+To install against a different site or with different options, use one of
+the script-based installs below instead — the `.exe` always runs
+`install-kiosk.ps1` with no arguments (its defaults). Rebuild it after
+editing any of the four scripts with:
+
+```
+makensis installer.nsi
+```
+
+## 1. Install (scripts)
 
 ### Fully local / offline install (recommended)
 
@@ -189,6 +216,30 @@ These are one-way conveniences applied alongside `AutoAdminLogon`;
 `.\uninstall-kiosk.ps1 -DisableAutoLogon` reverts them together with auto
 sign-in itself.
 
+### No desktop, ever ("force kiosk mode")
+
+By default (`-ReplaceShell`, on by default) the kiosk is installed as the
+account's **Windows shell** — the actual replacement for `explorer.exe` —
+instead of just something that launches on top of a normal desktop. Combined
+with auto sign-in, this means the PC never shows a desktop, taskbar, Start
+menu, or "default user" sign-in screen at all: from power-on it goes
+straight to the kiosk and nothing else is reachable.
+
+Don't want that (e.g. while testing, or to keep normal desktop access for
+maintenance)? Pass `-ReplaceShell:$false` and the kiosk goes back to
+launching via the Run key on top of a normal desktop instead:
+
+```powershell
+.\install-kiosk.ps1 -Site "https://yourdomain.com" -ReplaceShell:$false
+```
+
+**Emergency recovery**: with no desktop, the usual ways back in (right-click
+desktop, Win key, Alt+Tab) don't exist. `Ctrl+Shift+Esc` still opens Task
+Manager, though — it's a raw Windows hotkey handled independently of the
+shell — and from there, **File → Run new task → `explorer.exe`** (or
+`powershell.exe`) gets a normal desktop back without uninstalling anything.
+`.\uninstall-kiosk.ps1` always restores `explorer.exe` as the shell.
+
 ⚠️ **Security note**: `AutoAdminLogon` is a Windows OS feature, not
 something specific to this script — it works by storing the account's
 password in the registry in a form Windows itself can read back in
@@ -209,14 +260,16 @@ physically secured. To turn it back off later:
   own (crash/update), it's relaunched automatically after 2 seconds.
 - `install-kiosk.ps1` — copies `kiosk-player.ps1` to
   `%ProgramData%\DigitalSignageKiosk\`, generates and saves a permanent
-  device token to `device-token.txt` (when using `-Site`), and adds a
-  `HKCU...\Run` registry entry so the kiosk launches hidden on every
-  sign-in for the current user — the URL is baked into that registry
-  command, so it stays fixed across reboots without re-running the
-  installer.
-- `uninstall-kiosk.ps1` — stops any running kiosk session, removes the
-  registry entry and the installed files; pass `-DisableAutoLogon` (elevated)
-  to also turn off Windows auto sign-in if `-EnableAutoLogon` was used.
+  device token to `device-token.txt` (when using `-Site`), and (by default,
+  `-ReplaceShell`) sets it as the account's `HKCU...\Winlogon\Shell` in
+  place of `explorer.exe` — or, with `-ReplaceShell:$false`, adds a
+  `HKCU...\Run` entry instead so it launches hidden on top of a normal
+  desktop. Either way the URL is baked into that registry command, so it
+  stays fixed across reboots without re-running the installer.
+- `uninstall-kiosk.ps1` — stops any running kiosk session, restores
+  `explorer.exe` as the shell, removes the registry entry and the installed
+  files; pass `-DisableAutoLogon` (elevated) to also turn off Windows auto
+  sign-in and the kiosk-hardening settings if `-EnableAutoLogon` was used.
 - `ds-controller-agent.ps1` — the `-MultiDisplay` controller: detects every
   connected monitor and opens an isolated kiosk browser profile on each one.
 - `install-standalone.ps1` — single-file, offline version of the install
@@ -224,12 +277,18 @@ physically secured. To turn it back off later:
   `build-standalone.ps1` after editing any of them.
 - `bootstrap.ps1` — fetches the four scripts from GitHub and runs
   `install-kiosk.ps1`, for the remote one-line install.
+- `installer.nsi` / `DigitalSignageKioskSetup.exe` — the one-click `.exe`
+  installer ([section 0](#0-one-click-exe-installer)); the `.nsi` is the
+  NSIS source, rebuilt into the `.exe` with `makensis installer.nsi`.
 
 ## Closing the kiosk
 
 Press the configured hotkey (default `Ctrl+Alt+Shift+Q`). This closes the
-browser window and exits the player script back to the normal desktop. To
-start it again without signing out, either sign back in, or run:
+browser window and exits the player script. With `-ReplaceShell` (the
+default), that ends the Windows session entirely — auto sign-in immediately
+signs back in and restarts the kiosk. With `-ReplaceShell:$false`, it exits
+back to the normal desktop underneath. To start it again without signing
+out, either sign back in, or run:
 
 ```powershell
 Start-Process powershell -ArgumentList '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%ProgramData%\DigitalSignageKiosk\kiosk-player.ps1" -Url "https://yourdomain.com/signage/play/<token>/"'

@@ -24,6 +24,9 @@ Write-Host "==> Removing auto-start registry entry…"
 Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'DigitalSignageKiosk'
 Unregister-ScheduledTask -TaskName 'DigitalSignageController' -Confirm:$false -ErrorAction SilentlyContinue
 
+Write-Host "==> Restoring the normal desktop shell (undoing -ReplaceShell, if it was used)…"
+Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon' -Name 'Shell'
+
 Write-Host "==> Removing installed files…"
 $installDir = Join-Path $env:ProgramData 'DigitalSignageKiosk'
 Remove-Item -Path $installDir -Recurse -Force

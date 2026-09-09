@@ -10,6 +10,11 @@
     If the browser process ever exits on its own (crash, update), it is
     relaunched automatically unless the close hotkey triggered the exit.
 
+    Can be installed as the account's Windows shell in place of explorer.exe
+    (install-kiosk.ps1 -ReplaceShell, on by default) — in that mode, this
+    script exiting (via the close hotkey) ends the Windows session, and
+    AutoAdminLogon immediately signs back in and restarts it.
+
 .PARAMETER Url
     The player URL to display, e.g. https://yourdomain.com/signage/play/TOKEN/
 
@@ -82,7 +87,20 @@ function Resolve-BrowserPath {
 	throw "Could not find $Name. Install it, or pass -Browser edge/chrome for the one you have."
 }
 
-$browserPath = Resolve-BrowserPath -Name $Browser
+# Retry instead of throwing: this script can be installed as the account's
+# actual Windows shell (install-kiosk.ps1 -ReplaceShell), so letting an
+# exception escape and end the process would log the session straight back
+# off — with AutoAdminLogon that's a fast sign-in/sign-off loop, not a
+# graceful failure. A transient failure here (e.g. the browser package still
+# finishing its install on first boot) should just be waited out instead.
+$browserPath = $null
+while ( -not $browserPath ) {
+	try {
+		$browserPath = Resolve-BrowserPath -Name $Browser
+	} catch {
+		Start-Sleep -Seconds 5
+	}
+}
 
 # ---------------------------------------------------------------------------
 # Global hotkey registration (works even while the kiosk browser has focus).
