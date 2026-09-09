@@ -174,6 +174,27 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Under $ErrorActionPreference = 'Stop', ANY stderr line from a native exe
+# invoked with the call operator (&) becomes a *terminating* error — even
+# expected/benign ones (e.g. net.exe printing "The user name could not be
+# found." while we're just checking whether an account exists yet), and
+# even when its output is piped to Out-Null. Route native calls through
+# this instead: it temporarily relaxes the error preference so stderr just
+# becomes text output, and the caller checks $LASTEXITCODE as usual.
+function Invoke-NativeCommand {
+	param(
+		[Parameter(Mandatory = $true)][string]$FilePath,
+		[Parameter(Mandatory = $true)][string[]]$ArgumentList
+	)
+	$prevEap = $ErrorActionPreference
+	$ErrorActionPreference = 'SilentlyContinue'
+	try {
+		& $FilePath @ArgumentList 2>&1 | Out-Null
+	} finally {
+		$ErrorActionPreference = $prevEap
+	}
+}
+
 if ( -not $Site -and -not $Url ) {
 	# No -Site/-Url given (e.g. run via the one-line bootstrap install) — default
 	# to the site this deployment is paired to.
@@ -307,16 +328,16 @@ if ( $EnableAutoLogon -and $CreateKioskUser ) {
 	# Use net.exe rather than the New-LocalUser/Get-LocalUser cmdlets: those
 	# need the Microsoft.PowerShell.LocalAccounts module, which isn't present
 	# on every Windows version/edition — net.exe has been there since NT4.
-	& net.exe user $KioskUsername 2>&1 | Out-Null
+	Invoke-NativeCommand -FilePath 'net.exe' -ArgumentList @('user', $KioskUsername)
 	$kioskUserExists = ( $LASTEXITCODE -eq 0 )
 
 	if ( -not $kioskUserExists ) {
 		Write-Host "==> Creating local '$KioskUsername' account..." -ForegroundColor Cyan
-		& net.exe user $KioskUsername '' /add /expires:never /passwordchg:no /passwordreq:no | Out-Null
+		Invoke-NativeCommand -FilePath 'net.exe' -ArgumentList @('user', $KioskUsername, '', '/add', '/expires:never', '/passwordchg:no', '/passwordreq:no')
 		if ( $LASTEXITCODE -ne 0 ) {
 			throw "Failed to create local '$KioskUsername' account (net user exit code $LASTEXITCODE)."
 		}
-		& net.exe localgroup Users $KioskUsername /add 2>&1 | Out-Null
+		Invoke-NativeCommand -FilePath 'net.exe' -ArgumentList @('localgroup', 'Users', $KioskUsername, '/add')
 	} else {
 		Write-Host "==> Reusing existing local '$KioskUsername' account." -ForegroundColor Cyan
 	}
@@ -353,7 +374,7 @@ $offlineHiveName = 'DsKioskOfflineHive'
 $usingOfflineHive = [bool]$kioskNtUserDat
 if ( $usingOfflineHive ) {
 	Write-Host "==> Configuring '$AutoLogonUsername`'s profile offline ($kioskNtUserDat)..." -ForegroundColor Cyan
-	& reg.exe load "HKU\$offlineHiveName" $kioskNtUserDat | Out-Null
+	Invoke-NativeCommand -FilePath 'reg.exe' -ArgumentList @('load', "HKU\$offlineHiveName", $kioskNtUserDat)
 	if ( $LASTEXITCODE -ne 0 ) {
 		throw "reg.exe load failed (exit $LASTEXITCODE) for $kioskNtUserDat — is it already loaded/in use?"
 	}
@@ -403,7 +424,7 @@ try {
 		# unload fails with "access denied" until they're released.
 		[gc]::Collect()
 		[gc]::WaitForPendingFinalizers()
-		& reg.exe unload "HKU\$offlineHiveName" | Out-Null
+		Invoke-NativeCommand -FilePath 'reg.exe' -ArgumentList @('unload', "HKU\$offlineHiveName")
 	}
 }
 
