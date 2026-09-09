@@ -68,8 +68,11 @@ if ( $usingOfflineHive ) {
 }
 
 Write-Host "==> Removing installed files…"
-$installDir = Join-Path $env:ProgramData 'DigitalSignageKiosk'
-Remove-Item -Path $installDir -Recurse -Force
+Remove-Item -Path (Join-Path $env:ProgramData 'DigitalSignageKiosk') -Recurse -Force
+Remove-Item -Path (Join-Path $env:LOCALAPPDATA 'DigitalSignageKiosk') -Recurse -Force
+
+Write-Host "==> Removing 'Apps & Features' entry…"
+Remove-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\DigitalSignageKiosk' -Recurse -Force
 
 if ( $DisableAutoLogon -or $RemoveKioskUser ) {
 	$isElevated = ( [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent() ).IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )
@@ -103,6 +106,17 @@ if ( $DisableAutoLogon -or $RemoveKioskUser ) {
 			Remove-Item -Path (Join-Path $env:SystemDrive "Users\$KioskUsername") -Recurse -Force
 		}
 	}
+}
+
+# This script itself normally lives in %ProgramFiles%\Digital Signage Kiosk
+# alongside install-kiosk.ps1/kiosk-player.ps1 — deleting that folder from
+# inside a script running out of it is a bit too "cut the branch you're
+# sitting on" to do directly (that's also DigitalSignageKioskSetup.exe's own
+# uninstaller's job when installed via the .exe). Hand it off to a detached
+# process that runs after this one has fully exited instead.
+$appDir = Join-Path $env:ProgramFiles 'Digital Signage Kiosk'
+if ( Test-Path $appDir ) {
+	Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'timeout /t 2 /nobreak >nul & rmdir /s /q "{0}"' -f $appDir) -WindowStyle Hidden
 }
 
 Write-Host ""

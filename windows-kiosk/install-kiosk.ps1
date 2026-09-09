@@ -11,25 +11,30 @@
     entry that launches it alongside the normal desktop instead, if
     -ReplaceShell:$false is passed.
 
+    This installer always needs an elevated (Administrator) PowerShell —
+    installing into Program Files requires it regardless of any other
+    option — so if the shell running this script isn't already elevated, it
+    automatically relaunches itself with a UAC prompt; that one click is the
+    only interaction this installer needs.
+
     Windows auto sign-in (via the built-in AutoAdminLogon mechanism) is
     turned on by default — the PC boots straight to the kiosk with no
     keyboard/mouse needed at all, the Windows equivalent of the Raspberry Pi
-    installer's console autologin. This needs an elevated (Administrator)
-    PowerShell; if the shell running this script isn't already elevated, it
-    automatically relaunches itself with a UAC prompt — that one click is the
-    only interaction this installer needs. No password prompt: if the account
+    installer's console autologin. No password prompt: if the account
     already has no password (typical for a dedicated kiosk account), nothing
     further is asked and an empty password is written, which is exactly what
     AutoAdminLogon needs for a passwordless account; pass -AutoLogonPassword
     for an account that does have one. Pass -EnableAutoLogon:$false to skip
-    auto sign-in entirely and stay unelevated. Enabling it writes this
-    account's password (or a blank one) to the registry in a form Windows can
-    read back in cleartext — that's an inherent limitation of AutoAdminLogon,
-    not something this script can avoid, so only use it on a dedicated,
-    low-privilege kiosk account with no sensitive access, physically secured
-    hardware. By default (-CreateKioskUser) that dedicated account is
-    created for you — a passwordless local "Kiosk" account, auto-signed-in
-    instead of whichever account happens to run this installer.
+    auto sign-in — the installer stays elevated regardless, but this account
+    won't be the one Windows signs into automatically. Enabling it writes
+    this account's password (or a blank one) to the registry in a form
+    Windows can read back in cleartext — that's an inherent limitation of
+    AutoAdminLogon, not something this script can avoid, so only use it on a
+    dedicated, low-privilege kiosk account with no sensitive access,
+    physically secured hardware. By default (-CreateKioskUser) that
+    dedicated account is created for you — a passwordless local "Kiosk"
+    account, auto-signed-in instead of whichever account happens to run this
+    installer.
 
     Enabling auto sign-in also hardens the PC for running with no keyboard or
     mouse ever attached: sleep/hibernate/monitor-off are disabled, the screen
@@ -75,8 +80,8 @@
     desktop, taskbar, or Start menu ever reachable. Enabled by default; pass
     -ReplaceShell:$false to keep the normal desktop and launch the kiosk via
     the Run key on top of it instead (useful while testing, or for
-    maintenance access). Doesn't need elevation on its own (HKCU), but is
-    only really useful paired with -EnableAutoLogon. Emergency recovery if
+    maintenance access). Only really useful paired with -EnableAutoLogon.
+    Emergency recovery if
     something's wrong with the kiosk: Ctrl+Shift+Esc still opens Task
     Manager (a raw Windows hotkey, independent of the shell) — File > Run
     new task > explorer.exe (or powershell.exe) gets you back to a normal
@@ -131,7 +136,7 @@
     .\install-kiosk.ps1 -Site "https://example.com" -CreateKioskUser:$false
 
 .EXAMPLE
-    # Skip auto sign-in and stay unelevated — just the kiosk app on normal sign-in.
+    # Skip auto sign-in — just the kiosk app on normal sign-in.
     .\install-kiosk.ps1 -Site "https://example.com" -EnableAutoLogon:$false
 
 .EXAMPLE
@@ -178,15 +183,15 @@ if ( $Site -and $Url ) {
 	throw "Pass only one of -Site or -Url, not both."
 }
 
-# MultiDisplay and (the now-default-on) EnableAutoLogon both need an elevated
-# PowerShell. Rather than making the caller remember to run one, self-elevate:
-# relaunch this exact script with a UAC prompt, forward every parameter that
-# was actually passed in, and let the elevated copy do the real work.
+# Installing into Program Files, plus MultiDisplay and (the now-default-on)
+# EnableAutoLogon, all need an elevated PowerShell. Rather than making the
+# caller remember to run one, self-elevate: relaunch this exact script with
+# a UAC prompt, forward every parameter that was actually passed in, and let
+# the elevated copy do the real work.
 $isElevated = ( [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent() ).IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )
 
-if ( ( $EnableAutoLogon -or $MultiDisplay ) -and -not $isElevated ) {
-	$why = if ( $MultiDisplay ) { '-MultiDisplay' } else { 'auto sign-in (on by default — pass -EnableAutoLogon:$false to skip it and stay unelevated)' }
-	Write-Host "==> $why needs Administrator — a UAC prompt will appear; approve it to continue." -ForegroundColor Yellow
+if ( -not $isElevated ) {
+	Write-Host "==> Installing to Program Files needs Administrator — a UAC prompt will appear; approve it to continue." -ForegroundColor Yellow
 
 	$forward = New-Object System.Collections.Generic.List[string]
 	foreach ( $key in $PSBoundParameters.Keys ) {
@@ -214,12 +219,23 @@ if ( ( $EnableAutoLogon -or $MultiDisplay ) -and -not $isElevated ) {
 	exit $LASTEXITCODE
 }
 
-$installDir = Join-Path $env:ProgramData 'DigitalSignageKiosk'
-New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+# The application itself (scripts) lives in Program Files, like any other
+# installed app; per-device state (the pairing token) lives in ProgramData,
+# which stays writable without re-elevating on every future run.
+$appDir = Join-Path $env:ProgramFiles 'Digital Signage Kiosk'
+New-Item -ItemType Directory -Path $appDir -Force | Out-Null
 
-Copy-Item -Path (Join-Path $PSScriptRoot 'kiosk-player.ps1') -Destination $installDir -Force
-Copy-Item -Path (Join-Path $PSScriptRoot 'ds-controller-agent.ps1') -Destination $installDir -Force
-$scriptPath = Join-Path $installDir 'kiosk-player.ps1'
+$dataDir = Join-Path $env:ProgramData 'DigitalSignageKiosk'
+New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+
+Copy-Item -Path (Join-Path $PSScriptRoot 'kiosk-player.ps1') -Destination $appDir -Force
+Copy-Item -Path (Join-Path $PSScriptRoot 'ds-controller-agent.ps1') -Destination $appDir -Force
+Copy-Item -Path (Join-Path $PSScriptRoot 'uninstall-kiosk.ps1') -Destination $appDir -Force
+$scriptPath = Join-Path $appDir 'kiosk-player.ps1'
+
+# Kept for anything below still expecting $installDir (device-token.txt is
+# per-device state, so it belongs in $dataDir, not alongside the app).
+$installDir = $dataDir
 
 if ( $MultiDisplay ) {
 	if ( -not $Site ) {
@@ -232,7 +248,7 @@ if ( $MultiDisplay ) {
 	if ( -not $isElevated ) {
 		throw '-MultiDisplay must be installed from an elevated PowerShell.'
 	}
-	$controllerScript = Join-Path $installDir 'ds-controller-agent.ps1'
+	$controllerScript = Join-Path $appDir 'ds-controller-agent.ps1'
 	$controllerArgs = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Site "{1}" -Browser {2}' -f $controllerScript, $Site.TrimEnd('/'), $Browser
 	$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $controllerArgs
 	$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
@@ -449,6 +465,20 @@ if ( $EnableAutoLogon ) {
 	Set-ItemProperty -Path $auPath -Name 'NoAutoRebootWithLoggedOnUsers' -Value 1 -Type DWord -Force
 }
 
+# Register a normal "Apps & Features" / Control Panel uninstall entry, like
+# any other Program Files application. DigitalSignageKioskSetup.exe (built
+# from installer.nsi) overwrites this with its own Uninstall.exe afterward;
+# this is what's there when install-kiosk.ps1 was run directly instead.
+$uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\DigitalSignageKiosk'
+$uninstallCmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{0}" -DisableAutoLogon -RemoveKioskUser' -f (Join-Path $appDir 'uninstall-kiosk.ps1')
+New-Item -Path $uninstallKey -Force | Out-Null
+New-ItemProperty -Path $uninstallKey -Name 'DisplayName' -Value 'Digital Signage Kiosk' -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $uninstallKey -Name 'UninstallString' -Value $uninstallCmd -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $uninstallKey -Name 'InstallLocation' -Value $appDir -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $uninstallKey -Name 'Publisher' -Value 'Digital Signage' -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $uninstallKey -Name 'NoModify' -Value 1 -PropertyType DWord -Force | Out-Null
+New-ItemProperty -Path $uninstallKey -Name 'NoRepair' -Value 1 -PropertyType DWord -Force | Out-Null
+
 Write-Host ""
 Write-Host "✅ Installed. The kiosk will start automatically next time this Windows account signs in." -ForegroundColor Green
 Write-Host "   Player URL:     $Url"
@@ -484,4 +514,5 @@ if ( -not $EnableAutoLogon ) {
 	Write-Host ""
 }
 Write-Host "To re-pair this PC as a different screen: .\install-kiosk.ps1 -Site `"$Site`" -Regenerate"
-Write-Host "To remove: .\uninstall-kiosk.ps1"
+Write-Host "To remove: uninstall from Settings > Apps (as 'Digital Signage Kiosk'), or run:"
+Write-Host "  $uninstallCmd"

@@ -1,8 +1,9 @@
 # Windows Kiosk Player
 
 Turns a Windows PC into a Digital Signage player: on sign-in it automatically
-opens your player URL full-screen in a chrome-less kiosk browser window — no
-address bar, no tabs, no taskbar interaction, and by default (see
+opens your player URL full-screen — in a chrome-less kiosk browser window on
+**every connected monitor**, not just the primary one — with no address bar,
+no tabs, no taskbar interaction, and by default (see
 [section 2](#2-windows-auto-sign-in-on-by-default)) **no desktop at all** —
 the kiosk *is* the account's Windows shell. Since a kiosk browser normally
 can't be closed by a mouse/keyboard user (no window chrome, Alt+F4 is
@@ -12,7 +13,8 @@ Windows session and (with auto sign-in on) immediately restarts the kiosk,
 i.e. it's a "restart the kiosk" hotkey rather than a way out to a desktop.
 
 Works with **Microsoft Edge** (built into Windows 10/11, default) or
-**Google Chrome**. No installer/build step — it's PowerShell, run directly.
+**Google Chrome**. No build step for the scripts themselves — it's
+PowerShell, run directly; the `.exe` below is just a convenience wrapper.
 
 ## 0. One-click .exe installer
 
@@ -25,8 +27,16 @@ double-click it:
 2. A small progress window shows `install-kiosk.ps1` running live, against
    the default site with auto sign-in and kiosk shell replacement all on.
 3. It closes itself when done. Sign out and back in (or reboot) and the
-   kiosk starts — with no desktop ever showing, per
+   kiosk starts on every screen — with no desktop ever showing, per
    [section 2](#2-windows-auto-sign-in-on-by-default).
+
+Just like a normal Windows application, it installs into **Program Files**
+(`%ProgramFiles%\Digital Signage Kiosk`) and writes a real **`Uninstall.exe`**
+there, registered under **Settings → Apps** (or Control Panel → Programs) as
+"Digital Signage Kiosk" — uninstall from there, or run `Uninstall.exe`
+directly; either way it undoes the *entire* install (auto sign-in, the
+dedicated `Kiosk` account, shell replacement, kiosk hardening, and its own
+files), matching how thoroughly the installer set it up in the first place.
 
 To install against a different site or with different options, use one of
 the script-based installs below instead — the `.exe` always runs
@@ -276,25 +286,30 @@ physically secured. To turn it back off later (and delete the dedicated
 
 ## What it does
 
-- `kiosk-player.ps1` — the player itself. Launches the browser with
-  `--kiosk`, hides its own console window, registers the global close
-  hotkey via the Win32 `RegisterHotKey` API (works even while the browser
-  has focus), and watches the browser process — if it ever exits on its
-  own (crash/update), it's relaunched automatically after 2 seconds.
-- `install-kiosk.ps1` — copies `kiosk-player.ps1` to
-  `%ProgramData%\DigitalSignageKiosk\`, generates and saves a permanent
-  device token to `device-token.txt` (when using `-Site`), and (by default,
-  `-ReplaceShell`) sets it as the account's `HKCU...\Winlogon\Shell` in
-  place of `explorer.exe` — or, with `-ReplaceShell:$false`, adds a
-  `HKCU...\Run` entry instead so it launches hidden on top of a normal
-  desktop. Either way the URL is baked into that registry command, so it
-  stays fixed across reboots without re-running the installer.
+- `kiosk-player.ps1` — the player itself. Launches one `--kiosk` browser
+  window per connected monitor (positioned/sized to exactly cover it),
+  hides its own console window, registers the global close hotkey via the
+  Win32 `RegisterHotKey` API (works even while a browser window has focus),
+  and watches each browser process — if any of them exits on its own
+  (crash/update), just that one is relaunched automatically after 2 seconds.
+- `install-kiosk.ps1` — copies itself, `kiosk-player.ps1`,
+  `ds-controller-agent.ps1`, and `uninstall-kiosk.ps1` to
+  `%ProgramFiles%\Digital Signage Kiosk\` (per-device state like the pairing
+  token stays in `%ProgramData%\DigitalSignageKiosk\device-token.txt`
+  instead), registers a normal "Apps & Features" uninstall entry, generates
+  and saves a permanent device token (when using `-Site`), and (by default,
+  `-ReplaceShell`) sets it as the account's `...\Winlogon\Shell` in place of
+  `explorer.exe` — or, with `-ReplaceShell:$false`, adds a `...\Run` entry
+  instead so it launches hidden on top of a normal desktop. Either way the
+  URL is baked into that registry command, so it stays fixed across reboots
+  without re-running the installer.
 - `uninstall-kiosk.ps1` — stops any running kiosk session, restores
   `explorer.exe` as the shell (in the `Kiosk` account's own or Default
-  profile, offline, if that's where it was set), removes the registry entry
-  and the installed files; pass `-DisableAutoLogon` (elevated) to also turn
-  off Windows auto sign-in and the kiosk-hardening settings, and/or
-  `-RemoveKioskUser` (elevated) to delete the dedicated account and its
+  profile, offline, if that's where it was set), removes the registry
+  entries and the installed files (Program Files app folder included); pass
+  `-DisableAutoLogon` (elevated) to also turn off Windows auto sign-in and
+  the kiosk-hardening settings, and/or `-RemoveKioskUser` (elevated) to
+  delete the dedicated account and its
   profile, if `-EnableAutoLogon`/`-CreateKioskUser` were used.
 - `ds-controller-agent.ps1` — the `-MultiDisplay` controller: detects every
   connected monitor and opens an isolated kiosk browser profile on each one.
@@ -309,15 +324,15 @@ physically secured. To turn it back off later (and delete the dedicated
 
 ## Closing the kiosk
 
-Press the configured hotkey (default `Ctrl+Alt+Shift+Q`). This closes the
-browser window and exits the player script. With `-ReplaceShell` (the
+Press the configured hotkey (default `Ctrl+Alt+Shift+Q`). This closes every
+browser window (all screens) and exits the player script. With `-ReplaceShell` (the
 default), that ends the Windows session entirely — auto sign-in immediately
 signs back in and restarts the kiosk. With `-ReplaceShell:$false`, it exits
 back to the normal desktop underneath. To start it again without signing
 out, either sign back in, or run:
 
 ```powershell
-Start-Process powershell -ArgumentList '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%ProgramData%\DigitalSignageKiosk\kiosk-player.ps1" -Url "https://yourdomain.com/signage/play/<token>/"'
+Start-Process powershell -ArgumentList '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%ProgramFiles%\Digital Signage Kiosk\kiosk-player.ps1" -Url "https://yourdomain.com/signage/play/<token>/"'
 ```
 
 ## Uninstalling

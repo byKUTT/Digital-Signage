@@ -4,11 +4,12 @@
 
 .DESCRIPTION
     Launches the given player URL full-screen in a chrome-less kiosk browser
-    window, with no visible console. Watches for a global keyboard shortcut
-    (default Ctrl+Alt+Shift+Q) to close the kiosk and exit — the only normal
-    way out, since Alt+F4/Alt+Tab/the taskbar are unavailable in kiosk mode.
-    If the browser process ever exits on its own (crash, update), it is
-    relaunched automatically unless the close hotkey triggered the exit.
+    window on every connected monitor — not just the primary one — with no
+    visible console. Watches for a global keyboard shortcut (default
+    Ctrl+Alt+Shift+Q) to close the kiosk and exit — the only normal way out,
+    since Alt+F4/Alt+Tab/the taskbar are unavailable in kiosk mode. If any of
+    the browser windows exits on its own (crash, update), just that one is
+    relaunched automatically, unless the close hotkey triggered the exit.
 
     Can be installed as the account's Windows shell in place of explorer.exe
     (install-kiosk.ps1 -ReplaceShell, on by default) — in that mode, this
@@ -160,10 +161,13 @@ if (-not $registered) {
 $script:closing = $false
 $closeAction = {
 	$script:closing = $true
-	# Kill only the process tree we launched (taskkill /T), not every Edge/Chrome
-	# window on the machine — matters on a shared PC, not just a dedicated kiosk box.
-	if ($script:browserProcess -and -not $script:browserProcess.HasExited) {
-		Start-Process -FilePath 'taskkill.exe' -ArgumentList @('/PID', $script:browserProcess.Id, '/T', '/F') -WindowStyle Hidden -Wait -ErrorAction SilentlyContinue
+	# Kill only the process trees we launched (taskkill /T), not every
+	# Edge/Chrome window on the machine — matters on a shared PC, not just a
+	# dedicated kiosk box.
+	foreach ($process in $script:browserProcesses.Values) {
+		if ($process -and -not $process.HasExited) {
+			Start-Process -FilePath 'taskkill.exe' -ArgumentList @('/PID', $process.Id, '/T', '/F') -WindowStyle Hidden -Wait -ErrorAction SilentlyContinue
+		}
 	}
 	[Ds.Win32Hotkey]::UnregisterHotKey($form.Handle, $HOTKEY_ID) | Out-Null
 	[System.Windows.Forms.Application]::Exit()
@@ -171,12 +175,24 @@ $closeAction = {
 Register-ObjectEvent -InputObject $form -EventName HotkeyPressed -Action $closeAction | Out-Null
 
 # ---------------------------------------------------------------------------
-# Launch + watchdog: relaunch the browser if it exits on its own, but not if
-# the user closed it via the hotkey.
+# Launch + watchdog: one kiosk browser window per connected monitor, all
+# showing the same Url, positioned to exactly cover that monitor. Relaunches
+# any window that exits on its own, but not if the hotkey closed the kiosk.
 # ---------------------------------------------------------------------------
-function Start-KioskBrowser {
+function Start-KioskBrowserOnScreen {
+	param( $Bounds, [string]$ProfileKey )
+
+	# Chromium refuses to run two instances against the same profile at once,
+	# so each screen gets its own — that's also what lets them run as fully
+	# independent, individually-relaunchable windows.
+	$profileDir = Join-Path $env:LOCALAPPDATA "DigitalSignageKiosk\profile-$ProfileKey"
+	New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+
 	$flags = @(
 		"--kiosk", $Url,
+		"--user-data-dir=$profileDir",
+		"--window-position=$($Bounds.X),$($Bounds.Y)",
+		"--window-size=$($Bounds.Width),$($Bounds.Height)",
 		"--edge-kiosk-type=fullscreen",
 		"--no-first-run",
 		"--noerrdialogs",
@@ -190,7 +206,20 @@ function Start-KioskBrowser {
 	return Start-Process -FilePath $browserPath -ArgumentList $flags -PassThru
 }
 
-$script:browserProcess = Start-KioskBrowser
+# Enumerated once at startup, not live-tracked — a monitor plugged in or
+# unplugged mid-session takes effect on the next restart (close hotkey,
+# sign-out/sign-in, or reboot), not instantly.
+$screens = @( [System.Windows.Forms.Screen]::AllScreens | ForEach-Object { $_.Bounds } )
+if ( $screens.Count -eq 0 ) {
+	# Shouldn't happen (Windows always reports at least one), but don't run
+	# with nothing to show on if it somehow does.
+	$screens = @( [System.Drawing.Rectangle]::new(0, 0, 1920, 1080) )
+}
+
+$script:browserProcesses = @{} # screen index -> Process
+for ( $i = 0; $i -lt $screens.Count; $i++ ) {
+	$script:browserProcesses[$i] = Start-KioskBrowserOnScreen -Bounds $screens[$i] -ProfileKey $i
+}
 
 $watchdogTimer = New-Object System.Windows.Forms.Timer
 $watchdogTimer.Interval = 2000
@@ -198,9 +227,11 @@ $watchdogTimer.Add_Tick({
 	if ($script:closing) {
 		return
 	}
-	if ($script:browserProcess.HasExited) {
-		Start-Sleep -Seconds 2
-		$script:browserProcess = Start-KioskBrowser
+	foreach ($i in @($script:browserProcesses.Keys)) {
+		if ($script:browserProcesses[$i].HasExited) {
+			Start-Sleep -Seconds 2
+			$script:browserProcesses[$i] = Start-KioskBrowserOnScreen -Bounds $screens[$i] -ProfileKey $i
+		}
 	}
 })
 $watchdogTimer.Start()
