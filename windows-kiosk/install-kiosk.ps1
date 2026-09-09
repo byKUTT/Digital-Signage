@@ -288,12 +288,19 @@ $runCommand = 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy By
 # --- be running this installer. --------------------------------------------
 $kioskNtUserDat = $null # set below if that account needs offline configuration
 if ( $EnableAutoLogon -and $CreateKioskUser ) {
-	if ( -not (Get-LocalUser -Name $KioskUsername -ErrorAction SilentlyContinue) ) {
+	# Use net.exe rather than the New-LocalUser/Get-LocalUser cmdlets: those
+	# need the Microsoft.PowerShell.LocalAccounts module, which isn't present
+	# on every Windows version/edition — net.exe has been there since NT4.
+	& net.exe user $KioskUsername 2>&1 | Out-Null
+	$kioskUserExists = ( $LASTEXITCODE -eq 0 )
+
+	if ( -not $kioskUserExists ) {
 		Write-Host "==> Creating local '$KioskUsername' account..." -ForegroundColor Cyan
-		New-LocalUser -Name $KioskUsername -NoPassword -FullName 'Digital Signage Kiosk' `
-			-Description 'Unattended Digital Signage kiosk account (created by install-kiosk.ps1)' `
-			-AccountNeverExpires -PasswordNeverExpires | Out-Null
-		Add-LocalGroupMember -Group 'Users' -Member $KioskUsername -ErrorAction SilentlyContinue
+		& net.exe user $KioskUsername '' /add /expires:never /passwordchg:no /passwordreq:no | Out-Null
+		if ( $LASTEXITCODE -ne 0 ) {
+			throw "Failed to create local '$KioskUsername' account (net user exit code $LASTEXITCODE)."
+		}
+		& net.exe localgroup Users $KioskUsername /add 2>&1 | Out-Null
 	} else {
 		Write-Host "==> Reusing existing local '$KioskUsername' account." -ForegroundColor Cyan
 	}

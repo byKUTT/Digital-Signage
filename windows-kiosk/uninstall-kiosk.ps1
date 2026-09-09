@@ -98,7 +98,7 @@ if ( $DisableAutoLogon -or $RemoveKioskUser ) {
 			if ( $kioskProfile ) {
 				Remove-CimInstance -InputObject $kioskProfile
 			}
-			Remove-LocalUser -Name $KioskUsername
+			& net.exe user $KioskUsername /delete | Out-Null
 			# Belt and suspenders in case Win32_UserProfile didn't clean the folder.
 			Remove-Item -Path (Join-Path $env:SystemDrive "Users\$KioskUsername") -Recurse -Force
 		}
