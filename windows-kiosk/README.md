@@ -193,6 +193,28 @@ whoever signs in normally:
 .\install-kiosk.ps1 -Site "https://yourdomain.com" -EnableAutoLogon:$false
 ```
 
+### A dedicated "Kiosk" account (on by default)
+
+Auto sign-in above signs into a **dedicated local account** (`-KioskUsername`,
+default `Kiosk`) that the installer creates for you, with no password,
+rather than whichever account happened to run the installer — so a normal
+user account (e.g. the one used to set the machine up) never becomes the
+thing that auto-signs-in and boots into the kiosk.
+
+That account may never have actually signed in yet, so its shell/screen-saver
+settings can't be written to its own registry hive the normal way (it
+doesn't exist until first sign-in) — the installer instead writes them into
+Windows's **Default Profile template**, which every new local profile is
+seeded from, so they take effect the instant the account signs in for the
+first time (which `AutoAdminLogon` does automatically on the next reboot).
+
+Prefer to auto sign into the account you're already running the installer
+as, instead of creating a new one? Pass `-CreateKioskUser:$false`:
+
+```powershell
+.\install-kiosk.ps1 -Site "https://yourdomain.com" -CreateKioskUser:$false
+```
+
 ### No keyboard or mouse, ever
 
 Enabling auto sign-in also hardens the PC for running with **no input
@@ -245,10 +267,11 @@ something specific to this script — it works by storing the account's
 password in the registry in a form Windows itself can read back in
 cleartext. Only use it on a **dedicated, low-privilege kiosk account** with
 no sensitive access (not your everyday Windows login), on hardware that's
-physically secured. To turn it back off later:
+physically secured. To turn it back off later (and delete the dedicated
+`Kiosk` account too, if `-CreateKioskUser` made one):
 
 ```powershell
-.\uninstall-kiosk.ps1 -DisableAutoLogon   # from an elevated PowerShell
+.\uninstall-kiosk.ps1 -DisableAutoLogon -RemoveKioskUser   # from an elevated PowerShell
 ```
 
 ## What it does
@@ -267,9 +290,12 @@ physically secured. To turn it back off later:
   desktop. Either way the URL is baked into that registry command, so it
   stays fixed across reboots without re-running the installer.
 - `uninstall-kiosk.ps1` — stops any running kiosk session, restores
-  `explorer.exe` as the shell, removes the registry entry and the installed
-  files; pass `-DisableAutoLogon` (elevated) to also turn off Windows auto
-  sign-in and the kiosk-hardening settings if `-EnableAutoLogon` was used.
+  `explorer.exe` as the shell (in the `Kiosk` account's own or Default
+  profile, offline, if that's where it was set), removes the registry entry
+  and the installed files; pass `-DisableAutoLogon` (elevated) to also turn
+  off Windows auto sign-in and the kiosk-hardening settings, and/or
+  `-RemoveKioskUser` (elevated) to delete the dedicated account and its
+  profile, if `-EnableAutoLogon`/`-CreateKioskUser` were used.
 - `ds-controller-agent.ps1` — the `-MultiDisplay` controller: detects every
   connected monitor and opens an isolated kiosk browser profile on each one.
 - `install-standalone.ps1` — single-file, offline version of the install

@@ -27,7 +27,9 @@
     read back in cleartext — that's an inherent limitation of AutoAdminLogon,
     not something this script can avoid, so only use it on a dedicated,
     low-privilege kiosk account with no sensitive access, physically secured
-    hardware.
+    hardware. By default (-CreateKioskUser) that dedicated account is
+    created for you — a passwordless local "Kiosk" account, auto-signed-in
+    instead of whichever account happens to run this installer.
 
     Enabling auto sign-in also hardens the PC for running with no keyboard or
     mouse ever attached: sleep/hibernate/monitor-off are disabled, the screen
@@ -80,10 +82,30 @@
     new task > explorer.exe (or powershell.exe) gets you back to a normal
     desktop without uninstalling anything.
 
+.PARAMETER CreateKioskUser
+    Create a dedicated local account (-KioskUsername, default "Kiosk") with
+    no password and auto sign in as *that* account instead of whichever
+    account happens to run this installer. Enabled by default whenever
+    -EnableAutoLogon is; only takes effect together with it (creating a
+    kiosk-only account is pointless if nothing signs into it automatically).
+    Since the account may never have signed in yet, its shell/screen-saver/
+    Spotlight settings are written by loading its (or, if it's brand new,
+    Windows's Default Profile template's) NTUSER.DAT hive offline — that
+    template is what every new local profile is seeded from, so it applies
+    the moment the account signs in for the first time. Pass
+    -CreateKioskUser:$false to keep auto-signing into the account that ran
+    this installer instead (the old behavior).
+
+.PARAMETER KioskUsername
+    Name of the dedicated local account -CreateKioskUser creates/reuses.
+    Default: "Kiosk".
+
 .PARAMETER AutoLogonUsername
     The account to auto sign in as. Defaults to the account running this
     script (recommended: run this script while logged into the dedicated
-    kiosk account you want auto-signed-in).
+    kiosk account you want auto-signed-in) — but if -CreateKioskUser is in
+    effect and this isn't explicitly passed, it's overridden to
+    -KioskUsername instead.
 
 .PARAMETER AutoLogonPassword
     SecureString password for -AutoLogonUsername, for an account that
@@ -100,8 +122,13 @@
     Hotkey key to close the kiosk. Default: Q
 
 .EXAMPLE
-    # Fully unattended kiosk PC by default: signs in and starts playing with no one touching the keyboard.
+    # Fully unattended kiosk PC by default: creates a "Kiosk" account, signs
+    # into it automatically, and starts playing with no one touching the keyboard.
     .\install-kiosk.ps1 -Site "https://example.com"
+
+.EXAMPLE
+    # Auto sign-in, but into the account running this installer instead of a new one.
+    .\install-kiosk.ps1 -Site "https://example.com" -CreateKioskUser:$false
 
 .EXAMPLE
     # Skip auto sign-in and stay unelevated — just the kiosk app on normal sign-in.
@@ -121,6 +148,10 @@ param(
 	[switch]$EnableAutoLogon = $true,
 
 	[switch]$ReplaceShell = $true,
+
+	[switch]$CreateKioskUser = $true,
+
+	[string]$KioskUsername = 'Kiosk',
 
 	[switch]$MultiDisplay,
 
@@ -252,20 +283,105 @@ $modifiersArg = ($CloseModifiers -join ',')
 $runCommand = 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Url "{1}" -Browser {2} -CloseModifiers {3} -CloseKey {4}' -f `
 	$scriptPath, $Url, $Browser, $modifiersArg, $CloseKey
 
-if ( $ReplaceShell ) {
-	# Make the kiosk this account's Windows shell instead of explorer.exe:
-	# on sign-in there is no desktop, taskbar, or Start menu — just the kiosk
-	# browser. Per-user, no elevation needed. It doesn't also need a Run-key
-	# entry since it's now what launches on sign-in in the first place.
-	Write-Host "==> Setting the kiosk as this account's shell (no desktop, taskbar, or Start menu will ever appear)..." -ForegroundColor Cyan
-	$shellWinlogonPath = 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon'
-	New-Item -Path $shellWinlogonPath -Force | Out-Null
-	New-ItemProperty -Path $shellWinlogonPath -Name 'Shell' -Value $runCommand -PropertyType String -Force | Out-Null
-	Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'DigitalSignageKiosk' -ErrorAction SilentlyContinue
-} else {
-	New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' `
-		-Name 'DigitalSignageKiosk' -Value $runCommand -PropertyType String -Force | Out-Null
-	Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon' -Name 'Shell' -ErrorAction SilentlyContinue
+# --- Which account actually runs the kiosk? Create a dedicated one if -----
+# --- requested, instead of auto-signing into whichever account happens to -
+# --- be running this installer. --------------------------------------------
+$kioskNtUserDat = $null # set below if that account needs offline configuration
+if ( $EnableAutoLogon -and $CreateKioskUser ) {
+	if ( -not (Get-LocalUser -Name $KioskUsername -ErrorAction SilentlyContinue) ) {
+		Write-Host "==> Creating local '$KioskUsername' account..." -ForegroundColor Cyan
+		New-LocalUser -Name $KioskUsername -NoPassword -FullName 'Digital Signage Kiosk' `
+			-Description 'Unattended Digital Signage kiosk account (created by install-kiosk.ps1)' `
+			-AccountNeverExpires -PasswordNeverExpires | Out-Null
+		Add-LocalGroupMember -Group 'Users' -Member $KioskUsername -ErrorAction SilentlyContinue
+	} else {
+		Write-Host "==> Reusing existing local '$KioskUsername' account." -ForegroundColor Cyan
+	}
+	if ( -not $PSBoundParameters.ContainsKey('AutoLogonUsername') ) {
+		$AutoLogonUsername = $KioskUsername
+	}
+
+	if ( $KioskUsername -eq $env:USERNAME ) {
+		# Rare case: this installer is itself being run while already signed
+		# into the kiosk account. Its hive is the live HKCU right now — it
+		# can't also be loaded offline (the file's in use) — so just fall
+		# through to the normal live-registry path below, same as
+		# -CreateKioskUser:$false.
+	} else {
+		# Has $KioskUsername ever actually signed in? If so its own profile
+		# (NTUSER.DAT) exists and we configure that directly. If not — the
+		# common case, since AutoAdminLogon is what will sign it in for the
+		# very first time — there's nothing to load yet, so we write into
+		# Windows's Default Profile template instead: every new local
+		# profile is seeded from it, so our settings land the moment this
+		# account signs in.
+		$kioskNtUserDat = Join-Path $env:SystemDrive "Users\$KioskUsername\NTUSER.DAT"
+		if ( -not (Test-Path $kioskNtUserDat) ) {
+			$kioskNtUserDat = Join-Path $env:SystemDrive 'Users\Default\NTUSER.DAT'
+		}
+	}
+}
+
+# --- Per-account settings (shell/Run key, screen saver, Spotlight): write --
+# --- straight to the live registry for the current session's own account, -
+# --- or into an offline-loaded hive for a dedicated kiosk account that's --
+# --- not signed in right now. -----------------------------------------------
+$offlineHiveName = 'DsKioskOfflineHive'
+$usingOfflineHive = [bool]$kioskNtUserDat
+if ( $usingOfflineHive ) {
+	Write-Host "==> Configuring '$AutoLogonUsername`'s profile offline ($kioskNtUserDat)..." -ForegroundColor Cyan
+	& reg.exe load "HKU\$offlineHiveName" $kioskNtUserDat | Out-Null
+	if ( $LASTEXITCODE -ne 0 ) {
+		throw "reg.exe load failed (exit $LASTEXITCODE) for $kioskNtUserDat — is it already loaded/in use?"
+	}
+}
+$userRoot = if ( $usingOfflineHive ) { "Registry::HKEY_USERS\$offlineHiveName" } else { 'HKCU:' }
+
+try {
+	if ( $ReplaceShell ) {
+		# Make the kiosk this account's Windows shell instead of explorer.exe:
+		# on sign-in there is no desktop, taskbar, or Start menu — just the
+		# kiosk browser. It doesn't also need a Run-key entry since it's now
+		# what launches on sign-in in the first place.
+		Write-Host "==> Setting the kiosk as '$AutoLogonUsername`'s shell (no desktop, taskbar, or Start menu will ever appear)..." -ForegroundColor Cyan
+		New-Item -Path "$userRoot\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" -Force | Out-Null
+		New-ItemProperty -Path "$userRoot\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name 'Shell' -Value $runCommand -PropertyType String -Force | Out-Null
+		Remove-ItemProperty -Path "$userRoot\Software\Microsoft\Windows\CurrentVersion\Run" -Name 'DigitalSignageKiosk' -ErrorAction SilentlyContinue
+	} else {
+		New-Item -Path "$userRoot\Software\Microsoft\Windows\CurrentVersion\Run" -Force | Out-Null
+		New-ItemProperty -Path "$userRoot\Software\Microsoft\Windows\CurrentVersion\Run" `
+			-Name 'DigitalSignageKiosk' -Value $runCommand -PropertyType String -Force | Out-Null
+		Remove-ItemProperty -Path "$userRoot\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name 'Shell' -ErrorAction SilentlyContinue
+	}
+
+	if ( $EnableAutoLogon ) {
+		# Disable the screen saver outright — with AutoAdminLogon there's
+		# normally no lock screen to begin with, but a screen saver set to
+		# "on resume, display logon screen" would otherwise strand the kiosk
+		# behind one nobody can dismiss.
+		New-Item -Path "$userRoot\Control Panel\Desktop" -Force | Out-Null
+		Set-ItemProperty -Path "$userRoot\Control Panel\Desktop" -Name 'ScreenSaveActive' -Value '0' -Force
+		Remove-ItemProperty -Path "$userRoot\Control Panel\Desktop" -Name 'SCRNSAVE.EXE' -ErrorAction SilentlyContinue
+
+		# Turn off Windows Spotlight / "suggested content" / tips overlays,
+		# which occasionally take over the full screen after sign-in or a
+		# feature update and wait for a click to dismiss.
+		$cdmPath = "$userRoot\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager"
+		New-Item -Path $cdmPath -Force | Out-Null
+		foreach ( $name in 'SubscribedContent-338387Enabled', 'SubscribedContent-338388Enabled',
+			'SubscribedContent-338389Enabled', 'SubscribedContent-353694Enabled',
+			'SubscribedContent-353696Enabled', 'RotatingLockScreenEnabled', 'RotatingLockScreenOverlayEnabled' ) {
+			Set-ItemProperty -Path $cdmPath -Name $name -Value 0 -Type DWord -Force -ErrorAction SilentlyContinue
+		}
+	}
+} finally {
+	if ( $usingOfflineHive ) {
+		# The registry provider can leave handles open on keys we touched;
+		# unload fails with "access denied" until they're released.
+		[gc]::Collect()
+		[gc]::WaitForPendingFinalizers()
+		& reg.exe unload "HKU\$offlineHiveName" | Out-Null
+	}
 }
 
 # --- Optional: make Windows itself sign in automatically on boot. ---
@@ -310,13 +426,6 @@ if ( $EnableAutoLogon ) {
 		Start-Process -FilePath 'powercfg.exe' -ArgumentList $pcArgs -Wait -WindowStyle Hidden
 	}
 
-	# Disable the screen saver outright — with AutoAdminLogon there's normally
-	# no lock screen to begin with, but a screen saver set to "on resume,
-	# display logon screen" would otherwise strand the kiosk behind one nobody
-	# can dismiss.
-	Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'ScreenSaveActive' -Value '0' -Force
-	Remove-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'SCRNSAVE.EXE' -ErrorAction SilentlyContinue
-
 	# Suppress Windows Error Reporting's "<program> has stopped working"
 	# dialog — there's nobody to click "Close program" on it, and left open
 	# it blocks whatever's behind it.
@@ -331,17 +440,6 @@ if ( $EnableAutoLogon ) {
 	$auPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU'
 	New-Item -Path $auPath -Force | Out-Null
 	Set-ItemProperty -Path $auPath -Name 'NoAutoRebootWithLoggedOnUsers' -Value 1 -Type DWord -Force
-
-	# Turn off Windows Spotlight / "suggested content" / tips overlays, which
-	# occasionally take over the full screen after sign-in or a feature
-	# update and wait for a click to dismiss.
-	$cdmPath = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
-	New-Item -Path $cdmPath -Force | Out-Null
-	foreach ( $name in 'SubscribedContent-338387Enabled', 'SubscribedContent-338388Enabled',
-		'SubscribedContent-338389Enabled', 'SubscribedContent-353694Enabled',
-		'SubscribedContent-353696Enabled', 'RotatingLockScreenEnabled', 'RotatingLockScreenOverlayEnabled' ) {
-		Set-ItemProperty -Path $cdmPath -Name $name -Value 0 -Type DWord -Force -ErrorAction SilentlyContinue
-	}
 }
 
 Write-Host ""
@@ -351,6 +449,9 @@ Write-Host "   Close hotkey:   $modifiersArg+$CloseKey"
 Write-Host "   Installed to:   $scriptPath"
 if ( $EnableAutoLogon ) {
 	Write-Host "   Auto sign-in:   ENABLED for '$AutoLogonUsername' — this PC now boots straight to the kiosk." -ForegroundColor Green
+	if ( $CreateKioskUser ) {
+		Write-Host "   Kiosk account:  dedicated local '$KioskUsername' account, no password." -ForegroundColor Green
+	}
 	Write-Host "   Kiosk hardening: sleep/hibernate/screen saver disabled, crash and update" -ForegroundColor Green
 	Write-Host "                    dialogs suppressed — nothing here waits on input." -ForegroundColor Green
 }
