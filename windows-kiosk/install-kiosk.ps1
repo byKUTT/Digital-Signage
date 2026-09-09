@@ -44,6 +44,15 @@
     disabled — none of these need someone to click through them for the
     kiosk to keep running.
 
+    By default (-UseAssignedAccess) it also configures Windows's real
+    single-app kiosk feature (Assigned Access) for the account — the same
+    mechanism behind Settings > Accounts > Family & other users > "Set up a
+    kiosk", just configured directly instead of through that page (which
+    only lists Store apps to choose from). Needs Windows 10/11 Pro,
+    Enterprise, or Education; skipped with a warning on Home or if anything
+    about it fails — -ReplaceShell + AutoAdminLogon (configured either way)
+    already deliver the same practical result on every edition.
+
     This device generates and remembers its own pairing identity: pass -Site
     (your WordPress site's URL) and a permanent device token is created once,
     saved to %ProgramData%\DigitalSignageKiosk\device-token.txt, and reused on
@@ -105,6 +114,24 @@
     Name of the dedicated local account -CreateKioskUser creates/reuses.
     Default: "Kiosk".
 
+.PARAMETER UseAssignedAccess
+    Also configure Windows's real single-app kiosk feature (Assigned
+    Access — the mechanism behind Settings > Accounts > Family & other
+    users > "Set up a kiosk" / "Choose a kiosk app") for -KioskUsername,
+    pointing it at DigitalSignageKioskLauncher.exe. That Settings page's own
+    picker only lists Store apps, so a Win32 kiosk like this one can't be
+    chosen through it — but the feature itself (the AssignedAccess CSP)
+    fully supports Win32 apps since Windows 10 1809, and this configures it
+    the same way an MDM would, directly via the local WMI Bridge provider,
+    no Store app or MDM enrollment involved. Requires Windows 10/11 Pro,
+    Enterprise, or Education — Assigned Access isn't available on Home, and
+    on Home (or if this fails for any other reason) it's skipped with a
+    warning; -ReplaceShell/AutoAdminLogon (both still configured
+    regardless) already deliver the same practical result on every edition,
+    so this is a belt-and-suspenders layer, not something the kiosk depends
+    on. Only takes effect together with -EnableAutoLogon and
+    -CreateKioskUser. Pass -UseAssignedAccess:$false to skip it outright.
+
 .PARAMETER AutoLogonUsername
     The account to auto sign in as. Defaults to the account running this
     script (recommended: run this script while logged into the dedicated
@@ -157,6 +184,8 @@ param(
 	[switch]$CreateKioskUser = $true,
 
 	[string]$KioskUsername = 'Kiosk',
+
+	[switch]$UseAssignedAccess = $true,
 
 	[switch]$MultiDisplay,
 
@@ -254,6 +283,16 @@ Copy-Item -Path (Join-Path $PSScriptRoot 'ds-controller-agent.ps1') -Destination
 Copy-Item -Path (Join-Path $PSScriptRoot 'uninstall-kiosk.ps1') -Destination $appDir -Force
 $scriptPath = Join-Path $appDir 'kiosk-player.ps1'
 
+# Optional: the tiny fixed-arguments wrapper Windows Assigned Access points
+# at (see -UseAssignedAccess below). Best-effort — an older bundle without
+# it just skips Assigned Access and relies on -ReplaceShell/AutoAdminLogon.
+$launcherSource = Join-Path $PSScriptRoot 'DigitalSignageKioskLauncher.exe'
+$launcherPath = $null
+if ( Test-Path $launcherSource ) {
+	Copy-Item -Path $launcherSource -Destination $appDir -Force
+	$launcherPath = Join-Path $appDir 'DigitalSignageKioskLauncher.exe'
+}
+
 # Kept for anything below still expecting $installDir (device-token.txt is
 # per-device state, so it belongs in $dataDir, not alongside the app).
 $installDir = $dataDir
@@ -320,6 +359,18 @@ $modifiersArg = ($CloseModifiers -join ',')
 $runCommand = 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Url "{1}" -Browser {2} -CloseModifiers {3} -CloseKey {4}' -f `
 	$scriptPath, $Url, $Browser, $modifiersArg, $CloseKey
 
+# Same settings, but as a config file kiosk-player.ps1 reads when launched
+# with no arguments at all — which is how Windows Assigned Access has to
+# run it (see -UseAssignedAccess below): it launches one fixed .exe with no
+# arguments of its own.
+$kioskConfigPath = Join-Path $dataDir 'kiosk-config.json'
+[ordered]@{
+	Url            = $Url
+	Browser        = $Browser
+	CloseModifiers = $CloseModifiers
+	CloseKey       = $CloseKey
+} | ConvertTo-Json | Set-Content -Path $kioskConfigPath -Encoding UTF8
+
 # --- Which account actually runs the kiosk? Create a dedicated one if -----
 # --- requested, instead of auto-signing into whichever account happens to -
 # --- be running this installer. --------------------------------------------
@@ -362,6 +413,59 @@ if ( $EnableAutoLogon -and $CreateKioskUser ) {
 		$kioskNtUserDat = Join-Path $env:SystemDrive "Users\$KioskUsername\NTUSER.DAT"
 		if ( -not (Test-Path $kioskNtUserDat) ) {
 			$kioskNtUserDat = Join-Path $env:SystemDrive 'Users\Default\NTUSER.DAT'
+		}
+	}
+}
+
+# --- Windows Assigned Access (real single-app kiosk mode) — best-effort. --
+# The "Choose a kiosk app" picker in Settings only lists Store apps, but the
+# underlying feature (the AssignedAccess CSP) supports Win32 apps too since
+# Windows 10 1809; this configures it the same way an MDM would, via the
+# local WMI Bridge provider. Needs Pro/Enterprise/Education — on Home, or if
+# anything else goes wrong, this is skipped with a warning: -ReplaceShell +
+# AutoAdminLogon (already configured above/below regardless) deliver the
+# same practical result on every edition, so nothing depends on this working.
+$assignedAccessConfigured = $false
+if ( $EnableAutoLogon -and $CreateKioskUser -and $UseAssignedAccess ) {
+	if ( -not $launcherPath ) {
+		Write-Host "==> Skipping Assigned Access: DigitalSignageKioskLauncher.exe wasn't found alongside this script." -ForegroundColor Yellow
+	} else {
+		Write-Host "==> Configuring Windows Assigned Access (single-app kiosk) for '$KioskUsername'..." -ForegroundColor Cyan
+		try {
+			# Assigned Access launches this one .exe with no arguments and
+			# tracks it for the account's whole session — that's exactly
+			# what the launcher (running kiosk-player.ps1, which reads
+			# kiosk-config.json for everything else) is built to be.
+			$profileId = '{9A2A490F-10F6-4764-974A-43B19E722C23}'
+			$assignedAccessXml = @"
+<?xml version="1.0" encoding="utf-8" ?>
+<AssignedAccessConfiguration xmlns="http://schemas.microsoft.com/AssignedAccess/2020/config">
+	<Profiles>
+		<Profile Id="$profileId">
+			<KioskModeApp DesktopAppPath="$launcherPath" />
+		</Profile>
+	</Profiles>
+	<Configs>
+		<Config>
+			<Account>$KioskUsername</Account>
+			<DefaultProfile Id="$profileId"/>
+		</Config>
+	</Configs>
+</AssignedAccessConfiguration>
+"@
+			$namespaceName = 'root\cimv2\mdm\dmmap'
+			$existing = Get-CimInstance -Namespace $namespaceName -ClassName 'MDM_AssignedAccess' -ErrorAction Stop
+			if ( $existing ) {
+				$existing.Configuration = $assignedAccessXml
+				Set-CimInstance -CimInstance $existing -ErrorAction Stop
+			} else {
+				New-CimInstance -Namespace $namespaceName -ClassName 'MDM_AssignedAccess' -Property @{ Configuration = $assignedAccessXml } -ErrorAction Stop | Out-Null
+			}
+			Write-Host "==> Assigned Access configured — Windows now treats '$KioskUsername' as a real single-app kiosk account." -ForegroundColor Green
+			$assignedAccessConfigured = $true
+		} catch {
+			Write-Host "==> Assigned Access isn't available here (needs Windows 10/11 Pro, Enterprise, or Education) — continuing with shell replacement + auto sign-in only." -ForegroundColor Yellow
+			Write-Host "    ($($_.Exception.Message))" -ForegroundColor Yellow
 		}
 	}
 }
@@ -512,6 +616,12 @@ if ( $EnableAutoLogon ) {
 	}
 	Write-Host "   Kiosk hardening: sleep/hibernate/screen saver disabled, crash and update" -ForegroundColor Green
 	Write-Host "                    dialogs suppressed — nothing here waits on input." -ForegroundColor Green
+	if ( $assignedAccessConfigured ) {
+		Write-Host "   Assigned Access: CONFIGURED — real Windows single-app kiosk mode for '$KioskUsername'." -ForegroundColor Green
+	} elseif ( $UseAssignedAccess ) {
+		Write-Host "   Assigned Access: not available (needs Windows 10/11 Pro/Enterprise/Education) —" -ForegroundColor Yellow
+		Write-Host "                    relying on shell replacement + auto sign-in instead." -ForegroundColor Yellow
+	}
 }
 if ( $ReplaceShell ) {
 	Write-Host "   Shell:          REPLACED — no desktop, taskbar, or Start menu, just the kiosk." -ForegroundColor Green

@@ -52,9 +52,10 @@ makensis installer.nsi
 ### Fully local / offline install (recommended)
 
 `install-standalone.ps1` is a **single self-contained file** — it has
-`install-kiosk.ps1`, `kiosk-player.ps1`, `ds-controller-agent.ps1` and
-`uninstall-kiosk.ps1` embedded inside it, so there's nothing to fetch from
-GitHub and no folder to copy at install time. Get this one file onto the
+`install-kiosk.ps1`, `kiosk-player.ps1`, `ds-controller-agent.ps1`,
+`uninstall-kiosk.ps1` and `DigitalSignageKioskLauncher.exe` embedded inside
+it, so there's nothing to fetch from GitHub and no folder to copy at
+install time. Get this one file onto the
 kiosk PC however you like (USB stick, network share, email attachment,
 `scp`, ...), then paste this single line into `cmd` (or PowerShell) and
 press Enter:
@@ -284,6 +285,41 @@ physically secured. To turn it back off later (and delete the dedicated
 .\uninstall-kiosk.ps1 -DisableAutoLogon -RemoveKioskUser   # from an elevated PowerShell
 ```
 
+### Real Windows "kiosk mode" (Assigned Access)
+
+Windows has an actual, official single-app kiosk feature — **Assigned
+Access** — behind **Settings → Accounts → Family & other users → Set up a
+kiosk → Choose a kiosk app**. That page's own app picker only lists Store
+apps, so a Win32 app like this one can never be *chosen* through that
+specific screen — but the feature itself has fully supported Win32 apps
+since Windows 10 1809, and by default (`-UseAssignedAccess`) this installer
+configures it directly, the same way an MDM (e.g. Intune) would: via the
+local WMI Bridge provider, no Store app, MDM enrollment, or manual wizard
+click-through needed.
+
+Requires **Windows 10/11 Pro, Enterprise, or Education** — Assigned Access
+doesn't exist on Home. If the edition doesn't support it, or anything else
+about it fails, the installer skips it with a yellow warning and moves on;
+`-ReplaceShell` + `AutoAdminLogon` (configured either way) already deliver
+the same practical outcome — no desktop, boots straight to the kiosk — on
+every edition, so nothing about the kiosk *depends* on this succeeding. It's
+an extra, "make it official" layer on top, not a requirement.
+
+Under the hood: install-kiosk.ps1 points Assigned Access at
+`DigitalSignageKioskLauncher.exe`, a tiny fixed-arguments wrapper that runs
+`kiosk-player.ps1` — Assigned Access always launches one exe with no
+arguments of its own, so `kiosk-player.ps1` reads its URL/browser/hotkey
+from `kiosk-config.json` (written by install-kiosk.ps1) instead of the
+command line whenever none are passed. Don't want this at all? Pass
+`-UseAssignedAccess:$false`:
+
+```powershell
+.\install-kiosk.ps1 -Site "https://yourdomain.com" -UseAssignedAccess:$false
+```
+
+`.\uninstall-kiosk.ps1 -DisableAutoLogon` clears the Assigned Access
+configuration alongside everything else.
+
 ## What it does
 
 - `kiosk-player.ps1` — the player itself. Launches one `--kiosk` browser
@@ -314,13 +350,18 @@ physically secured. To turn it back off later (and delete the dedicated
 - `ds-controller-agent.ps1` — the `-MultiDisplay` controller: detects every
   connected monitor and opens an isolated kiosk browser profile on each one.
 - `install-standalone.ps1` — single-file, offline version of the install
-  above with all four scripts embedded (base64); regenerate it with
-  `build-standalone.ps1` after editing any of them.
+  above with the four scripts and `DigitalSignageKioskLauncher.exe` all
+  embedded (base64); regenerate it with `build-standalone.ps1` after
+  editing any of them.
 - `bootstrap.ps1` — fetches the four scripts from GitHub and runs
   `install-kiosk.ps1`, for the remote one-line install.
 - `installer.nsi` / `DigitalSignageKioskSetup.exe` — the one-click `.exe`
   installer ([section 0](#0-one-click-exe-installer)); the `.nsi` is the
   NSIS source, rebuilt into the `.exe` with `makensis installer.nsi`.
+- `kiosk-launcher.nsi` / `DigitalSignageKioskLauncher.exe` — the tiny,
+  fixed-arguments wrapper Windows Assigned Access points at (see [Real
+  Windows "kiosk mode"](#real-windows-kiosk-mode-assigned-access) above);
+  rebuild with `makensis kiosk-launcher.nsi`.
 
 ## Closing the kiosk
 

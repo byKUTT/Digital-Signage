@@ -3,8 +3,9 @@
     Removes the Digital Signage Windows kiosk auto-start and installed files.
 
 .PARAMETER DisableAutoLogon
-    Also turn off Windows auto sign-in (AutoAdminLogon) and revert the
-    unattended-kiosk power/screen-saver/error-reporting/update settings, if
+    Also turn off Windows auto sign-in (AutoAdminLogon), revert the
+    unattended-kiosk power/screen-saver/error-reporting/update settings, and
+    clear any Windows Assigned Access (single-app kiosk) configuration, if
     install-kiosk.ps1 -EnableAutoLogon set them up. Requires an elevated
     PowerShell.
 
@@ -92,6 +93,13 @@ if ( $DisableAutoLogon -or $RemoveKioskUser ) {
 			powercfg /change standby-timeout-dc 15
 			Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting' -Name 'Disabled'
 			Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -Name 'NoAutoRebootWithLoggedOnUsers'
+
+			Write-Host "==> Clearing Windows Assigned Access configuration (if -UseAssignedAccess set one up)…"
+			$assignedAccess = Get-CimInstance -Namespace 'root\cimv2\mdm\dmmap' -ClassName 'MDM_AssignedAccess'
+			if ( $assignedAccess ) {
+				$assignedAccess.Configuration = '<?xml version="1.0" encoding="utf-8" ?><AssignedAccessConfiguration xmlns="http://schemas.microsoft.com/AssignedAccess/2020/config"></AssignedAccessConfiguration>'
+				Set-CimInstance -CimInstance $assignedAccess
+			}
 		}
 
 		if ( $RemoveKioskUser ) {

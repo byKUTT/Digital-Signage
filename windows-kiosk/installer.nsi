@@ -1,11 +1,12 @@
 ; Digital Signage Windows Kiosk — one-click installer + matching uninstaller.
 ;
 ; Installs into Program Files like a normal Windows application. Bundles
-; install-kiosk.ps1, kiosk-player.ps1, ds-controller-agent.ps1 and
-; uninstall-kiosk.ps1; requests admin once (a single UAC prompt), extracts
-; the scripts to a temp staging folder, and runs install-kiosk.ps1 — which
-; does the real Program Files install itself (auto sign-in, dedicated
-; "Kiosk" account, shell replacement, kiosk hardening, one browser window
+; install-kiosk.ps1, kiosk-player.ps1, ds-controller-agent.ps1,
+; uninstall-kiosk.ps1 and DigitalSignageKioskLauncher.exe; requests admin
+; once (a single UAC prompt), extracts them to a temp staging folder, and
+; runs install-kiosk.ps1 — which does the real Program Files install itself
+; (auto sign-in, dedicated "Kiosk" account, shell replacement, Windows
+; Assigned Access single-app kiosk mode, kiosk hardening, one browser window
 ; per connected screen). Also writes a normal "Apps & Features" uninstaller
 ; (Uninstall.exe, in the install folder) that runs uninstall-kiosk.ps1 with
 ; a full teardown (-DisableAutoLogon -RemoveKioskUser).
@@ -44,6 +45,7 @@ Section "Install"
 	File "kiosk-player.ps1"
 	File "ds-controller-agent.ps1"
 	File "uninstall-kiosk.ps1"
+	File "DigitalSignageKioskLauncher.exe"
 
 	DetailPrint "Running install-kiosk.ps1 (default site, auto sign-in, kiosk shell, all screens)..."
 	nsExec::ExecToLog '"powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\install-kiosk.ps1"'
@@ -78,6 +80,7 @@ Section "Uninstall"
 	Delete "${APPDIR}\kiosk-player.ps1"
 	Delete "${APPDIR}\ds-controller-agent.ps1"
 	Delete "${APPDIR}\uninstall-kiosk.ps1"
+	Delete "${APPDIR}\DigitalSignageKioskLauncher.exe"
 	Delete "${APPDIR}\Uninstall.exe"
 	RMDir "${APPDIR}"
 SectionEnd

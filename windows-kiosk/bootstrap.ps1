@@ -27,7 +27,7 @@ $installDir = Join-Path $env:TEMP 'ds-kiosk-install'
 
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
 
-foreach ( $f in 'install-kiosk.ps1', 'kiosk-player.ps1', 'ds-controller-agent.ps1', 'uninstall-kiosk.ps1' ) {
+foreach ( $f in 'install-kiosk.ps1', 'kiosk-player.ps1', 'ds-controller-agent.ps1', 'uninstall-kiosk.ps1', 'DigitalSignageKioskLauncher.exe' ) {
 	Invoke-WebRequest -UseBasicParsing -Uri "$base/$f" -OutFile (Join-Path $installDir $f)
 }
 

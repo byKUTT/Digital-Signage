@@ -4,16 +4,18 @@
 
 .DESCRIPTION
     install-standalone.ps1 embeds install-kiosk.ps1, kiosk-player.ps1,
-    ds-controller-agent.ps1 and uninstall-kiosk.ps1 as base64 blobs so it can
-    install fully offline as a single file. Run this script after editing
-    any of those four files to rebuild install-standalone.ps1 from the
+    ds-controller-agent.ps1, uninstall-kiosk.ps1 and
+    DigitalSignageKioskLauncher.exe as base64 blobs so it can install fully
+    offline as a single file. Run this script after editing any of the four
+    scripts, or after rebuilding the launcher exe (makensis
+    kiosk-launcher.nsi), to regenerate install-standalone.ps1 from the
     current source — do not hand-edit the base64 blobs.
 #>
 
 $ErrorActionPreference = 'Stop'
 
 $root = $PSScriptRoot
-$files = 'install-kiosk.ps1', 'kiosk-player.ps1', 'ds-controller-agent.ps1', 'uninstall-kiosk.ps1'
+$files = 'install-kiosk.ps1', 'kiosk-player.ps1', 'ds-controller-agent.ps1', 'uninstall-kiosk.ps1', 'DigitalSignageKioskLauncher.exe'
 
 $payloadLines = foreach ( $f in $files ) {
 	$bytes = [IO.File]::ReadAllBytes( (Join-Path $root $f) )
@@ -29,13 +31,13 @@ $header = @'
 
 .DESCRIPTION
     A single-file version of the windows-kiosk installer: install-kiosk.ps1,
-    kiosk-player.ps1, ds-controller-agent.ps1 and uninstall-kiosk.ps1 are all
-    embedded below (base64) and written out to a local folder at run time.
-    Nothing is fetched from GitHub or anywhere else at install time — copy
-    this one file to the kiosk PC (USB stick, network share, email
-    attachment, etc.) and run it locally. The only network access this
-    installer (and the kiosk it sets up) needs is to the signage site
-    itself.
+    kiosk-player.ps1, ds-controller-agent.ps1, uninstall-kiosk.ps1 and
+    DigitalSignageKioskLauncher.exe are all embedded below (base64) and
+    written out to a local folder at run time. Nothing is fetched from
+    GitHub or anywhere else at install time — copy this one file to the
+    kiosk PC (USB stick, network share, email attachment, etc.) and run it
+    locally. The only network access this installer (and the kiosk it sets
+    up) needs is to the signage site itself.
 
     Any parameters you pass are forwarded as-is to install-kiosk.ps1 (e.g.
     -Site, -Url, -MultiDisplay, -Browser, -EnableAutoLogon, -Regenerate,
@@ -43,8 +45,8 @@ $header = @'
     baked into install-kiosk.ps1 (https://test.kutt.ee).
 
     To regenerate this file after editing install-kiosk.ps1 / kiosk-player.ps1
-    / ds-controller-agent.ps1 / uninstall-kiosk.ps1, see build-standalone.ps1
-    in this same folder.
+    / ds-controller-agent.ps1 / uninstall-kiosk.ps1 / kiosk-launcher.nsi, see
+    build-standalone.ps1 in this same folder.
 
 .EXAMPLE
     .\install-standalone.ps1

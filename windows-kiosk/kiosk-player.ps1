@@ -16,8 +16,17 @@
     script exiting (via the close hotkey) ends the Windows session, and
     AutoAdminLogon immediately signs back in and restarts it.
 
+    Also runnable with no parameters at all — install-kiosk.ps1 always
+    writes them to kiosk-config.json (%ProgramData%\DigitalSignageKiosk\),
+    and this script falls back to reading that file for anything not passed
+    on the command line. That's what lets DigitalSignageKioskLauncher.exe
+    (a tiny fixed-arguments wrapper) work as a Windows Assigned Access
+    "KioskModeApp" — Assigned Access launches one exe with no arguments of
+    its own, so the settings have to come from somewhere else.
+
 .PARAMETER Url
     The player URL to display, e.g. https://yourdomain.com/signage/play/TOKEN/
+    Falls back to kiosk-config.json if not given; an error if neither has it.
 
 .PARAMETER Browser
     "edge" (default, ships with Windows) or "chrome".
@@ -34,18 +43,42 @@
 #>
 
 param(
-	[Parameter(Mandatory = $true)]
 	[string]$Url,
 
-	[ValidateSet('edge', 'chrome')]
-	[string]$Browser = 'edge',
+	[string]$Browser,
 
-	[string[]]$CloseModifiers = @('Ctrl', 'Alt', 'Shift'),
+	[string[]]$CloseModifiers,
 
-	[string]$CloseKey = 'Q'
+	[string]$CloseKey
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Fill in anything not passed on the command line from kiosk-config.json —
+# written by install-kiosk.ps1 on every install/re-pair — so this script
+# also works launched with zero arguments (Windows Assigned Access's
+# "KioskModeApp" launches its one configured .exe with none of its own).
+$configPath = Join-Path $env:ProgramData 'DigitalSignageKiosk\kiosk-config.json'
+if ( -not $Url -or -not $Browser -or -not $CloseModifiers -or -not $CloseKey ) {
+	$config = $null
+	if ( Test-Path $configPath ) {
+		try {
+			$config = Get-Content -Path $configPath -Raw | ConvertFrom-Json
+		} catch {
+			Write-Warning "Could not read/parse $configPath — $($_.Exception.Message)"
+		}
+	}
+	if ( -not $Url ) { $Url = $config.Url }
+	if ( -not $Browser ) { $Browser = if ( $config.Browser ) { $config.Browser } else { 'edge' } }
+	if ( -not $CloseModifiers ) { $CloseModifiers = if ( $config.CloseModifiers ) { @( $config.CloseModifiers ) } else { @( 'Ctrl', 'Alt', 'Shift' ) } }
+	if ( -not $CloseKey ) { $CloseKey = if ( $config.CloseKey ) { $config.CloseKey } else { 'Q' } }
+}
+if ( -not $Url ) {
+	throw "No -Url given and none found in $configPath. Run install-kiosk.ps1 first, or pass -Url directly."
+}
+if ( $Browser -notin 'edge', 'chrome' ) {
+	throw "Browser must be 'edge' or 'chrome', got '$Browser' (from -Browser or kiosk-config.json)."
+}
 
 # ---------------------------------------------------------------------------
 # Hide our own console window (harmless if already hidden via -WindowStyle).
