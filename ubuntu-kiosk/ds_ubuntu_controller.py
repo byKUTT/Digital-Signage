@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import json
+import fcntl
 import os
 import platform
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -19,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "3.2.0"
+VERSION = "3.2.1"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
 HEARTBEAT_SECONDS = 10
@@ -56,7 +58,7 @@ class Output:
 
 @dataclass
 class Player:
-    """A Firefox process assigned to one output."""
+    """A Chrome-family browser process assigned to one output."""
 
     process: subprocess.Popen[Any]
     url: str
@@ -147,6 +149,48 @@ def reconcile_targets(
     return targets
 
 
+def find_browser(configured: str = "") -> str:
+    """Find a Chrome-family executable, preferring Google Chrome Stable."""
+    candidates = [
+        configured,
+        "google-chrome-stable",
+        "google-chrome",
+        "chromium",
+        "chromium-browser",
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        if os.path.isabs(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+    return ""
+
+
+def chrome_command(browser: str, profile: Path, output: Output, url: str) -> list[str]:
+    """Build an isolated, exactly positioned kiosk command for one output."""
+    return [
+        browser,
+        f"--user-data-dir={profile}",
+        f"--window-position={output.x},{output.y}",
+        f"--window-size={output.width},{output.height}",
+        f"--class=bykutt-signage-{output.output_key}",
+        "--kiosk",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-session-crashed-bubble",
+        "--disable-translate",
+        "--disable-features=Translate,TranslateUI",
+        "--disable-component-update",
+        "--autoplay-policy=no-user-gesture-required",
+        "--disable-pinch",
+        "--overscroll-history-navigation=0",
+        url,
+    ]
+
+
 class Controller:
     """Controller lifecycle, server transport, and one browser per output."""
 
@@ -159,9 +203,10 @@ class Controller:
         self.profile_root = Path(
             str(self.settings.get("profile_root") or self.user_home / ".local/share/digital-signage-ubuntu")
         )
-        self.firefox = str(self.settings.get("firefox") or shutil.which("firefox") or "")
-        if not self.firefox:
-            raise RuntimeError("Firefox executable was not found")
+        self.browser = find_browser(str(self.settings.get("browser") or ""))
+        if not self.browser:
+            raise RuntimeError("Google Chrome or Chromium executable was not found")
+        self.browser_name = "Google Chrome" if "google-chrome" in self.browser else "Chromium"
         self.identity = load_json(identity_path) if identity_path.exists() else {}
         self.players: dict[str, Player] = {}
         self.recent_log: list[str] = []
@@ -252,7 +297,7 @@ class Controller:
             "architecture": platform.machine(),
             "cpu_cores": os.cpu_count() or 1,
             "kernel": platform.release(),
-            "browser": "Firefox",
+            "browser": self.browser_name,
             "memory_total_mb": memory_total,
             "memory_free_mb": memory_free,
             "disk_total_mb": disk.total // 1024 // 1024,
@@ -324,7 +369,7 @@ class Controller:
         if command_type == "restart_players":
             self.stop_players()
             self.force_refresh = True
-            self.ack(command_id, "succeeded", "Firefox players restarted")
+            self.ack(command_id, "succeeded", "Chrome players restarted")
             return
         if command_type == "refresh_displays":
             self.force_refresh = True
@@ -380,27 +425,8 @@ class Controller:
         before = self.window_ids()
         profile = self.profile_root / output.output_key
         profile.mkdir(parents=True, exist_ok=True)
-        (profile / "user.js").write_text(
-            '// Managed Digital Signage Firefox profile.\n'
-            'user_pref("browser.aboutwelcome.enabled", false);\n'
-            'user_pref("browser.shell.checkDefaultBrowser", false);\n'
-            'user_pref("browser.translations.enable", false);\n'
-            'user_pref("browser.translations.automaticallyPopup", false);\n'
-            'user_pref("datareporting.policy.dataSubmissionEnabled", false);\n'
-            'user_pref("media.autoplay.default", 0);\n'
-            'user_pref("media.autoplay.blocking_policy", 0);\n',
-            encoding="utf-8",
-        )
         process = subprocess.Popen(
-            [
-                self.firefox,
-                "--no-remote",
-                "--new-instance",
-                "--profile",
-                str(profile),
-                "--kiosk",
-                url,
-            ],
+            chrome_command(self.browser, profile, output, url),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
             start_new_session=False,
@@ -416,7 +442,7 @@ class Controller:
             time.sleep(0.5)
         if not window_id:
             process.terminate()
-            raise RuntimeError(f"Firefox window did not appear for {output.connector}")
+            raise RuntimeError(f"Chrome window did not appear for {output.connector}")
         self.log(f"Started {output.connector} at {output.width}x{output.height}+{output.x}+{output.y}")
         return Player(
             process=process,
@@ -463,6 +489,8 @@ class Controller:
 
     def run(self) -> int:
         self.log(f"Ubuntu controller {VERSION} starting")
+        signal.signal(signal.SIGTERM, lambda _signum, _frame: setattr(self, "stop_requested", True))
+        signal.signal(signal.SIGINT, lambda _signum, _frame: setattr(self, "stop_requested", True))
         last_heartbeat = 0.0
         assignments: list[dict[str, Any]] = []
         consecutive_errors = 0
@@ -502,11 +530,34 @@ class Controller:
 def main() -> int:
     settings = Path(os.environ.get("DS_UBUNTU_SETTINGS", str(DEFAULT_SETTINGS)))
     identity = Path(os.environ.get("DS_UBUNTU_IDENTITY", str(DEFAULT_IDENTITY)))
+    lock_handle = None
+    pid_path = None
     try:
+        loaded_settings = load_json(settings)
+        raw_profile_root = str(loaded_settings.get("profile_root") or "")
+        if not raw_profile_root:
+            raise RuntimeError("profile_root is missing")
+        profile_root = Path(raw_profile_root)
+        profile_root.mkdir(parents=True, exist_ok=True)
+        lock_handle = (profile_root / "controller.lock").open("a+", encoding="utf-8")
+        try:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise RuntimeError("another Digital Signage controller is already running") from error
+        pid_path = profile_root / "controller.pid"
+        pid_path.write_text(f"{os.getpid()}\n", encoding="utf-8")
         return Controller(settings, identity).run()
     except (OSError, KeyError, ValueError, RuntimeError) as error:
         print(f"Digital Signage controller could not start: {error}", file=sys.stderr)
         return 1
+    finally:
+        if pid_path is not None:
+            try:
+                pid_path.unlink()
+            except FileNotFoundError:
+                pass
+        if lock_handle is not None:
+            lock_handle.close()
 
 
 if __name__ == "__main__":

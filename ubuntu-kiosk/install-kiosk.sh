@@ -55,15 +55,41 @@ esac
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
-	python3 git x11-xserver-utils wmctrl xdotool dbus-x11 gdm3
+	python3 git ca-certificates curl x11-xserver-utils wmctrl xdotool dbus-x11 gdm3
 
-firefox_bin="$(command -v firefox || true)"
-if [ -z "$firefox_bin" ]; then
-	apt-get install -y firefox
-	firefox_bin="$(command -v firefox || true)"
+browser_bin=""
+for browser_candidate in google-chrome-stable google-chrome; do
+	if command -v "$browser_candidate" >/dev/null 2>&1; then
+		browser_bin="$(command -v "$browser_candidate")"
+		break
+	fi
+done
+if [ -z "$browser_bin" ] && [ "$(dpkg --print-architecture)" = "amd64" ]; then
+	chrome_deb="$(mktemp --suffix=.google-chrome.deb)"
+	if ! curl --fail --location --retry 3 --output "$chrome_deb" \
+		https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb; then
+		rm -f "$chrome_deb"
+		echo "Google Chrome download failed. Check this device's DNS, gateway, and internet access." >&2
+		exit 1
+	fi
+	apt-get install -y "$chrome_deb"
+	rm -f "$chrome_deb"
+	browser_bin="$(command -v google-chrome-stable || command -v google-chrome || true)"
 fi
-if [ -z "$firefox_bin" ]; then
-	echo "Firefox could not be installed." >&2
+if [ -z "$browser_bin" ]; then
+	for browser_candidate in chromium chromium-browser; do
+		if command -v "$browser_candidate" >/dev/null 2>&1; then
+			browser_bin="$(command -v "$browser_candidate")"
+			break
+		fi
+	done
+fi
+if [ -z "$browser_bin" ]; then
+	apt-get install -y chromium-browser
+	browser_bin="$(command -v chromium || command -v chromium-browser || true)"
+fi
+if [ -z "$browser_bin" ]; then
+	echo "Google Chrome or Chromium could not be installed." >&2
 	exit 1
 fi
 
@@ -85,11 +111,7 @@ config_root="/etc/digital-signage-ubuntu"
 backup_root="/var/lib/digital-signage-ubuntu-backups"
 kiosk_home="$(getent passwd "$kiosk_user" | cut -d: -f6)"
 kiosk_group="$(id -gn "$kiosk_user")"
-if command -v snap >/dev/null 2>&1 && snap list firefox >/dev/null 2>&1; then
-	profile_root="$kiosk_home/snap/firefox/common/digital-signage"
-else
-	profile_root="$kiosk_home/.local/share/digital-signage-ubuntu"
-fi
+profile_root="$kiosk_home/.local/share/digital-signage-ubuntu/chrome"
 mkdir -p "$install_root" "$config_root" "$backup_root"
 chown root:"$kiosk_group" "$config_root"
 chmod 770 "$config_root"
@@ -97,20 +119,26 @@ runuser -u "$kiosk_user" -- mkdir -p "$profile_root"
 chown "$kiosk_user":"$kiosk_group" "$profile_root"
 chmod 700 "$profile_root"
 
-if [ "$mode" != "--upgrade" ] || [ ! -f "$config_root/settings.json" ]; then
-	python3 - "$config_root/settings.json" "$site" "$kiosk_user" "$kiosk_home" "$profile_root" "$firefox_bin" "$managed_repo" "$branch" "$remote" <<'PY'
+python3 - "$config_root/settings.json" "$site" "$kiosk_user" "$kiosk_home" "$profile_root" "$browser_bin" "$managed_repo" "$branch" "$remote" <<'PY'
 import json, os, sys
-path, site, user, home, profile_root, firefox, repository, branch, remote = sys.argv[1:]
-data = {
+path, site, user, home, profile_root, browser, repository, branch, remote = sys.argv[1:]
+data = {}
+if os.path.exists(path):
+    with open(path, encoding="utf-8") as handle:
+        existing = json.load(handle)
+    if isinstance(existing, dict):
+        data.update(existing)
+data.update({
     "site": site,
     "user": user,
     "user_home": home,
     "profile_root": profile_root,
-    "firefox": firefox,
+    "browser": browser,
     "repository_path": repository,
     "branch": branch,
     "remote": remote,
-}
+})
+data.pop("firefox", None)
 temporary = path + ".tmp"
 with open(temporary, "w", encoding="utf-8") as handle:
     json.dump(data, handle, indent=2, sort_keys=True)
@@ -118,39 +146,34 @@ with open(temporary, "w", encoding="utf-8") as handle:
 os.chmod(temporary, 0o644)
 os.replace(temporary, path)
 PY
-	chown root:"$kiosk_group" "$config_root/settings.json"
-	chmod 640 "$config_root/settings.json"
-fi
+chown root:"$kiosk_group" "$config_root/settings.json"
+chmod 640 "$config_root/settings.json"
 
 install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/ds_ubuntu_controller.py" \
 	"$install_root/ds_ubuntu_controller.py"
-install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/ds-ubuntu-session-wait.sh" \
-	/usr/local/bin/ds-ubuntu-session-wait
+install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/ds-ubuntu-autostart.sh" \
+	/usr/local/bin/ds-ubuntu-autostart
 install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/update-kiosk.sh" \
 	/usr/local/sbin/digital-signage-update
 install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/digital-signage-root-command" \
 	/usr/local/sbin/digital-signage-root-command
 
-mkdir -p /etc/firefox/policies
-install -o root -g root -m 644 /dev/stdin /etc/firefox/policies/policies.json <<'POLICY'
+mkdir -p /etc/opt/chrome/policies/managed /etc/chromium/policies/managed /etc/chromium-browser/policies/managed /etc/xdg/autostart
+for policy_root in /etc/opt/chrome/policies/managed /etc/chromium/policies/managed /etc/chromium-browser/policies/managed; do
+	install -o root -g root -m 644 /dev/stdin "$policy_root/bykutt-digital-signage.json" <<'POLICY'
 {
-  "policies": {
-    "DisableAppUpdate": true,
-    "DisableFirefoxAccounts": true,
-    "DisableFirefoxStudies": true,
-    "DisablePocket": true,
-    "DisableTelemetry": true,
-    "DontCheckDefaultBrowser": true,
-    "OfferToSaveLogins": false,
-    "PasswordManagerEnabled": false,
-    "UserMessaging": {
-      "ExtensionRecommendations": false,
-      "FeatureRecommendations": false,
-      "WhatsNew": false
-    }
-  }
+  "BrowserSignin": 0,
+  "DefaultBrowserSettingEnabled": false,
+  "MetricsReportingEnabled": false,
+  "PasswordManagerEnabled": false,
+  "PromotionalTabsEnabled": false,
+  "TranslateEnabled": false
 }
 POLICY
+	done
+install -o root -g root -m 644 \
+	"$managed_repo/ubuntu-kiosk/autostart/bykutt-digital-signage.desktop" \
+	/etc/xdg/autostart/bykutt-digital-signage.desktop
 
 gdm_config="/etc/gdm3/custom.conf"
 gdm_backup="$backup_root/gdm-custom.conf"
@@ -160,16 +183,8 @@ fi
 python3 "$managed_repo/ubuntu-kiosk/configure_gdm.py" "$gdm_config" "$kiosk_user"
 chmod 644 "$gdm_config"
 
-service_template="$managed_repo/ubuntu-kiosk/systemd/digital-signage-ubuntu.service"
-python3 - "$service_template" /etc/systemd/system/digital-signage-ubuntu.service \
-	"$kiosk_user" "$kiosk_group" "$kiosk_home" <<'PY'
-import pathlib, sys
-source, target, user, group, home = sys.argv[1:]
-text = pathlib.Path(source).read_text(encoding="utf-8")
-text = text.replace("@@KIOSK_USER@@", user).replace("@@KIOSK_GROUP@@", group).replace("@@USER_HOME@@", home)
-pathlib.Path(target).write_text(text, encoding="utf-8")
-PY
-chmod 644 /etc/systemd/system/digital-signage-ubuntu.service
+systemctl disable --now digital-signage-ubuntu.service >/dev/null 2>&1 || true
+rm -f /etc/systemd/system/digital-signage-ubuntu.service /usr/local/bin/ds-ubuntu-session-wait
 
 sudoers_file="/etc/sudoers.d/digital-signage-ubuntu"
 install -o root -g root -m 440 /dev/stdin "$sudoers_file" <<EOF
@@ -183,14 +198,20 @@ fi
 systemctl unmask getty@tty1.service >/dev/null 2>&1 || true
 systemctl set-default graphical.target
 systemctl daemon-reload
-systemctl enable digital-signage-ubuntu.service
 
 if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
-	systemctl try-restart digital-signage-ubuntu.service || true
+	pid_file="$profile_root/controller.pid"
+	if [ -r "$pid_file" ]; then
+		controller_pid="$(tr -cd '0-9' < "$pid_file")"
+		if [ -n "$controller_pid" ] && [ -r "/proc/$controller_pid/cmdline" ] && \
+			tr '\0' ' ' < "/proc/$controller_pid/cmdline" | grep -q '/digital-signage-ubuntu/ds_ubuntu_controller.py'; then
+			kill -TERM "$controller_pid" || true
+		fi
+	fi
 fi
 
 echo
-echo "Digital Signage Ubuntu controller 3.2.0 is installed."
+echo "Digital Signage Ubuntu controller 3.2.1 with Chrome boot autostart is installed."
 echo "No automatic reboot timer or reboot watchdog was installed."
 echo "Reboot once to activate Xorg autologin: sudo reboot"
 echo "Future updates: sudo digital-signage-update"

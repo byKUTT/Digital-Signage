@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=byKUTT Digital Signage
+Comment=Start the multi-display Chrome kiosk after graphical login
+Exec=/usr/local/bin/ds-ubuntu-autostart
+Terminal=false
+NoDisplay=true
+OnlyShowIn=GNOME;
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=3

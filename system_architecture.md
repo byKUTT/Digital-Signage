@@ -12,18 +12,21 @@
   stable output key and maps to one `ds_controller_displays` row/WordPress
   Screen. A disconnected output is marked offline but its Screen assignment is
   retained for reconnection to the same port.
-- The controller launches one isolated Firefox profile/process per connected
-  output. Firefox runs as the kiosk user with that user's X authority, runtime
-  directory, and D-Bus session; `wmctrl` places and fullscreens each process at
-  the XRandR geometry. Ubuntu Snap Firefox profiles live inside
-  `~/snap/firefox/common/` to satisfy confinement.
+- GDM autologin starts a normal Xorg desktop, then the system-wide XDG
+  autostart entry runs only for the configured kiosk user. This inherits the
+  session's real display number, X authority, runtime directory, and D-Bus
+  address; no service guesses `DISPLAY=:0` before login is ready.
+- The controller launches one isolated Chrome-family profile/process per
+  connected output. Chrome receives each XRandR output's exact position and
+  dimensions on its command line, with `wmctrl` enforcing fullscreen placement
+  after the native window appears.
 - Persisted settings and identity never live inside the managed Git checkout.
   `sudo digital-signage-update` verifies the configured origin, refuses dirty
   or divergent state, fast-forwards the configured branch, and reapplies the
   installer in upgrade mode. Site, user, identity, output assignments, and
   browser profiles remain unchanged.
-- Process recovery is intentionally separate from machine power. Firefox and
-  the controller service restart on failure, but there is no daily timer,
+- Process recovery is intentionally separate from machine power. Chrome and
+  the graphical-session controller restart on failure, but there is no daily timer,
   watchdog escalation, `StartLimitAction`, or any other automatic computer
   reboot. A manually queued authenticated reboot command remains available.
 

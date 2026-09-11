@@ -13,8 +13,13 @@ systemctl disable --now digital-signage-ubuntu.service >/dev/null 2>&1 || true
 rm -f /etc/systemd/system/digital-signage-ubuntu.service
 rm -f /etc/sudoers.d/digital-signage-ubuntu
 rm -f /usr/local/bin/ds-ubuntu-session-wait
+rm -f /usr/local/bin/ds-ubuntu-autostart
 rm -f /usr/local/sbin/digital-signage-update
 rm -f /usr/local/sbin/digital-signage-root-command
+rm -f /etc/xdg/autostart/bykutt-digital-signage.desktop
+rm -f /etc/opt/chrome/policies/managed/bykutt-digital-signage.json
+rm -f /etc/chromium/policies/managed/bykutt-digital-signage.json
+rm -f /etc/chromium-browser/policies/managed/bykutt-digital-signage.json
 rm -rf /usr/local/lib/digital-signage-ubuntu
 
 backup="/var/lib/digital-signage-ubuntu-backups/gdm-custom.conf"

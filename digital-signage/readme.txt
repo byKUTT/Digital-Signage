@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.2.0
+Stable tag: 3.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -45,6 +45,12 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 3.2.1 =
+* Ubuntu kiosks now start Google Chrome automatically from the real GDM graphical session on every boot.
+* One isolated Chrome kiosk window is positioned on every connected XRandR output for independent screen/channel playback.
+* Replaced the unreliable early system service and hard-coded DISPLAY value with XDG session autostart and process-only recovery.
+* Existing controller identity, site, output assignments, Git settings, and other persisted configuration remain intact during update.
 
 = 3.2.0 =
 * Added an Ubuntu Desktop controller using the installed Firefox instead of unavailable firefox-esr packages.

@@ -23,3 +23,15 @@
 - [x] Update architecture notes, commit, and publish fast-forward-only to GitHub.
 
 ---
+
+# Ubuntu Chrome boot autostart 3.2.1
+
+- [x] Replace early system-service startup with GDM graphical-session autostart.
+- [x] Install/detect Chrome and migrate preserved Ubuntu controller settings.
+- [x] Launch one isolated Chrome kiosk process at each XRandR output geometry.
+- [x] Add controller single-instance locking and graphical-session crash recovery.
+- [x] Update the settings-preserving updater and uninstaller.
+- [x] Update Ubuntu and WordPress version/documentation metadata to 3.2.1.
+- [x] Run shell, Python, static, multi-monitor, and no-auto-reboot verification.
+- [x] Rebuild and byte-verify both ZIP archives.
+- [x] Commit and publish the fast-forward update to GitHub.

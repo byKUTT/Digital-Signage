@@ -62,7 +62,24 @@ git -C "$repository_path" merge --ff-only "origin/$branch"
 DS_SKIP_SERVICE_RESTART=1 bash "$repository_path/ubuntu-kiosk/install-kiosk.sh" "$site" "$kiosk_user" --upgrade
 
 if [ "$restart_service" -eq 1 ]; then
-	systemctl restart digital-signage-ubuntu.service
+	controller_pid="$(python3 - "$settings_file" <<'PY'
+import json, pathlib, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    profile_root = pathlib.Path(str(json.load(handle).get("profile_root", "")))
+pid_file = profile_root / "controller.pid"
+try:
+    value = pid_file.read_text(encoding="utf-8").strip()
+    print(value if value.isdigit() else "")
+except OSError:
+    print("")
+PY
+)"
+	if [ -n "$controller_pid" ] && [ -r "/proc/$controller_pid/cmdline" ]; then
+		controller_command="$(tr '\0' ' ' < "/proc/$controller_pid/cmdline")"
+		case "$controller_command" in
+			*/digital-signage-ubuntu/ds_ubuntu_controller.py*) kill -TERM "$controller_pid" || true ;;
+		esac
+	fi
 fi
 
 echo "Digital Signage is updated. Existing identity and settings were preserved."

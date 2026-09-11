@@ -1,3 +1,33 @@
+# Ubuntu Chrome boot autostart — approved-scope amendment
+
+## Outcome
+
+- Start the signage controller automatically inside the selected kiosk user's GDM Xorg session on every system boot, so it inherits the real `DISPLAY`, `XAUTHORITY`, D-Bus, and runtime environment instead of guessing `DISPLAY=:0` from an early system service.
+- Launch one independent Google Chrome kiosk window and profile for every connected XRandR output, using exact per-output position and size flags. Keep each connector's existing WordPress Screen/channel assignment stable across reboot and reconnect.
+- Prefer Google Chrome Stable on supported amd64 Ubuntu systems. Detect an existing `google-chrome-stable`/`google-chrome` first and use Chromium only as the documented fallback where Google Chrome is unavailable.
+- Restart a failed browser/controller process from the graphical-session launcher, but never reboot the computer automatically. Retain only the existing explicitly requested remote/manual reboot command.
+- Preserve the site URL, kiosk user, controller token/identity, output assignments, Git remote/branch, and all other persisted settings during installation and `sudo digital-signage-update`.
+
+## File changes
+
+- **Modify `ubuntu-kiosk/install-kiosk.sh`:** install/detect Chrome, migrate settings from the Firefox field, install a system-wide XDG autostart entry plus user-session launcher, disable/remove the obsolete early-boot controller service, retain GDM Xorg autologin and safe Raspberry Pi service migration.
+- **Modify `ubuntu-kiosk/ds_ubuntu_controller.py`:** build Chrome-family kiosk commands with isolated output profiles and exact geometry, add a single-controller lock, update browser telemetry/messages, and continue reconciling hot-plugged outputs independently.
+- **Add `ubuntu-kiosk/ds-ubuntu-autostart.sh` and `ubuntu-kiosk/autostart/bykutt-digital-signage.desktop`:** wait for the inherited graphical display, disable blanking, and restart the controller with bounded delay if it exits.
+- **Modify `ubuntu-kiosk/update-kiosk.sh`:** reapply the installation without changing settings, then restart only the user-session controller so the new version is picked up without rebooting the PC.
+- **Modify `ubuntu-kiosk/uninstall-kiosk.sh`:** remove the XDG autostart integration and installed launcher, and clean up the obsolete service migration safely.
+- **Remove/deprecate `ubuntu-kiosk/ds-ubuntu-session-wait.sh` and `ubuntu-kiosk/systemd/digital-signage-ubuntu.service`:** eliminate the hard-coded display-number startup path that can boot to an empty desktop.
+- **Modify tests and documentation:** cover Chrome command geometry for one to three monitors, independent crash recovery, single-instance behavior, XDG autostart installation, settings preservation, and the no-automatic-reboot boundary.
+- **Bump synchronized plugin/device metadata to `3.2.1`, rebuild `ubuntu-kiosk.zip` and `digital-signage.zip`, and publish the verified source and archives to the existing Git branch.**
+
+## Verification
+
+- Run Bash syntax checks on every changed shell script and ShellCheck when available.
+- Compile the Python controller and run its unit suite, including simulated one-, two-, and three-monitor Chrome launches and failed-process replacement.
+- Statically verify that autostart runs in the graphical user session, no startup path hard-codes `DISPLAY=:0`, and no timer/watchdog can reboot the machine.
+- Verify upgrade migration from the current Firefox settings, archive/source byte parity, synchronized version metadata, and a clean intended Git diff before publication.
+
+---
+
 # Ubuntu multi-display controller — implementation plan
 
 ## Confirmed behavior

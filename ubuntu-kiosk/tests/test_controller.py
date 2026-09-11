@@ -107,6 +107,29 @@ class AssignmentTests(unittest.TestCase):
         self.assertEqual([("hdmi-1", "https://example.test/two")], launched)
 
 
+class ChromeCommandTests(unittest.TestCase):
+    def test_each_output_gets_isolated_profile_and_exact_geometry(self):
+        output = CONTROLLER.Output("hdmi-1", "HDMI-1", 1920, 0, 1080, 1920)
+        command = CONTROLLER.chrome_command(
+            "/usr/bin/google-chrome-stable",
+            pathlib.Path("/profiles/hdmi-1"),
+            output,
+            "https://example.test/signage/play/two/",
+        )
+        self.assertIn("--user-data-dir=/profiles/hdmi-1", command)
+        self.assertIn("--window-position=1920,0", command)
+        self.assertIn("--window-size=1080,1920", command)
+        self.assertIn("--kiosk", command)
+        self.assertEqual("https://example.test/signage/play/two/", command[-1])
+
+    def test_negative_desktop_coordinates_are_preserved(self):
+        output = CONTROLLER.Output("dp-2", "DP-2", -1280, -100, 1280, 1024)
+        command = CONTROLLER.chrome_command(
+            "/usr/bin/chromium", pathlib.Path("/profiles/dp-2"), output, "https://example.test"
+        )
+        self.assertIn("--window-position=-1280,-100", command)
+
+
 class ValidationTests(unittest.TestCase):
     def test_site_normalization(self):
         self.assertEqual("https://example.test", CONTROLLER.validate_site_url("https://example.test/"))
@@ -122,6 +145,18 @@ class ValidationTests(unittest.TestCase):
         self.assertNotIn("StartLimitAction", source)
         self.assertNotIn("reboot-force", source)
         self.assertNotIn("OnCalendar", source)
+
+    def test_graphical_session_autostart_does_not_guess_display(self):
+        root = pathlib.Path(__file__).parents[1]
+        launcher = (root / "ds-ubuntu-autostart.sh").read_text(encoding="utf-8")
+        desktop = (root / "autostart/bykutt-digital-signage.desktop").read_text(encoding="utf-8")
+        self.assertNotIn("DISPLAY=:0", launcher)
+        self.assertIn("Exec=/usr/local/bin/ds-ubuntu-autostart", desktop)
+        self.assertIn("X-GNOME-Autostart-enabled=true", desktop)
+
+    def test_controller_has_a_nonblocking_single_instance_lock(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn("fcntl.LOCK_EX | fcntl.LOCK_NB", source)
 
 
 class GdmConfigurationTests(unittest.TestCase):

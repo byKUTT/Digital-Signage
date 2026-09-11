@@ -1,13 +1,14 @@
 # Ubuntu multi-display kiosk
 
-This controller is for Ubuntu Desktop PCs. It uses Ubuntu's installed Firefox,
-an unattended Xorg login, and the Digital Signage controller API. One PC is
+This controller is for Ubuntu Desktop PCs. It uses Google Chrome, an unattended
+Xorg login, and the Digital Signage controller API. One PC is
 paired once; every connected monitor appears as a separate Screen in WordPress
 and can be assigned a different channel.
 
-Supported target: Ubuntu Desktop 24.04 LTS or newer with GDM. The installer
-supports Ubuntu's normal Snap-packaged Firefox and does not require
-`firefox-esr`.
+Supported target: Ubuntu Desktop 24.04 LTS or newer with GDM. On amd64, the
+installer uses an existing Google Chrome Stable or downloads the official
+Google Chrome package. Chromium is the fallback on architectures where Google
+Chrome is unavailable. `firefox-esr` is not required.
 
 ## Recover the black screen created by the Pi installer
 
@@ -40,9 +41,11 @@ Replace the site URL and `robin` if needed. Normal displays need no resolution
 argument: XRandR supplies every monitor's desktop geometry automatically.
 
 The installer configures GDM Xorg autologin, removes the incompatible Pi
-`tty1` startup, installs the controller service, keeps a managed Git checkout
-under `/opt/bykutt-digital-signage`, and disables screen blanking while signage
-is running. It installs no daily reboot timer or automatic reboot watchdog.
+`tty1` startup, installs graphical-session autostart, keeps a managed Git
+checkout under `/opt/bykutt-digital-signage`, and disables screen blanking while
+signage is running. It installs no daily reboot timer or automatic reboot
+watchdog. Chrome starts automatically after every boot and opens one kiosk
+window on every detected monitor.
 
 ## Pair and assign monitors
 
@@ -63,18 +66,18 @@ sudo digital-signage-update
 
 The updater accepts only a clean fast-forward update from the configured
 repository and branch. It preserves the site URL, kiosk user, controller
-identity/token, monitor assignments, Firefox profiles, and other settings. The
+identity/token, monitor assignments, Chrome profiles, and other settings. The
 same update can be queued from the Controller page in WordPress.
 
 ## Status and logs
 
 ```bash
-systemctl status digital-signage-ubuntu.service --no-pager
-sudo journalctl -u digital-signage-ubuntu.service -b -n 150 --no-pager
+pgrep -af ds_ubuntu_controller.py
+pgrep -af 'google-chrome|chromium'
 xrandr --query
 ```
 
-Firefox players and the controller restart after process crashes. Repeated
+Chrome players and the controller restart after process crashes. Repeated
 errors stay in the logs and WordPress telemetry; they never trigger an
 automatic computer reboot.
 

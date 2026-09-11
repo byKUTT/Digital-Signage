@@ -40,7 +40,7 @@ ready-made installers are included for the common cases:
 
 ### Ubuntu PC with one or more monitors
 
-Use `ubuntu-kiosk/` to run the installed Firefox inside an unattended Xorg
+Use `ubuntu-kiosk/` to run Google Chrome inside an unattended Xorg
 session. Every connected monitor becomes a separately assignable WordPress
 Screen. Install and update with:
 
@@ -54,7 +54,8 @@ sudo reboot
 sudo digital-signage-update
 ```
 
-It restarts failed processes but never reboots the Ubuntu computer
+It starts from the logged-in graphical session on every boot and restarts failed
+Chrome/controller processes, but never reboots the Ubuntu computer
 automatically. See `ubuntu-kiosk/README.md` for black-screen recovery,
 multi-monitor assignment, diagnostics, and uninstall instructions.
 
