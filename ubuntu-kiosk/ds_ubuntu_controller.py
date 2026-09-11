@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "3.2.1"
+VERSION = "3.2.2"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
 HEARTBEAT_SECONDS = 10
@@ -181,12 +181,16 @@ def chrome_command(browser: str, profile: Path, output: Output, url: str) -> lis
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-session-crashed-bubble",
+        "--disable-background-mode",
+        "--disable-save-password-bubble",
+        "--disable-sync",
         "--disable-translate",
         "--disable-features=Translate,TranslateUI",
         "--disable-component-update",
         "--autoplay-policy=no-user-gesture-required",
         "--disable-pinch",
         "--overscroll-history-navigation=0",
+        "--password-store=basic",
         url,
     ]
 
@@ -433,7 +437,7 @@ class Controller:
         )
         window_id = ""
         deadline = time.monotonic() + 20
-        while time.monotonic() < deadline and process.poll() is None:
+        while time.monotonic() < deadline:
             new_windows = self.window_ids() - before
             if new_windows:
                 window_id = sorted(new_windows)[-1]
@@ -441,7 +445,8 @@ class Controller:
                 break
             time.sleep(0.5)
         if not window_id:
-            process.terminate()
+            if process.poll() is None:
+                process.terminate()
             raise RuntimeError(f"Chrome window did not appear for {output.connector}")
         self.log(f"Started {output.connector} at {output.width}x{output.height}+{output.x}+{output.y}")
         return Player(
@@ -453,14 +458,18 @@ class Controller:
 
     def sync_players(self, outputs: list[Output], targets: dict[str, str]) -> None:
         current = {output.output_key: output for output in outputs}
+        live_windows = self.window_ids()
         for key in list(self.players):
             player = self.players[key]
             output = current.get(key)
             geometry = (output.x, output.y, output.width, output.height) if output else None
+            window_missing = bool(player.window_id) and player.window_id not in live_windows
+            launcher_failed = not player.window_id and player.process.poll() is not None
             if (
                 not output
                 or key not in targets
-                or player.process.poll() is not None
+                or window_missing
+                or launcher_failed
                 or player.url != targets[key]
                 or player.geometry != geometry
             ):
@@ -475,6 +484,12 @@ class Controller:
 
     def stop_players(self) -> None:
         for player in self.players.values():
+            if player.window_id:
+                subprocess.run(
+                    ["wmctrl", "-ic", player.window_id],
+                    check=False,
+                    timeout=10,
+                )
             if player.process.poll() is None:
                 player.process.terminate()
         deadline = time.monotonic() + 5

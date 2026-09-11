@@ -35,3 +35,10 @@
 - [x] Run shell, Python, static, multi-monitor, and no-auto-reboot verification.
 - [x] Rebuild and byte-verify both ZIP archives.
 - [x] Commit and publish the fast-forward update to GitHub.
+
+# Ubuntu Chrome stability and unattended-session fix 3.2.2
+
+- [x] Track Chrome player health by X11 window instead of launcher PID.
+- [x] Hide the cursor and disable sign-in, sync, autofill, passwords, and keyring access.
+- [x] Add regression tests for live-window handoff and unattended Chrome flags.
+- [x] Rebuild, verify, commit, and publish 3.2.2.

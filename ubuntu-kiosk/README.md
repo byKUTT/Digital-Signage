@@ -47,6 +47,10 @@ signage is running. It installs no daily reboot timer or automatic reboot
 watchdog. Chrome starts automatically after every boot and opens one kiosk
 window on every detected monitor.
 
+The cursor is hidden after the graphical session starts. Chrome runs without
+sign-in, sync, saved passwords, autofill, profile selection, or GNOME login
+keyring access, so an unattended screen does not wait for authentication.
+
 ## Pair and assign monitors
 
 After reboot, every detected monitor opens a controller pairing page. Enter its
@@ -77,7 +81,9 @@ pgrep -af 'google-chrome|chromium'
 xrandr --query
 ```
 
-Chrome players and the controller restart after process crashes. Repeated
+Chrome player health follows the actual X11 window rather than Chrome's
+short-lived launcher process, preventing open/close loops. Missing windows and
+the controller still restart after real failures. Repeated
 errors stay in the logs and WordPress telemetry; they never trigger an
 automatic computer reboot.
 

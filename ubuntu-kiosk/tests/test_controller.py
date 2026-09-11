@@ -92,6 +92,7 @@ class AssignmentTests(unittest.TestCase):
             "dp-1": CONTROLLER.Player(working, "https://example.test/one", (0, 0, 1920, 1080)),
             "hdmi-1": CONTROLLER.Player(failed, "https://example.test/two", (1920, 0, 1920, 1080)),
         }
+        controller.window_ids = lambda: set()
         launched = []
 
         def launch(output, url):
@@ -105,6 +106,27 @@ class AssignmentTests(unittest.TestCase):
         )
         self.assertIs(working, controller.players["dp-1"].process)
         self.assertEqual([("hdmi-1", "https://example.test/two")], launched)
+
+    def test_chrome_launcher_exit_does_not_replace_a_live_window(self):
+        class ExitedLauncher:
+            def poll(self):
+                return 0
+
+            def terminate(self):
+                raise AssertionError("live Chrome window must not be terminated")
+
+        controller = CONTROLLER.Controller.__new__(CONTROLLER.Controller)
+        player = CONTROLLER.Player(
+            ExitedLauncher(),
+            "https://example.test/one",
+            (0, 0, 1920, 1080),
+            "0x100001",
+        )
+        controller.players = {"dp-1": player}
+        controller.window_ids = lambda: {"0x100001"}
+        controller.launch_player = lambda _output, _url: self.fail("live window was relaunched")
+        controller.sync_players(self.outputs, {"dp-1": "https://example.test/one"})
+        self.assertIs(player, controller.players["dp-1"])
 
 
 class ChromeCommandTests(unittest.TestCase):
@@ -120,6 +142,8 @@ class ChromeCommandTests(unittest.TestCase):
         self.assertIn("--window-position=1920,0", command)
         self.assertIn("--window-size=1080,1920", command)
         self.assertIn("--kiosk", command)
+        self.assertIn("--disable-sync", command)
+        self.assertIn("--password-store=basic", command)
         self.assertEqual("https://example.test/signage/play/two/", command[-1])
 
     def test_negative_desktop_coordinates_are_preserved(self):
@@ -149,10 +173,15 @@ class ValidationTests(unittest.TestCase):
     def test_graphical_session_autostart_does_not_guess_display(self):
         root = pathlib.Path(__file__).parents[1]
         launcher = (root / "ds-ubuntu-autostart.sh").read_text(encoding="utf-8")
+        installer = (root / "install-kiosk.sh").read_text(encoding="utf-8")
         desktop = (root / "autostart/bykutt-digital-signage.desktop").read_text(encoding="utf-8")
         self.assertNotIn("DISPLAY=:0", launcher)
         self.assertIn("Exec=/usr/local/bin/ds-ubuntu-autostart", desktop)
         self.assertIn("X-GNOME-Autostart-enabled=true", desktop)
+        self.assertIn("unclutter -idle 0.1 -root", launcher)
+        self.assertIn('"SigninAllowed": false', installer)
+        self.assertIn('"SyncDisabled": true', installer)
+        self.assertIn('"PasswordManagerEnabled": false', installer)
 
     def test_controller_has_a_nonblocking_single_instance_lock(self):
         source = MODULE_PATH.read_text(encoding="utf-8")

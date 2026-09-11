@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.2.1
+Stable tag: 3.2.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -45,6 +45,11 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 3.2.2 =
+* Fixed Chrome kiosk windows repeatedly opening and closing when the initial launcher process exits after handing off a live browser window.
+* Ubuntu controllers now track the actual X11 window for health and close/restart only windows that disappear or change assignment.
+* The kiosk cursor is hidden automatically and Chrome sign-in, sync, profiles, password prompts, autofill, and GNOME keyring access are disabled.
 
 = 3.2.1 =
 * Ubuntu kiosks now start Google Chrome automatically from the real GDM graphical session on every boot.

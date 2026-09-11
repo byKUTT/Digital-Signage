@@ -55,7 +55,7 @@ esac
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
-	python3 git ca-certificates curl x11-xserver-utils wmctrl xdotool dbus-x11 gdm3
+	python3 git ca-certificates curl x11-xserver-utils wmctrl xdotool unclutter dbus-x11 gdm3
 
 browser_bin=""
 for browser_candidate in google-chrome-stable google-chrome; do
@@ -162,11 +162,18 @@ mkdir -p /etc/opt/chrome/policies/managed /etc/chromium/policies/managed /etc/ch
 for policy_root in /etc/opt/chrome/policies/managed /etc/chromium/policies/managed /etc/chromium-browser/policies/managed; do
 	install -o root -g root -m 644 /dev/stdin "$policy_root/bykutt-digital-signage.json" <<'POLICY'
 {
+  "AutofillAddressEnabled": false,
+  "AutofillCreditCardEnabled": false,
   "BrowserSignin": 0,
+  "BrowserAddPersonEnabled": false,
+  "BrowserGuestModeEnabled": false,
   "DefaultBrowserSettingEnabled": false,
+  "ForceBrowserSignin": false,
   "MetricsReportingEnabled": false,
   "PasswordManagerEnabled": false,
   "PromotionalTabsEnabled": false,
+  "SigninAllowed": false,
+  "SyncDisabled": true,
   "TranslateEnabled": false
 }
 POLICY
@@ -211,7 +218,7 @@ if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
 fi
 
 echo
-echo "Digital Signage Ubuntu controller 3.2.1 with Chrome boot autostart is installed."
+echo "Digital Signage Ubuntu controller 3.2.2 with stable Chrome boot autostart is installed."
 echo "No automatic reboot timer or reboot watchdog was installed."
 echo "Reboot once to activate Xorg autologin: sudo reboot"
 echo "Future updates: sudo digital-signage-update"

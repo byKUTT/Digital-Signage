@@ -20,6 +20,11 @@
   connected output. Chrome receives each XRandR output's exact position and
   dimensions on its command line, with `wmctrl` enforcing fullscreen placement
   after the native window appears.
+- Player health is tied to the actual X11 window ID, not the initial Chrome
+  launcher PID because Chrome may hand the window to another process. The
+  session hides the cursor with `unclutter`; managed browser policy and the
+  `basic` password-store flag disable sign-in, sync, autofill, password saving,
+  and GNOME keyring prompts for the unattended kiosk account.
 - Persisted settings and identity never live inside the managed Git checkout.
   `sudo digital-signage-update` verifies the configured origin, refuses dirty
   or divergent state, fast-forwards the configured branch, and reapplies the
