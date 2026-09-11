@@ -38,6 +38,26 @@ Once a screen is paired in wp-admin, point the display's browser at its
 player URL (`/signage/play/{token}/`) in kiosk/full-screen mode. Two
 ready-made installers are included for the common cases:
 
+### Ubuntu PC with one or more monitors
+
+Use `ubuntu-kiosk/` to run the installed Firefox inside an unattended Xorg
+session. Every connected monitor becomes a separately assignable WordPress
+Screen. Install and update with:
+
+```bash
+git clone https://github.com/byKUTT/Digital-Signage.git
+cd Digital-Signage/ubuntu-kiosk
+sudo bash install-kiosk.sh "https://yourdomain.com" "$(whoami)"
+sudo reboot
+
+# Later, from any directory; identity and settings stay unchanged:
+sudo digital-signage-update
+```
+
+It restarts failed processes but never reboots the Ubuntu computer
+automatically. See `ubuntu-kiosk/README.md` for black-screen recovery,
+multi-monitor assignment, diagnostics, and uninstall instructions.
+
 ### VIDAA 9 TV without external hardware
 
 Open `https://your-site.example/signage/tv/` in the VIDAA browser. The stable

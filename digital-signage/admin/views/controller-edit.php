@@ -14,6 +14,8 @@ $telemetry_labels = array(
 	'gpu' => __( 'Graphics', 'digital-signage' ), 'browser' => __( 'Browser', 'digital-signage' ), 'architecture' => __( 'Architecture', 'digital-signage' ), 'kernel' => __( 'Kernel', 'digital-signage' ),
 	'network' => __( 'Network', 'digital-signage' ), 'browser_running' => __( 'Players running', 'digital-signage' ), 'rtc_wake_supported' => __( 'RTC wake supported', 'digital-signage' ),
 	'suspend_supported' => __( 'Suspend supported', 'digital-signage' ), 'os_update_supported' => __( 'OS updates supported', 'digital-signage' ),
+	'connected_outputs' => __( 'Connected outputs', 'digital-signage' ), 'player_processes' => __( 'Firefox player processes', 'digital-signage' ),
+	'automatic_reboot_enabled' => __( 'Automatic computer reboot', 'digital-signage' ),
 );
 ?>
 <div class="ds-app-wrap">

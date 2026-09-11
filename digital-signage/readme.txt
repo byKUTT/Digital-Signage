@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.1.0
+Stable tag: 3.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -45,6 +45,13 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 3.2.0 =
+* Added an Ubuntu Desktop controller using the installed Firefox instead of unavailable firefox-esr packages.
+* Added independent per-channel playback for every connected XRandR monitor with stable connector assignments.
+* Added a one-command, fast-forward Git updater that preserves controller identity and settings.
+* Added safe migration away from the Raspberry Pi tty1 service that caused a black screen on Ubuntu.
+* Firefox and controller processes recover automatically without any scheduled or watchdog computer reboot.
 
 = 3.1.0 =
 * Fixed public GitHub Release updates by validating complete release assets and falling back to the published SHA256SUMS manifest when GitHub does not expose asset digests.

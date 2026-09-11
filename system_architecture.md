@@ -1,5 +1,32 @@
 # Digital Signage architecture notes
 
+## Ubuntu multi-display controller
+
+- Ubuntu Desktop uses `ubuntu-kiosk/`; the Raspberry Pi installer remains
+  exclusive to Raspberry Pi OS. The Ubuntu installer migrates away from the
+  Pi service by disabling `ds-kiosk.service`, unmasking `getty@tty1`, restoring
+  `graphical.target`, and using the normal GDM Xorg session. It never starts a
+  competing root-owned X server on `tty1`.
+- One Ubuntu PC owns one authenticated controller identity stored outside Git
+  under `/etc/digital-signage-ubuntu/`. Each connected XRandR connector is a
+  stable output key and maps to one `ds_controller_displays` row/WordPress
+  Screen. A disconnected output is marked offline but its Screen assignment is
+  retained for reconnection to the same port.
+- The controller launches one isolated Firefox profile/process per connected
+  output. Firefox runs as the kiosk user with that user's X authority, runtime
+  directory, and D-Bus session; `wmctrl` places and fullscreens each process at
+  the XRandR geometry. Ubuntu Snap Firefox profiles live inside
+  `~/snap/firefox/common/` to satisfy confinement.
+- Persisted settings and identity never live inside the managed Git checkout.
+  `sudo digital-signage-update` verifies the configured origin, refuses dirty
+  or divergent state, fast-forwards the configured branch, and reapplies the
+  installer in upgrade mode. Site, user, identity, output assignments, and
+  browser profiles remain unchanged.
+- Process recovery is intentionally separate from machine power. Firefox and
+  the controller service restart on failure, but there is no daily timer,
+  watchdog escalation, `StartLimitAction`, or any other automatic computer
+  reboot. A manually queued authenticated reboot command remains available.
+
 ## VIDAA/private smart-TV bootstrap
 
 - `/signage/tv/` is a stable browser entry point; it creates a pairing identity through `/ds/v1/pair/request`, stores the opaque token in localStorage (with a URL-fragment fallback), and checks `/ds/v1/pair/status/{token}` until paired.

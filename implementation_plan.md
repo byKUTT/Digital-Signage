@@ -1,3 +1,95 @@
+# Ubuntu multi-display controller — implementation plan
+
+## Confirmed behavior
+
+- Support Ubuntu Desktop 24.04 LTS and newer Ubuntu Desktop releases using the installed Firefox package (including Ubuntu's Snap build); do not depend on `firefox-esr`.
+- Treat one Ubuntu PC as one controller. Every connected XRandR output becomes a separate WordPress screen with its own pairing/player URL, channel assignment, orientation, resolution, heartbeat state, and browser process.
+- Use an unattended Xorg desktop login for the selected kiosk user. Never take ownership of `tty1` with a root `startx` process; detect and safely disable the incompatible Raspberry Pi kiosk service during migration.
+- Restart failed Firefox players and the controller service without ever rebooting the Ubuntu computer automatically.
+- Install `sudo digital-signage-update` as the easy update command. It performs a fast-forward-only update from the configured Git branch and reapplies binaries/units without changing the site URL, controller identity/token, kiosk user, monitor assignments, Firefox profiles, reboot schedule, or other persisted settings.
+
+## Files
+
+### [NEW] `ubuntu-kiosk/install-kiosk.sh`
+
+- Validate Ubuntu, the site URL, kiosk user, Firefox, Xorg/GDM, Git source, and required packages before changing startup configuration.
+- Support first install and idempotent `--upgrade` mode; persist configuration separately under `/etc/digital-signage-ubuntu/` with restrictive permissions.
+- Configure GDM autologin for the selected user and Xorg rather than launching a competing root-owned X server.
+- Back up each system file before its first managed change, disable/unmask the legacy `ds-kiosk.service`/`getty@tty1` combination when present, and return the machine to `graphical.target`.
+- Install the controller, systemd services/timers, update command, and per-user Firefox profile directories; preserve all persisted values during upgrades.
+
+### [NEW] `ubuntu-kiosk/ds-ubuntu-controller.py`
+
+- Register/authenticate through the existing `/ds/v1/controller/*` API and retain one stable controller identity.
+- Discover connected outputs and geometry through XRandR, use stable connector-based output keys, report hot-plug changes, and reconcile assignments returned by WordPress.
+- Launch one isolated Firefox instance/profile per output, position and fullscreen it on that output, and show the controller pairing URL until WordPress returns an assigned player URL.
+- Restart only failed/stale player processes and preserve working outputs during monitor changes; controller failures are handled by ordinary rate-limited service restarts, never by a system reboot.
+- Report Ubuntu/Firefox/hardware/network telemetry and implement existing controller commands: restart players, refresh displays, reboot, Git software update, Ubuntu system update, and power test/acknowledgement.
+- Avoid shell interpolation of remote payloads; validate URLs, display keys, command types, versions, and subprocess arguments.
+
+### [NEW] `ubuntu-kiosk/ds-ubuntu-session-wait.sh`
+
+- Wait for the selected user's Xorg display and authority file, expose only the required environment, and start the controller after the graphical login is actually ready.
+
+### [NEW] `ubuntu-kiosk/update-kiosk.sh`
+
+- Implement the installed `digital-signage-update` command using `git fetch` plus fast-forward-only checkout of the configured repository/branch.
+- Refuse dirty, divergent, or unexpected-remote states; log the reason without replacing the working installation.
+- Re-run the Ubuntu installer in `--upgrade` mode and restart only the controller service after a successful verified update.
+
+### [NEW] `ubuntu-kiosk/uninstall-kiosk.sh`
+
+- Disable Ubuntu controller/reboot units and remove installed program files.
+- Restore backed-up GDM/default-target settings and leave the persistent identity/config available by default, with an explicit purge option.
+
+### [NEW] `ubuntu-kiosk/systemd/*`
+
+- Add the graphical-session controller service with ordinary bounded restart behavior and no reboot escalation.
+- Add a root-owned update helper service for authenticated WordPress `software_update` commands without granting the Firefox/controller process unrestricted sudo.
+- Apply sensible service hardening while retaining the narrowly required display, network, update, and reboot capabilities.
+
+### [NEW] `ubuntu-kiosk/tests/*`
+
+- Cover XRandR parsing, stable multi-display reconciliation, assignment-to-window mapping, persisted-config preservation, command validation, recovery thresholds, and update refusal cases without modifying the host system.
+
+### [NEW] `ubuntu-kiosk/README.md`
+
+- Document recovery from the current black-screen Pi installation, fresh Git installation, pairing, independent channel assignment for each monitor, process recovery, logs, uninstall, and the single update command.
+- State Xorg/Firefox requirements and explain that monitor connector names remain the stable assignment key across reboots.
+
+### [MODIFY] `digital-signage/includes/class-ds-controllers.php`
+
+- Preserve the existing controller/display model and harden Ubuntu telemetry/command handling where needed for controller-driven Git updates and multiple simultaneous outputs.
+- Keep assignments attached to stable output keys when a display is temporarily disconnected.
+
+### [MODIFY] `digital-signage/admin/views/controller-edit.php`
+
+- Surface Ubuntu controller/update version, connected outputs, process health, and per-output screen/channel assignment without exposing controller secrets.
+
+### [MODIFY] `digital-signage/digital-signage.php`, `digital-signage/readme.txt`
+
+- Bump and synchronize the WordPress/device release to `3.2.0`; document Ubuntu multi-display, preserved Git updates, and process-level recovery without automatic computer reboots.
+
+### [MODIFY] `README.md`, `system_architecture.md`, `task.md`
+
+- Make the Ubuntu installer the documented path for Ubuntu PCs and keep the Raspberry Pi installer scoped to Raspberry Pi OS.
+- Record the controller/output identity boundary, Xorg session ownership, update transaction, and no-auto-reboot boundary; track execution and verification.
+
+### [NEW/REBUILD] `ubuntu-kiosk.zip`, `digital-signage.zip`
+
+- Package and byte-verify the Ubuntu controller and versioned WordPress plugin while leaving the Raspberry Pi and Windows packages unchanged.
+
+## Verification and publication
+
+- Run `bash -n` and ShellCheck where available on every Ubuntu shell file.
+- Run Python compilation plus the isolated Ubuntu controller test suite.
+- Run PHP syntax checks and targeted security/static checks on modified plugin files.
+- Verify a simulated one-, two-, and three-monitor lifecycle, hot-unplug/reconnect, independent assignments, browser crash recovery, absence of reboot actions, and settings-preserving Git upgrade.
+- Verify migration disables the incompatible Pi `tty1` service and restores a graphical Ubuntu boot without modifying Pi/Windows source or archives.
+- Rebuild and compare both ZIPs to their source trees, update version metadata, commit, and push fast-forward-only to `claude/wordpress-digital-signage-plugin-mbfbdt` in `byKUTT/Digital-Signage`.
+
+---
+
 # VIDAA 9 private TV player — implementation plan
 
 ## Confirmed approach
