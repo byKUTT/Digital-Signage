@@ -198,7 +198,8 @@ rm -f /etc/systemd/system/digital-signage-ubuntu.service /usr/local/bin/ds-ubunt
 
 sudoers_file="/etc/sudoers.d/digital-signage-ubuntu"
 install -o root -g root -m 440 /dev/stdin "$sudoers_file" <<EOF
-$kiosk_user ALL=(root) NOPASSWD: /usr/local/sbin/digital-signage-root-command reboot, /usr/local/sbin/digital-signage-root-command software-update, /usr/local/sbin/digital-signage-root-command system-update, /usr/local/sbin/digital-signage-root-command check
+Defaults:$kiosk_user !requiretty
+$kiosk_user ALL=(root) NOPASSWD: /usr/local/sbin/digital-signage-root-command
 EOF
 visudo -cf "$sudoers_file" >/dev/null
 
@@ -224,7 +225,9 @@ fi
 systemctl unmask getty@tty1.service >/dev/null 2>&1 || true
 systemctl set-default graphical.target
 systemctl daemon-reload
-runuser -u "$kiosk_user" -- sudo -n /usr/local/sbin/digital-signage-root-command check >/dev/null
+for allowed_action in check software-update system-update reboot; do
+	runuser -u "$kiosk_user" -- sudo -n -l /usr/local/sbin/digital-signage-root-command "$allowed_action" >/dev/null
+done
 
 if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
 	pid_file="$profile_root/controller.pid"
@@ -238,7 +241,7 @@ if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
 fi
 
 echo
-echo "Digital Signage Ubuntu controller 3.3.0 is installed."
+echo "Digital Signage Ubuntu controller 3.4.0 is installed."
 echo "No automatic reboot timer or reboot watchdog was installed."
 echo "Reboot once to activate Xorg autologin: sudo reboot"
 echo "Future updates: sudo digital-signage-update"

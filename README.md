@@ -63,6 +63,9 @@ hibernation are disabled, but the Ubuntu computer is never rebooted
 automatically. See `ubuntu-kiosk/README.md` for recovery, assignment,
 diagnostics, and uninstall instructions.
 
+Version 3.4.0 also lets Ubuntu controllers queue their configured Git update
+directly from WordPress without requiring a separate GitHub Release asset.
+
 ### VIDAA 9 TV without external hardware
 
 Open `https://your-site.example/signage/tv/` in the VIDAA browser. The stable

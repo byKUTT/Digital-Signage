@@ -47,7 +47,8 @@ blanking, automatic suspend, and hibernation. It installs no daily reboot timer
 or automatic reboot watchdog. Chrome starts automatically after every boot and
 is launched once for every detected monitor.
 
-The cursor is hidden in kiosk mode and restored in desktop mode. Chrome runs without
+The cursor is hidden in kiosk mode with both an invisible X cursor and an
+immediate cursor-hider fallback, then restored in desktop mode. Chrome runs without
 sign-in, sync, saved passwords, autofill, profile selection, or GNOME login
 keyring access, so an unattended screen does not wait for authentication.
 
@@ -74,6 +75,10 @@ identity/token, monitor assignments, Chrome profiles, and other settings. The
 same update can be queued from the Controller page in WordPress. It runs in a
 non-blocking system service, so controller heartbeats continue and the latest
 update status/result appears in telemetry.
+
+The installer creates and validates passwordless sudo access only for
+`/usr/local/sbin/digital-signage-root-command`. That helper has a fixed action
+allowlist, so the unattended account cannot use it to run arbitrary root commands.
 
 ## Kiosk and desktop mode
 

@@ -116,8 +116,9 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 	</div>
 
 	<?php if ( $id && count( $screen_ids ) > 1 ) : ?>
-		<div class="ds-panel">
-			<h3><?php esc_html_e( 'Clone as separate schedules', 'digital-signage' ); ?></h3>
+		<details class="ds-disclosure">
+			<summary><?php esc_html_e( 'Clone as separate schedules', 'digital-signage' ); ?></summary>
+			<div class="ds-disclosure-body">
 			<p class="ds-hint"><?php esc_html_e( 'Split this schedule into one independent copy per screen, so each can be edited on its own later.', 'digital-signage' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="ds_clone_schedule" />
@@ -128,6 +129,7 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 				<?php endforeach; ?>
 				<button type="submit" class="ds-btn"><?php esc_html_e( 'Clone to Separate Schedules', 'digital-signage' ); ?></button>
 			</form>
-		</div>
+			</div>
+		</details>
 	<?php endif; ?>
 </div>

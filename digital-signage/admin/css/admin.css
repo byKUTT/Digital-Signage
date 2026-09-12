@@ -333,6 +333,21 @@
 .ds-controller-summary { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-bottom: 20px; }
 .ds-controller-summary > * { margin: 0; }
 .ds-controller-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ds-controller-primary-actions { border-color: #c3d9ec; background: #f7fbff; }
+.ds-disclosure { margin: 0 0 14px; border: 1px solid #dcdcde; border-radius: 8px; background: #fff; }
+.ds-disclosure > summary { padding: 14px 16px; cursor: pointer; font-weight: 600; color: #1d2327; }
+.ds-disclosure > summary:hover { background: #f6f7f7; }
+.ds-disclosure > summary:focus-visible { outline: 2px solid #2271b1; outline-offset: 2px; }
+.ds-disclosure[open] > summary { border-bottom: 1px solid #dcdcde; }
+.ds-disclosure-body { padding: 16px; }
+.ds-disclosure-body > :first-child { margin-top: 0; }
+.ds-disclosure-in-form { margin-top: 14px; }
+.ds-disclosure-in-form + .ds-btn { margin-top: 4px; }
+.ds-overview-line { margin: 0 0 20px; color: #50575e; font-size: 14px; }
+@media (max-width: 782px) {
+	.ds-controller-actions .ds-btn { flex: 1 1 100%; justify-content: center; }
+	.ds-disclosure-body { padding: 14px; }
+}
 .ds-weekday-grid { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 10px 0; }
 .ds-weekday-grid label { font-weight: 500; }
 .ds-version-pair { display: grid; grid-template-columns: repeat(2,minmax(140px,1fr)); gap: 12px; margin: 16px 0; }

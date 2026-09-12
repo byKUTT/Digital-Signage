@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.3.0
+Stable tag: 3.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -45,6 +45,13 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 3.4.0 =
+* Fixed Ubuntu controller updates from WordPress by queuing the configured Git updater without requiring an unrelated GitHub Release asset.
+* Ubuntu installation now verifies narrow passwordless sudo access for the signage helper automatically.
+* Cursor hiding now combines an invisible X cursor with immediate unclutter enforcement and reports its state in telemetry.
+* Simplified controller, screen, channel, and schedule pages by prioritizing everyday actions and moving technical controls into accessible advanced sections.
+* Controller command failures now explain the actual recoverable problem instead of showing a generic queue error.
 
 = 3.3.0 =
 * Ubuntu launches Chrome once per assigned output at boot without window detection or automatic browser-health relaunch loops.

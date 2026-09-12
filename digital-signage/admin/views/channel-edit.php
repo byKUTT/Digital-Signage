@@ -88,6 +88,9 @@ $transition_options = array(
 				<input type="text" id="title" name="title" class="ds-input ds-input-large" value="<?php echo $id ? esc_attr( $channel->post_title ) : ''; ?>" placeholder="<?php esc_attr_e( 'e.g. Lobby Menu', 'digital-signage' ); ?>" required />
 			</div>
 
+			<details class="ds-disclosure ds-disclosure-in-form">
+				<summary><?php esc_html_e( 'Layout and playback settings', 'digital-signage' ); ?></summary>
+				<div class="ds-disclosure-body">
 			<div class="ds-field">
 				<label><?php esc_html_e( 'Zone layout', 'digital-signage' ); ?></label>
 				<div class="ds-layout-picker">
@@ -194,6 +197,8 @@ $transition_options = array(
 					<input type="number" min="5" id="scroll_speed" name="scroll_speed" value="<?php echo esc_attr( $scroll_speed ); ?>" class="ds-input ds-input-small" />
 				</div>
 			</div>
+				</div>
+			</details>
 
 			<button type="submit" class="ds-btn ds-btn-primary"><?php echo $id ? esc_html__( 'Save Changes', 'digital-signage' ) : esc_html__( 'Create Channel', 'digital-signage' ); ?></button>
 		</form>

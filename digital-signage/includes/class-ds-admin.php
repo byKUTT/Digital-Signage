@@ -631,10 +631,14 @@ class DS_Admin {
 		}
 		$payload = array();
 		if ( 'software_update' === $type ) {
-			$asset = DS_Updater::instance()->get_device_asset( $controller->platform, true );
-			if ( is_wp_error( $asset ) ) {
-				wp_safe_redirect( admin_url( 'admin.php?page=ds-controller-edit&id=' . $id . '&ds_error=update_asset' ) );
-				exit;
+			if ( 'linux' === $controller->platform ) {
+				$asset = array( 'version' => DS_DEVICE_VERSION, 'source' => 'configured_git_remote' );
+			} else {
+				$asset = DS_Updater::instance()->get_device_asset( $controller->platform, true );
+				if ( is_wp_error( $asset ) ) {
+					wp_safe_redirect( admin_url( 'admin.php?page=ds-controller-edit&id=' . $id . '&ds_error=update_asset' ) );
+					exit;
+				}
 			}
 			if ( preg_match( '/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/', (string) $controller->software_version ) && version_compare( $controller->software_version, $asset['version'], '>' ) ) {
 				wp_safe_redirect( admin_url( 'admin.php?page=ds-controller-edit&id=' . $id . '&ds_error=update_newer' ) );
@@ -647,7 +651,7 @@ class DS_Admin {
 			$payload = $asset;
 		}
 		$result = DS_Controllers::queue_command( $id, $type, $payload );
-		$query  = is_wp_error( $result ) ? '&ds_error=command' : '&ds_command_queued=1';
+		$query  = is_wp_error( $result ) ? '&ds_error=' . rawurlencode( $result->get_error_code() ) : '&ds_command_queued=1';
 		wp_safe_redirect( admin_url( 'admin.php?page=ds-controller-edit&id=' . $id . $query ) );
 		exit;
 	}
@@ -701,34 +705,39 @@ class DS_Admin {
 		$result     = array( 'queued' => 0, 'skipped' => 0, 'errors' => array() );
 		$controllers = DS_Controllers::get_all();
 
-		if ( is_wp_error( $release ) ) {
-			$result['errors'][] = $release->get_error_message();
+		if ( 'selected' === $mode && empty( $selected ) ) {
+			$result['errors'][] = __( 'Select at least one controller to update.', 'digital-signage' );
 		} else {
-			if ( 'selected' === $mode && empty( $selected ) ) {
-				$result['errors'][] = __( 'Select at least one controller to update.', 'digital-signage' );
-			}
 			foreach ( $controllers as $controller ) {
 				$id      = (int) $controller->id;
 				$current = (string) $controller->software_version;
 				if ( 'all_outdated' !== $mode && ! in_array( $id, $selected, true ) ) {
 					continue;
 				}
+				if ( 'linux' === $controller->platform ) {
+					$asset = array( 'version' => DS_DEVICE_VERSION, 'source' => 'configured_git_remote' );
+				} else {
+					if ( is_wp_error( $release ) ) {
+						$result['errors'][] = sprintf( '%s: %s', $controller->name ?: $controller->hostname, $release->get_error_message() );
+						continue;
+					}
+					$asset = DS_Updater::instance()->get_device_asset( $controller->platform );
+					if ( is_wp_error( $asset ) ) {
+						$result['errors'][] = sprintf( '%s: %s', $controller->name ?: $controller->hostname, $asset->get_error_message() );
+						continue;
+					}
+				}
 				$current_is_valid = (bool) preg_match( '/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/', $current );
-				if ( 'all_outdated' === $mode && $current_is_valid && ! version_compare( $current, $release['version'], '<' ) ) {
+				if ( 'all_outdated' === $mode && $current_is_valid && ! version_compare( $current, $asset['version'], '<' ) ) {
 					$result['skipped']++;
 					continue;
 				}
-				if ( $current_is_valid && version_compare( $current, $release['version'], '>' ) ) {
+				if ( $current_is_valid && version_compare( $current, $asset['version'], '>' ) ) {
 					$result['skipped']++;
 					continue;
 				}
-				if ( DS_Controllers::has_active_software_update( $id, $release['version'] ) ) {
+				if ( DS_Controllers::has_active_software_update( $id, $asset['version'] ) ) {
 					$result['skipped']++;
-					continue;
-				}
-				$asset = DS_Updater::instance()->get_device_asset( $controller->platform );
-				if ( is_wp_error( $asset ) ) {
-					$result['errors'][] = sprintf( '%s: %s', $controller->name ?: $controller->hostname, $asset->get_error_message() );
 					continue;
 				}
 				$command_id = DS_Controllers::queue_command( $id, 'software_update', $asset );

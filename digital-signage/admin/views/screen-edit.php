@@ -100,6 +100,9 @@ $parent_controller = $parent_controller_id ? DS_Controllers::get( $parent_contro
 					<span class="ds-hint"><?php esc_html_e( 'Rotates the player content on any TV or browser. Changes appear on a running screen automatically.', 'digital-signage' ); ?></span>
 				</div>
 
+				<details class="ds-disclosure ds-disclosure-in-form">
+					<summary><?php esc_html_e( 'Advanced screen settings', 'digital-signage' ); ?></summary>
+					<div class="ds-disclosure-body">
 				<div class="ds-field">
 					<label><input type="checkbox" name="short_url_enabled" value="1" <?php checked( $short_url_enabled ); ?> /> <?php esc_html_e( 'Enable short player URL', 'digital-signage' ); ?></label>
 					<span class="ds-hint"><?php esc_html_e( 'Creates a stable six-character address that is easier to type on a TV. It is also easier to guess than the private long URL.', 'digital-signage' ); ?></span>
@@ -114,6 +117,8 @@ $parent_controller = $parent_controller_id ? DS_Controllers::get( $parent_contro
 						<?php endforeach; ?>
 					</select>
 				</div>
+					</div>
+				</details>
 
 				<button type="submit" class="ds-btn ds-btn-primary"><?php echo $id ? esc_html__( 'Save Changes', 'digital-signage' ) : esc_html__( 'Create Screen', 'digital-signage' ); ?></button>
 			</form>
@@ -161,7 +166,9 @@ $parent_controller = $parent_controller_id ? DS_Controllers::get( $parent_contro
 	</div>
 
 	<?php if ( $id && $device ) : ?>
-		<div class="ds-panel">
+		<details class="ds-disclosure">
+			<summary><?php esc_html_e( 'Raspberry Pi device settings', 'digital-signage' ); ?></summary>
+			<div class="ds-disclosure-body">
 			<div class="ds-panel-header">
 				<h2><?php esc_html_e( 'Device', 'digital-signage' ); ?></h2>
 				<span class="ds-badge ds-badge-online"><?php esc_html_e( 'Agent connected', 'digital-signage' ); ?></span>
@@ -259,6 +266,7 @@ $parent_controller = $parent_controller_id ? DS_Controllers::get( $parent_contro
 				<p class="ds-hint"><?php esc_html_e( 'The device agent’s own log — commands it applied, WiFi/rotation/resolution changes, errors. Newest first.', 'digital-signage' ); ?></p>
 				<pre class="ds-device-log"><?php echo esc_html( implode( "\n", array_reverse( $device['recent_log'] ) ) ); ?></pre>
 			<?php endif; ?>
-		</div>
+			</div>
+		</details>
 	<?php endif; ?>
 </div>

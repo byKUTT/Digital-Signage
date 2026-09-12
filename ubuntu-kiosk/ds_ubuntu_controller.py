@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "3.3.0"
+VERSION = "3.4.0"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
 HEARTBEAT_SECONDS = 10
@@ -217,6 +217,8 @@ class Controller:
         self.screens_paused = bool(self.state.get("screens_paused", False))
         self.players: dict[str, Player] = {}
         self.cursor_process: subprocess.Popen[Any] | None = None
+        self.cursor_hidden = False
+        self.cursor_error = ""
         self.recent_log: list[str] = []
         self.last_error = ""
         self.force_refresh = True
@@ -318,6 +320,8 @@ class Controller:
             "uptime_seconds": self.uptime_seconds(),
             "browser_running": bool(self.players),
             "screens_paused": self.screens_paused,
+            "cursor_hidden": self.cursor_hidden,
+            "cursor_error": self.cursor_error,
             "update_status": str(update_status.get("status", ""))[:100],
             "update_result": str(update_status.get("message", ""))[:300],
             "connected_outputs": self.connected_output_count,
@@ -335,16 +339,43 @@ class Controller:
         save_private_json(self.state_path, self.state)
 
     def set_cursor_hidden(self, hidden: bool) -> None:
-        if hidden and (self.cursor_process is None or self.cursor_process.poll() is not None):
-            self.cursor_process = subprocess.Popen(
-                ["unclutter", "-idle", "0.1", "-root"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.STDOUT,
-            )
-        elif not hidden and self.cursor_process is not None:
+        self.cursor_error = ""
+        if not hidden and self.cursor_process is not None:
             if self.cursor_process.poll() is None:
                 self.cursor_process.terminate()
             self.cursor_process = None
+        try:
+            if hidden:
+                cursor_dir = self.profile_root / "cursor"
+                cursor_dir.mkdir(parents=True, exist_ok=True)
+                bitmap = cursor_dir / "blank.xbm"
+                bitmap.write_text(
+                    "#define blank_width 1\n#define blank_height 1\n"
+                    "static unsigned char blank_bits[] = { 0x00 };\n",
+                    encoding="ascii",
+                )
+                subprocess.run(
+                    ["xsetroot", "-cursor", str(bitmap), str(bitmap)],
+                    check=True,
+                    timeout=10,
+                )
+                if self.cursor_process is None or self.cursor_process.poll() is not None:
+                    self.cursor_process = subprocess.Popen(
+                        ["unclutter", "-idle", "0", "-jitter", "1", "-root"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.STDOUT,
+                    )
+            else:
+                subprocess.run(
+                    ["xsetroot", "-cursor_name", "left_ptr"],
+                    check=False,
+                    timeout=10,
+                )
+            self.cursor_hidden = hidden
+        except (OSError, subprocess.SubprocessError) as error:
+            self.cursor_hidden = False
+            self.cursor_error = str(error)[:300]
+            self.log(f"Cursor control warning: {self.cursor_error}")
 
     @staticmethod
     def uptime_seconds() -> int:

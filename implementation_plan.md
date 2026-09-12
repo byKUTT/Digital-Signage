@@ -627,3 +627,39 @@ If a zone contains a non-image slide, it will not be hidden: that zone will use 
 - Confirm existing channels use their old spacing value as both new spacing fallbacks.
 - Player tests at portrait and landscape dimensions, including resize/orientation changes, one-image and multi-image carousels, no visible blank loop gap, and no duplicate animation timers.
 - Rebuild and inspect `digital-signage.zip`, then verify Git status contains only intended changes before committing and pushing the requested branch.
+# WordPress workflow simplification and Ubuntu reliability 3.4.0
+
+## Goal
+
+Make routine signage operation obvious: create content, assign it to screens, and control the Ubuntu kiosk without technical friction. Fix remote Git updates before they reach the device, reliably hide the pointer in kiosk mode, and preserve narrowly scoped unattended root access.
+
+## Device changes
+
+- **Modify `ubuntu-kiosk/ds_ubuntu_controller.py`:** replace the single legacy `unclutter` invocation with a compatible cursor-hider launcher that supports Ubuntu's available `unclutter` implementation, starts hidden immediately, reports cursor state/errors in telemetry, and restores the cursor in desktop mode.
+- **Modify `ubuntu-kiosk/install-kiosk.sh`:** install the cursor-hiding dependency explicitly, write and validate an idempotent sudoers policy for the configured kiosk user, and verify every permitted helper action with non-interactive `sudo -n` during install/upgrade.
+- **Modify `ubuntu-kiosk/digital-signage-root-command`:** keep a fixed action allowlist and expose a safe diagnostic action; never grant an unrestricted shell or arbitrary command execution.
+- **Modify Ubuntu tests/docs:** cover cursor command selection, immediate hiding, narrow passwordless access, install/upgrade idempotency, and troubleshooting.
+
+## WordPress command fix
+
+- **Modify `digital-signage/includes/class-ds-admin.php`:** queue Ubuntu Git software updates without requiring a GitHub Release asset, since the controller updater pulls its already-pinned repository/branch and ignores release payload URLs. Preserve release-asset verification for platforms that actually consume release files.
+- **Modify `digital-signage/includes/class-ds-controllers.php`:** make queue insertion failures explicit and return the actual localized database/error reason instead of a generic redirect.
+- **Modify `digital-signage/admin/views/controller-edit.php`:** show precise recoverable notices for command failures and display current update progress/result.
+- **Add regression coverage/static checks** for Ubuntu update queuing without release discovery, allowlists, nonces, capability checks, and escaped notices.
+
+## WordPress interface distillation
+
+- **Dashboard:** replace the instructional/metric-heavy opening with clear next actions and concise current-status lists.
+- **Controllers:** make kiosk state and the primary Start/Close action prominent; keep Restart and Update secondary; move display geometry, telemetry, command history, logs, OS update, and reboot into labelled advanced disclosure sections.
+- **Screens:** keep name, assigned channel, orientation, and preview/player access in the main flow; move device networking, resolution, raw status, and destructive actions into advanced sections.
+- **Channels:** prioritize title, playlist, Add Slide, ordering, and assigned screens; collapse layout/transition and secondary playback settings under Advanced settings.
+- **Schedules:** keep target screens and active time rules visible; move cloning and exceptional controls behind secondary disclosure.
+- **List pages:** reduce columns to identity, assignment/status, and one clear action; preserve bulk tools in a compact secondary row.
+- **Modify `digital-signage/admin/css/admin.css`:** add accessible native disclosure styling, clearer status/action hierarchy, responsive action groups, focus states, and compact tables without replacing the existing WordPress-native visual language.
+- **Modify relevant admin views only:** preserve every feature and backend handler; simplification uses hierarchy and progressive disclosure rather than deleting capabilities.
+
+## Release and verification
+
+- Synchronize WordPress, device, installer, readme, and changelog versions at **3.4.0**.
+- Run Python unit tests, Python compilation, shell syntax, PHP lint when available, static WordPress security checks, diff checks, and archive/source parity checks.
+- Rebuild `digital-signage.zip` and `ubuntu-kiosk.zip`, commit, and publish a fast-forward update to the existing public branch.

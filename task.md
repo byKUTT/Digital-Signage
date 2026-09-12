@@ -51,3 +51,12 @@
 - [x] Repair WordPress-triggered updates with an independent root update job and result reporting.
 - [x] Update WordPress UI, command allowlists, telemetry, versions, documentation, and tests.
 - [x] Rebuild and byte-verify both ZIPs, commit, and publish 3.3.0.
+# WordPress workflow simplification and Ubuntu reliability 3.4.0
+
+- [x] Fix Ubuntu Git update queuing so it does not depend on GitHub Release assets.
+- [x] Return specific controller-command errors instead of the generic queue failure.
+- [x] Add verified, narrow, passwordless device-helper access during install and upgrade.
+- [x] Make cursor hiding immediate and compatible while restoring it in desktop mode.
+- [x] Distill dashboard, controller, screen, channel, and schedule interfaces with progressive disclosure.
+- [x] Synchronize version 3.4.0, documentation, architecture notes, and regression tests.
+- [x] Rebuild and verify both ZIPs, commit, publish, and verify the public branch.

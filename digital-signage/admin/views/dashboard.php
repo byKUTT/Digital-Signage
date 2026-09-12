@@ -60,13 +60,7 @@ foreach ( $screens as $s ) {
 		</div>
 	<?php endif; ?>
 
-	<div class="ds-card-grid ds-stat-grid">
-		<div class="ds-stat-card"><span class="ds-stat-num"><?php echo esc_html( $channel_count ); ?></span><span class="ds-stat-label"><?php esc_html_e( 'Channels', 'digital-signage' ); ?></span></div>
-		<div class="ds-stat-card"><span class="ds-stat-num"><?php echo count( $screens ); ?></span><span class="ds-stat-label"><?php esc_html_e( 'Screens', 'digital-signage' ); ?></span></div>
-		<div class="ds-stat-card"><span class="ds-stat-num"><?php echo esc_html( count( $controllers ) ); ?></span><span class="ds-stat-label"><?php esc_html_e( 'Controllers', 'digital-signage' ); ?></span></div>
-		<div class="ds-stat-card"><span class="ds-stat-num ds-text-online"><?php echo esc_html( $online ); ?></span><span class="ds-stat-label"><?php esc_html_e( 'Online', 'digital-signage' ); ?></span></div>
-		<div class="ds-stat-card"><span class="ds-stat-num ds-text-offline"><?php echo esc_html( count( $screens ) - $online ); ?></span><span class="ds-stat-label"><?php esc_html_e( 'Offline / Unknown', 'digital-signage' ); ?></span></div>
-	</div>
+	<p class="ds-overview-line"><?php echo esc_html( sprintf( __( '%1$d screens online · %2$d screens total · %3$d channels', 'digital-signage' ), $online, count( $screens ), $channel_count ) ); ?></p>
 
 	<?php if ( $controllers ) : ?>
 		<div class="ds-panel">
@@ -145,11 +139,11 @@ foreach ( $screens as $s ) {
 		<?php endif; ?>
 	</div>
 
-	<div class="ds-quick-links">
+	<details class="ds-disclosure"><summary><?php esc_html_e( 'More tools', 'digital-signage' ); ?></summary><div class="ds-disclosure-body ds-quick-links">
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-calendar' ) ); ?>" class="ds-btn"><?php esc_html_e( 'Calendar View', 'digital-signage' ); ?></a>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-analytics' ) ); ?>" class="ds-btn"><?php esc_html_e( 'Proof of Play', 'digital-signage' ); ?></a>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-import-export' ) ); ?>" class="ds-btn"><?php esc_html_e( 'Import / Export', 'digital-signage' ); ?></a>
-	</div>
+	</div></details>
 
 	<p class="ds-app-footer"><?php esc_html_e( 'Digital Signage', 'digital-signage' ); ?> v<?php echo esc_html( DS_VERSION ); ?></p>
 </div>

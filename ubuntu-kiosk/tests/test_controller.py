@@ -192,7 +192,9 @@ class ValidationTests(unittest.TestCase):
         self.assertIn("Exec=/usr/local/bin/ds-ubuntu-autostart", desktop)
         self.assertIn("X-GNOME-Autostart-enabled=true", desktop)
         controller_source = MODULE_PATH.read_text(encoding="utf-8")
-        self.assertIn('["unclutter", "-idle", "0.1", "-root"]', controller_source)
+        self.assertIn('["xsetroot", "-cursor", str(bitmap), str(bitmap)]', controller_source)
+        self.assertIn('["unclutter", "-idle", "0", "-jitter", "1", "-root"]', controller_source)
+        self.assertIn('["xsetroot", "-cursor_name", "left_ptr"]', controller_source)
         self.assertIn('"SigninAllowed": false', installer)
         self.assertIn('"SyncDisabled": true', installer)
         self.assertIn('"PasswordManagerEnabled": false', installer)
@@ -215,6 +217,23 @@ class ValidationTests(unittest.TestCase):
         self.assertIn("AllowHibernation=no", installer)
         self.assertIn("IdleAction=ignore", installer)
         self.assertIn("systemctl start --no-block digital-signage-ubuntu-update.service", root_command)
+
+    def test_installer_grants_only_the_allowlisted_root_helper(self):
+        root = pathlib.Path(__file__).parents[1]
+        installer = (root / "install-kiosk.sh").read_text(encoding="utf-8")
+        helper = (root / "digital-signage-root-command").read_text(encoding="utf-8")
+        self.assertIn("NOPASSWD: /usr/local/sbin/digital-signage-root-command", installer)
+        self.assertIn("sudo -n -l /usr/local/sbin/digital-signage-root-command", installer)
+        self.assertIn('case "${1:-}" in', helper)
+        self.assertIn("Unsupported privileged command.", helper)
+
+    def test_wordpress_linux_update_does_not_require_a_release_asset(self):
+        repo = pathlib.Path(__file__).parents[2]
+        admin = (repo / "digital-signage/includes/class-ds-admin.php").read_text(encoding="utf-8")
+        controller = (repo / "digital-signage/includes/class-ds-controllers.php").read_text(encoding="utf-8")
+        self.assertIn("'configured_git_remote'", admin)
+        self.assertIn("'linux' === $controller->platform", admin)
+        self.assertIn("command_database", controller)
 
 
 class GdmConfigurationTests(unittest.TestCase):

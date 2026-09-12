@@ -24,8 +24,9 @@
   reconciliation, or output reconnection.
 - A controller-local state file persists kiosk versus desktop mode across
   reboot. WordPress can close managed profile processes to expose the desktop
-  or launch all assigned screens. `unclutter` hides the cursor only in kiosk
-  mode. Managed browser policy and the `basic` password-store flag disable
+  or launch all assigned screens. An invisible X root cursor plus immediate
+  `unclutter` enforcement hides the pointer only in kiosk mode and reports
+  failures through telemetry. Managed browser policy and the `basic` password-store flag disable
   sign-in, sync, autofill, password saving, and GNOME keyring prompts.
 - Persisted settings and identity never live inside the managed Git checkout.
   `sudo digital-signage-update` verifies the configured origin, refuses dirty
@@ -34,6 +35,14 @@
   browser profiles remain unchanged. WordPress starts the updater through a
   dedicated non-blocking oneshot system service; an atomic status file exposes
   running/succeeded/failed results through controller telemetry.
+- Linux software-update commands are queued from WordPress without GitHub
+  Release metadata because the Ubuntu updater consumes only its locally pinned,
+  validated Git origin and branch. The kiosk user receives passwordless sudo
+  access only to a fixed root helper whose internal action allowlist rejects
+  arbitrary commands.
+- Routine admin views prioritize content, assignments, status, and the primary
+  kiosk action. Technical telemetry, logs, rare device controls, layout tuning,
+  and destructive actions use native accessible disclosure sections.
 - Controller-wide GNOME and systemd configuration disables idle locking,
   blanking, suspend, hybrid sleep, suspend-then-hibernate, and hibernation.
   There is no daily timer, watchdog escalation, `StartLimitAction`, browser
