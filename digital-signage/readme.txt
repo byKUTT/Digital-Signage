@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.4.0
+Stable tag: 4.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -45,6 +45,14 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 4.0.0 =
+* Added the authenticated `/signage-manager/` frontend portal with a simplified overview, screens, channels, controllers, and people experience.
+* Added per-screen and per-channel ownership/sharing by WordPress user email; non-administrators see only their own or shared signage.
+* Added controller display sleep schedules that power monitors off and on while Ubuntu remains awake.
+* Added verified Switch URL migration, which moves a controller to another WordPress installation and reboots it automatically.
+* WordPress-triggered software updates now reboot automatically after a successful update while preserving device settings and identity.
+* Ubuntu privileged device actions use a narrowly allowlisted passwordless helper; no device password is stored in WordPress.
 
 = 3.4.0 =
 * Fixed Ubuntu controller updates from WordPress by queuing the configured Git updater without requiring an unrelated GitHub Release asset.

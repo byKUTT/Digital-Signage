@@ -6,7 +6,7 @@ The plugin source lives in [`digital-signage/`](digital-signage/) and is also pa
 
 ## What's included
 
-- **A fully custom admin UI** — custom list and edit pages for Channels, Screens, Slides and Schedules (Channels, Screens, Slides and Schedules are stored as custom post types under the hood, but there's no native WP post-editor screen involved: every page is hand-built and gated by a single `manage_digital_signage` capability).
+- **A focused frontend portal** at `/signage-manager/` for everyday screen, channel, controller, schedule, and people management, protected by normal WordPress login.
 - **Custom DB tables** (`ds_heartbeats`, `ds_proof_of_play`, `ds_pairing_codes`) for high-write, append-only data.
 - **Scheduling**: recurring day-of-week/time rules, one-off date overrides, per-slide time windows, and priority/emergency channels that interrupt rotation on all screens instantly.
 - **Slide types**: image, video (full-length or fixed-duration), webpage/iframe, custom HTML/CSS, RSS/Atom ticker, weather widget, live clock, PDF/Google Slides embed, social embed, and an **infinite scroll gallery** (multiple images, configurable background/spacing/speed, looping top-to-bottom on portrait screens or left-to-right on landscape) — each with per-slide duration and transition overrides on top of global defaults.
@@ -59,12 +59,12 @@ Chrome kiosk per assigned output without window detection or browser-health
 restart loops. WordPress can close all players to show the desktop, start or
 restart them again, and queue non-blocking software updates. Kiosk mode hides
 the cursor; desktop mode restores it. Locking, blanking, suspend, and
-hibernation are disabled, but the Ubuntu computer is never rebooted
-automatically. See `ubuntu-kiosk/README.md` for recovery, assignment,
+hibernation are disabled. Successful remote software updates and verified URL
+migrations reboot automatically; there is no daily reboot or watchdog. See `ubuntu-kiosk/README.md` for recovery, assignment,
 diagnostics, and uninstall instructions.
 
-Version 3.4.0 also lets Ubuntu controllers queue their configured Git update
-directly from WordPress without requiring a separate GitHub Release asset.
+Version 4.0.0 adds display sleep schedules, verified WordPress URL migration,
+and automatic reboot after successful Git updates.
 
 ### VIDAA 9 TV without external hardware
 

@@ -52,6 +52,7 @@ class DS_Admin {
 		add_action( 'admin_post_ds_save_controller', array( $this, 'handle_save_controller' ) );
 		add_action( 'admin_post_ds_controller_command', array( $this, 'handle_controller_command' ) );
 		add_action( 'admin_post_ds_save_power_schedule', array( $this, 'handle_save_power_schedule' ) );
+		add_action( 'admin_post_ds_switch_controller_url', array( $this, 'handle_switch_controller_url' ) );
 		add_action( 'admin_post_ds_update_settings', array( $this, 'handle_update_settings' ) );
 		add_action( 'admin_post_ds_install_plugin_update', array( $this, 'handle_install_plugin_update' ) );
 		add_action( 'admin_post_ds_update_controllers', array( $this, 'handle_update_controllers' ) );
@@ -665,6 +666,26 @@ class DS_Admin {
 		}
 		DS_Controllers::save_schedule( $id, wp_unslash( $_POST ) );
 		wp_safe_redirect( admin_url( 'admin.php?page=ds-controller-edit&id=' . $id . '&ds_schedule_saved=1' ) );
+		exit;
+	}
+
+	public function handle_switch_controller_url() {
+		$this->require_cap();
+		check_admin_referer( 'ds_switch_controller_url' );
+		$id         = absint( $_POST['controller_id'] ?? 0 );
+		$controller = DS_Controllers::get( $id );
+		$new_url    = esc_url_raw( wp_unslash( $_POST['new_site_url'] ?? '' ) );
+		$verify     = sanitize_text_field( wp_unslash( $_POST['verify_host'] ?? '' ) );
+		$confirmed  = ! empty( $_POST['confirm_switch'] );
+		$current_host = strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
+		$new_host     = strtolower( (string) wp_parse_url( $new_url, PHP_URL_HOST ) );
+		if ( ! $controller || 'linux' !== $controller->platform || ! $confirmed || ! wp_http_validate_url( $new_url ) || ! in_array( wp_parse_url( $new_url, PHP_URL_SCHEME ), array( 'http', 'https' ), true ) || ! $new_host || ! hash_equals( $current_host, strtolower( $verify ) ) ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=ds-controller-edit&id=' . $id . '&ds_error=switch_verify' ) );
+			exit;
+		}
+		$result = DS_Controllers::queue_command( $id, 'switch_url', array( 'site' => untrailingslashit( $new_url ) ) );
+		$query  = is_wp_error( $result ) ? '&ds_error=' . rawurlencode( $result->get_error_code() ) : '&ds_command_queued=1';
+		wp_safe_redirect( admin_url( 'admin.php?page=ds-controller-edit&id=' . $id . $query ) );
 		exit;
 	}
 

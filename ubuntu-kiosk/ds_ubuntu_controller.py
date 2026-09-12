@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import datetime
 import fcntl
 import os
 import platform
@@ -17,11 +18,12 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "3.4.0"
+VERSION = "4.0.0"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
 HEARTBEAT_SECONDS = 10
@@ -224,6 +226,7 @@ class Controller:
         self.force_refresh = True
         self.stop_requested = False
         self.connected_output_count = 0
+        self.display_sleeping: bool | None = None
 
     def log(self, message: str) -> None:
         line = time.strftime("%Y-%m-%d %H:%M:%S ") + message
@@ -330,6 +333,7 @@ class Controller:
             "suspend_supported": False,
             "rtc_wake_supported": False,
             "automatic_reboot_enabled": False,
+            "display_sleeping": bool(self.display_sleeping),
             "last_error": self.last_error,
             "recent_log": self.recent_log,
         }
@@ -427,6 +431,7 @@ class Controller:
             "software_update",
             "system_update",
             "power_test",
+            "switch_url",
         }
         if not command_id or command_type not in allowed:
             return
@@ -458,6 +463,23 @@ class Controller:
         if command_type == "power_test":
             self.ack(command_id, "failed", "Automatic suspend/wake is disabled on Ubuntu")
             return
+        if command_type == "switch_url":
+            payload = command.get("payload") if isinstance(command.get("payload"), dict) else {}
+            new_site = validate_site_url(str(payload.get("site", "")))
+            old_settings = dict(self.settings)
+            self.settings["site"] = new_site
+            save_private_json(self.settings_path, self.settings)
+            save_private_json(self.identity_path, {})
+            self.ack(command_id, "succeeded", f"Controller moved to {new_site}; rebooting")
+            ok, result = self.run_root_command("reboot")
+            if ok:
+                self.stop_requested = True
+            else:
+                self.settings = old_settings
+                save_private_json(self.settings_path, self.settings)
+                save_private_json(self.identity_path, self.identity)
+                raise RuntimeError(f"URL switch reboot failed; old settings restored: {result}")
+            return
         root_name = {
             "reboot": "reboot",
             "software_update": "software-update",
@@ -465,6 +487,36 @@ class Controller:
         }[command_type]
         ok, result = self.run_root_command(root_name)
         self.ack(command_id, "succeeded" if ok else "failed", result)
+
+    def apply_display_schedule(self, schedule: dict[str, Any] | None) -> None:
+        if not isinstance(schedule, dict) or not schedule.get("enabled"):
+            should_sleep = False
+        else:
+            try:
+                now = datetime.datetime.now(ZoneInfo(str(schedule.get("timezone") or "UTC")))
+                days = {int(day) for day in schedule.get("days", [])}
+                wake_hour, wake_minute = map(int, str(schedule.get("wake_time", "07:00")).split(":"))
+                sleep_hour, sleep_minute = map(int, str(schedule.get("sleep_time", "22:00")).split(":"))
+                current = now.hour * 60 + now.minute
+                wake = wake_hour * 60 + wake_minute
+                sleep = sleep_hour * 60 + sleep_minute
+                active_day = (now.weekday() + 1) % 7 in days
+                outside_window = (current < wake or current >= sleep) if wake <= sleep else (sleep <= current < wake)
+                should_sleep = not active_day or outside_window
+            except (KeyError, TypeError, ValueError, ZoneInfoNotFoundError) as error:
+                self.last_error = f"Invalid display sleep schedule: {error}"[:300]
+                return
+        if self.display_sleeping is should_sleep:
+            return
+        if should_sleep:
+            subprocess.run(["xset", "+dpms"], check=False, timeout=10)
+            subprocess.run(["xset", "dpms", "force", "off"], check=False, timeout=10)
+            self.log("Display sleep schedule turned screens off")
+        else:
+            subprocess.run(["xset", "dpms", "force", "on"], check=False, timeout=10)
+            subprocess.run(["xset", "-dpms"], check=False, timeout=10)
+            self.log("Display sleep schedule turned screens on")
+        self.display_sleeping = should_sleep
 
     def launch_player(self, output: Output, url: str) -> Player:
         profile = self.profile_root / output.output_key
@@ -547,6 +599,7 @@ class Controller:
         signal.signal(signal.SIGINT, lambda _signum, _frame: setattr(self, "stop_requested", True))
         last_heartbeat = 0.0
         assignments: list[dict[str, Any]] = []
+        schedule: dict[str, Any] | None = None
         consecutive_errors = 0
         self.set_cursor_hidden(not self.screens_paused)
         try:
@@ -561,12 +614,14 @@ class Controller:
                     if self.force_refresh or now - last_heartbeat >= HEARTBEAT_SECONDS:
                         state = self.heartbeat(outputs)
                         assignments = list(state.get("assignments") or [])
+                        schedule = state.get("schedule") if isinstance(state.get("schedule"), dict) else None
                         command = state.get("command")
                         if isinstance(command, dict):
                             self.apply_command(command)
                         last_heartbeat = now
                         self.force_refresh = False
                     self.sync_players(outputs, reconcile_targets(outputs, assignments))
+                    self.apply_display_schedule(schedule)
                     consecutive_errors = 0
                     self.last_error = ""
                 except (OSError, ValueError, RuntimeError, subprocess.SubprocessError, urllib.error.URLError) as error:

@@ -218,6 +218,17 @@ class ValidationTests(unittest.TestCase):
         self.assertIn("IdleAction=ignore", installer)
         self.assertIn("systemctl start --no-block digital-signage-ubuntu-update.service", root_command)
 
+    def test_remote_update_reboots_only_after_success(self):
+        updater = (pathlib.Path(__file__).parents[1] / "update-kiosk.sh").read_text(encoding="utf-8")
+        self.assertIn('if [ "$restart_service" -eq 1 ]; then', updater)
+        self.assertIn("systemctl reboot", updater)
+
+    def test_controller_supports_remote_url_switch_and_display_schedule(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn('if command_type == "switch_url":', source)
+        self.assertIn('["xset", "dpms", "force", "off"]', source)
+        self.assertIn('["xset", "dpms", "force", "on"]', source)
+
     def test_installer_grants_only_the_allowlisted_root_helper(self):
         root = pathlib.Path(__file__).parents[1]
         installer = (root / "install-kiosk.sh").read_text(encoding="utf-8")

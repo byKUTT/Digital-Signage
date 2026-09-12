@@ -74,11 +74,23 @@ repository and branch. It preserves the site URL, kiosk user, controller
 identity/token, monitor assignments, Chrome profiles, and other settings. The
 same update can be queued from the Controller page in WordPress. It runs in a
 non-blocking system service, so controller heartbeats continue and the latest
-update status/result appears in telemetry.
+update status/result appears in telemetry. A successful remote update reboots
+the controller so the new version starts cleanly; settings and identity remain
+unchanged.
 
 The installer creates and validates passwordless sudo access only for
 `/usr/local/sbin/digital-signage-root-command`. That helper has a fixed action
 allowlist, so the unattended account cannot use it to run arbitrary root commands.
+The Ubuntu login password is never stored in or sent through WordPress.
+
+## Display sleep schedule and URL migration
+
+Open `/signage-manager/`, choose **Controllers**, then select the device. The
+Sleep schedule powers the connected monitors off and on at the chosen local
+times without suspending Ubuntu. **Switch URL** requires the current hostname
+to be typed as confirmation. It saves the new WordPress URL, clears the old
+pairing identity, acknowledges the old controller, and reboots; the device then
+shows a fresh pairing code on the new site.
 
 ## Kiosk and desktop mode
 

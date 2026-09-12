@@ -109,3 +109,6 @@ fi
 write_status "succeeded" "Digital Signage update completed and settings were preserved."
 update_completed=1
 echo "Digital Signage is updated. Existing identity and settings were preserved."
+if [ "$restart_service" -eq 1 ]; then
+	systemctl reboot
+fi
