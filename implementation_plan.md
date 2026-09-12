@@ -1,3 +1,37 @@
+# Ubuntu desktop-control and reliable update release 3.3.0 — implementation amendment
+
+## Confirmed outcome
+
+- Remove X11/window detection and browser health probing completely. On boot, issue exactly one Chrome kiosk launch per connected output using its unique profile and command-line geometry, then trust the launch. Relaunch only for an explicit WordPress Start/Restart command, assignment/URL change, geometry change, or output reconnect; never relaunch because a window ID or launcher PID is absent.
+- Add controller-level **Close Screens / Show Desktop** and **Start Kiosk Screens** actions in WordPress. Closing screens terminates all managed Chrome profiles, reveals the cursor, stores a persistent desktop-mode state, and leaves the controller agent online for commands and telemetry. Starting screens clears desktop mode, hides the cursor, and immediately restores automatic Chrome kiosk playback on every connected output; the chosen mode survives reboot.
+- Hard-code automatic screen locking, display sleep, system suspend, suspend-then-hibernate, and hibernation prevention controller-wide through GNOME session settings plus managed systemd-logind/sleep configuration. This is not a WordPress option. Manual reboot remains available, and no automatic reboot/watchdog is added.
+- Fix **Update Signage Software** from WordPress by running `digital-signage-update` in an independent root-owned systemd oneshot job. Persist the requesting command ID and an atomic result file so the controller can acknowledge actual success/failure after the Git update; on success the updater restarts only the controller process and preserves every setting.
+- Bump and synchronize the WordPress plugin, Ubuntu controller, device metadata, changelog, and packages to `3.3.0`.
+
+## Files
+
+- **Modify `ubuntu-kiosk/ds_ubuntu_controller.py`:** remove window discovery/placement and automatic health probing, launch once per output/profile, terminate exact managed profiles only for commands/reconciliation, persist desktop/kiosk mode, expose `screens_paused` and update state telemetry, implement `stop_players`/`start_players`, and reconcile asynchronous update results without blocking heartbeats.
+- **Modify `ubuntu-kiosk/ds-ubuntu-autostart.sh`:** let the controller own cursor visibility so desktop mode restores the pointer; retain graphical-session environment and GNOME idle/sleep prevention.
+- **Modify `ubuntu-kiosk/install-kiosk.sh`:** install the update service and automatic sleep/hibernate prevention drop-ins, preserve desktop-mode/update state on upgrade, validate the narrow sudo helper, and reload affected system configuration safely.
+- **Add `ubuntu-kiosk/systemd/digital-signage-ubuntu-update.service`:** execute the existing settings-preserving updater as an independent root oneshot with network ordering and bounded runtime.
+- **Modify `ubuntu-kiosk/digital-signage-root-command`:** validate and enqueue only the fixed update service; expose a non-mutating authorization check while retaining the existing explicit reboot/system-update commands.
+- **Modify `ubuntu-kiosk/update-kiosk.sh`:** atomically record running/succeeded/failed results, retain the requesting WordPress command ID, and restart the controller only after a completed successful update.
+- **Modify `ubuntu-kiosk/uninstall-kiosk.sh`:** remove the update unit and kiosk sleep-prevention configuration and reload systemd.
+- **Modify `digital-signage/includes/class-ds-controllers.php`:** allow the two new controller commands and sanitize the paused/update telemetry fields.
+- **Modify `digital-signage/includes/class-ds-admin.php` and `digital-signage/admin/views/controller-edit.php`:** securely queue the new commands with the existing capability/nonce path, show current kiosk/desktop state, and add clearly labelled stop/start actions.
+- **Modify tests:** cover Chrome-running-without-window detection, exact-profile termination, persistent desktop mode, cursor changes, command allowlists, asynchronous update completion, and sleep/hibernate configuration without touching the host system.
+- **Modify documentation and version metadata; rebuild `digital-signage.zip` and `ubuntu-kiosk.zip`; publish fast-forward-only to the existing public branch after all checks pass.**
+
+## Verification
+
+- Run Bash syntax, Python compilation/unit tests, PHP syntax when available, WordPress static security checks, and archive/source byte parity.
+- Simulate one-to-three displays and an exited launcher PID; confirm each output launches once and no window/process-health condition causes a duplicate.
+- Simulate stop, reboot-state reload, and start; confirm the controller remains online, Chrome stays closed in desktop mode, the pointer is visible, and kiosk mode restores all outputs automatically.
+- Simulate successful and failed root update jobs; confirm WordPress command history receives the real result and settings remain unchanged.
+- Statically verify GNOME/systemd automatic sleep and hibernation prevention and confirm there is still no automatic reboot mechanism.
+
+---
+
 # Ubuntu Chrome boot autostart — approved-scope amendment
 
 ## Outcome

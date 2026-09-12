@@ -54,10 +54,14 @@ sudo reboot
 sudo digital-signage-update
 ```
 
-It starts from the logged-in graphical session on every boot and restarts failed
-Chrome/controller processes, but never reboots the Ubuntu computer
-automatically. See `ubuntu-kiosk/README.md` for black-screen recovery,
-multi-monitor assignment, diagnostics, and uninstall instructions.
+It starts from the logged-in graphical session on every boot and launches one
+Chrome kiosk per assigned output without window detection or browser-health
+restart loops. WordPress can close all players to show the desktop, start or
+restart them again, and queue non-blocking software updates. Kiosk mode hides
+the cursor; desktop mode restores it. Locking, blanking, suspend, and
+hibernation are disabled, but the Ubuntu computer is never rebooted
+automatically. See `ubuntu-kiosk/README.md` for recovery, assignment,
+diagnostics, and uninstall instructions.
 
 ### VIDAA 9 TV without external hardware
 

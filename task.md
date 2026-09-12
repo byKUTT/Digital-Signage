@@ -42,3 +42,12 @@
 - [x] Hide the cursor and disable sign-in, sync, autofill, passwords, and keyring access.
 - [x] Add regression tests for live-window handoff and unattended Chrome flags.
 - [x] Rebuild, verify, commit, and publish 3.2.2.
+
+# Ubuntu controller desktop mode and hard-coded awake state 3.3.0
+
+- [x] Remove all window detection and health-triggered Chrome relaunches.
+- [x] Add persistent Stop Screens / Start Kiosk Screens controller commands and cursor switching.
+- [x] Hard-code controller-wide automatic sleep and hibernation prevention.
+- [x] Repair WordPress-triggered updates with an independent root update job and result reporting.
+- [x] Update WordPress UI, command allowlists, telemetry, versions, documentation, and tests.
+- [x] Rebuild and byte-verify both ZIPs, commit, and publish 3.3.0.

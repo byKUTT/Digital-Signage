@@ -11,12 +11,21 @@ case "${1:-}" in
 		systemctl reboot
 		;;
 	software-update)
-		/usr/local/sbin/digital-signage-update --no-restart
+		if systemctl is-active --quiet digital-signage-ubuntu-update.service; then
+			echo "A signage update is already running."
+			exit 0
+		fi
+		systemctl reset-failed digital-signage-ubuntu-update.service >/dev/null 2>&1 || true
+		systemctl start --no-block digital-signage-ubuntu-update.service
+		echo "Signage update job started."
 		;;
 	system-update)
 		export DEBIAN_FRONTEND=noninteractive
 		apt-get update
 		apt-get -y upgrade
+		;;
+	check)
+		echo "Digital Signage privileged command access is ready."
 		;;
 	*)
 		echo "Unsupported privileged command." >&2

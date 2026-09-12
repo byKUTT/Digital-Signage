@@ -263,9 +263,9 @@ class DS_Controllers {
 	}
 
 	private static function sanitize_telemetry( array $telemetry ) {
-		$allowed_strings = array( 'architecture', 'cpu_model', 'gpu', 'browser', 'network', 'kernel', 'power_state', 'last_error' );
+		$allowed_strings = array( 'architecture', 'cpu_model', 'gpu', 'browser', 'network', 'kernel', 'power_state', 'update_status', 'update_result', 'last_error' );
 		$allowed_numbers = array( 'cpu_cores', 'cpu_load_percent', 'cpu_temp_c', 'memory_total_mb', 'memory_free_mb', 'disk_total_mb', 'disk_free_mb', 'uptime_seconds', 'connected_outputs', 'player_processes' );
-		$allowed_bools   = array( 'browser_running', 'rtc_wake_supported', 'suspend_supported', 'os_update_supported', 'automatic_reboot_enabled' );
+		$allowed_bools   = array( 'browser_running', 'screens_paused', 'rtc_wake_supported', 'suspend_supported', 'os_update_supported', 'automatic_reboot_enabled' );
 		$out = array();
 		foreach ( $allowed_strings as $key ) {
 			if ( isset( $telemetry[ $key ] ) ) {
@@ -390,7 +390,7 @@ class DS_Controllers {
 
 	public static function queue_command( $controller_id, $type, array $payload = array() ) {
 		global $wpdb;
-		$allowed = array( 'restart_players', 'refresh_displays', 'reboot', 'software_update', 'system_update', 'power_test' );
+		$allowed = array( 'restart_players', 'stop_players', 'start_players', 'refresh_displays', 'reboot', 'software_update', 'system_update', 'power_test' );
 		$type    = sanitize_key( $type );
 		if ( ! in_array( $type, $allowed, true ) ) {
 			return new WP_Error( 'ds_command_type', __( 'Unsupported controller command.', 'digital-signage' ) );

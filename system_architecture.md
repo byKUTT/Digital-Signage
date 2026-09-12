@@ -18,22 +18,27 @@
   address; no service guesses `DISPLAY=:0` before login is ready.
 - The controller launches one isolated Chrome-family profile/process per
   connected output. Chrome receives each XRandR output's exact position and
-  dimensions on its command line, with `wmctrl` enforcing fullscreen placement
-  after the native window appears.
-- Player health is tied to the actual X11 window ID, not the initial Chrome
-  launcher PID because Chrome may hand the window to another process. The
-  session hides the cursor with `unclutter`; managed browser policy and the
-  `basic` password-store flag disable sign-in, sync, autofill, password saving,
-  and GNOME keyring prompts for the unattended kiosk account.
+  dimensions on its command line. There is no window discovery or browser
+  health check: boot issues one launch per assigned output and trusts Chrome.
+  Relaunch occurs only for an explicit Start/Restart command, URL or geometry
+  reconciliation, or output reconnection.
+- A controller-local state file persists kiosk versus desktop mode across
+  reboot. WordPress can close managed profile processes to expose the desktop
+  or launch all assigned screens. `unclutter` hides the cursor only in kiosk
+  mode. Managed browser policy and the `basic` password-store flag disable
+  sign-in, sync, autofill, password saving, and GNOME keyring prompts.
 - Persisted settings and identity never live inside the managed Git checkout.
   `sudo digital-signage-update` verifies the configured origin, refuses dirty
   or divergent state, fast-forwards the configured branch, and reapplies the
   installer in upgrade mode. Site, user, identity, output assignments, and
-  browser profiles remain unchanged.
-- Process recovery is intentionally separate from machine power. Chrome and
-  the graphical-session controller restart on failure, but there is no daily timer,
-  watchdog escalation, `StartLimitAction`, or any other automatic computer
-  reboot. A manually queued authenticated reboot command remains available.
+  browser profiles remain unchanged. WordPress starts the updater through a
+  dedicated non-blocking oneshot system service; an atomic status file exposes
+  running/succeeded/failed results through controller telemetry.
+- Controller-wide GNOME and systemd configuration disables idle locking,
+  blanking, suspend, hybrid sleep, suspend-then-hibernate, and hibernation.
+  There is no daily timer, watchdog escalation, `StartLimitAction`, browser
+  health relaunch, or automatic computer reboot. A manually queued authenticated
+  reboot command remains available.
 
 ## VIDAA/private smart-TV bootstrap
 

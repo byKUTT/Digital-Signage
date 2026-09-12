@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "3.2.2"
+VERSION = "3.3.0"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
 HEARTBEAT_SECONDS = 10
@@ -63,7 +63,7 @@ class Player:
     process: subprocess.Popen[Any]
     url: str
     geometry: tuple[int, int, int, int]
-    window_id: str = ""
+    profile: Path | None = None
 
 
 def stable_output_key(connector: str) -> str:
@@ -212,7 +212,11 @@ class Controller:
             raise RuntimeError("Google Chrome or Chromium executable was not found")
         self.browser_name = "Google Chrome" if "google-chrome" in self.browser else "Chromium"
         self.identity = load_json(identity_path) if identity_path.exists() else {}
+        self.state_path = settings_path.with_name("state.json")
+        self.state = load_json(self.state_path) if self.state_path.exists() else {}
+        self.screens_paused = bool(self.state.get("screens_paused", False))
         self.players: dict[str, Player] = {}
+        self.cursor_process: subprocess.Popen[Any] | None = None
         self.recent_log: list[str] = []
         self.last_error = ""
         self.force_refresh = True
@@ -297,6 +301,11 @@ class Controller:
                     memory_free = int(line.split()[1]) // 1024
         except (OSError, ValueError, IndexError):
             pass
+        update_status: dict[str, Any] = {}
+        try:
+            update_status = load_json(self.settings_path.with_name("update-status.json"))
+        except (OSError, ValueError):
+            pass
         return {
             "architecture": platform.machine(),
             "cpu_cores": os.cpu_count() or 1,
@@ -308,6 +317,9 @@ class Controller:
             "disk_free_mb": disk.free // 1024 // 1024,
             "uptime_seconds": self.uptime_seconds(),
             "browser_running": bool(self.players),
+            "screens_paused": self.screens_paused,
+            "update_status": str(update_status.get("status", ""))[:100],
+            "update_result": str(update_status.get("message", ""))[:300],
             "connected_outputs": self.connected_output_count,
             "player_processes": len(self.players),
             "os_update_supported": True,
@@ -317,6 +329,22 @@ class Controller:
             "last_error": self.last_error,
             "recent_log": self.recent_log,
         }
+
+    def save_state(self) -> None:
+        self.state["screens_paused"] = self.screens_paused
+        save_private_json(self.state_path, self.state)
+
+    def set_cursor_hidden(self, hidden: bool) -> None:
+        if hidden and (self.cursor_process is None or self.cursor_process.poll() is not None):
+            self.cursor_process = subprocess.Popen(
+                ["unclutter", "-idle", "0.1", "-root"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT,
+            )
+        elif not hidden and self.cursor_process is not None:
+            if self.cursor_process.poll() is None:
+                self.cursor_process.terminate()
+            self.cursor_process = None
 
     @staticmethod
     def uptime_seconds() -> int:
@@ -361,6 +389,8 @@ class Controller:
         command_type = str(command.get("type", ""))
         allowed = {
             "restart_players",
+            "stop_players",
+            "start_players",
             "refresh_displays",
             "reboot",
             "software_update",
@@ -374,6 +404,21 @@ class Controller:
             self.stop_players()
             self.force_refresh = True
             self.ack(command_id, "succeeded", "Chrome players restarted")
+            return
+        if command_type == "stop_players":
+            self.screens_paused = True
+            self.save_state()
+            self.stop_players()
+            self.set_cursor_hidden(False)
+            self.ack(command_id, "succeeded", "Kiosk screens closed; desktop mode active")
+            return
+        if command_type == "start_players":
+            self.screens_paused = False
+            self.save_state()
+            self.stop_players()
+            self.set_cursor_hidden(True)
+            self.force_refresh = True
+            self.ack(command_id, "succeeded", "Automatic kiosk screens started")
             return
         if command_type == "refresh_displays":
             self.force_refresh = True
@@ -389,44 +434,8 @@ class Controller:
         }[command_type]
         ok, result = self.run_root_command(root_name)
         self.ack(command_id, "succeeded" if ok else "failed", result)
-        if ok and command_type == "software_update":
-            self.stop_requested = True
-
-    def window_ids(self) -> set[str]:
-        completed = subprocess.run(
-            ["wmctrl", "-l"], capture_output=True, text=True, timeout=10, check=False
-        )
-        return {
-            line.split(None, 1)[0]
-            for line in completed.stdout.splitlines()
-            if line.startswith("0x")
-        }
-
-    def place_window(self, window_id: str, output: Output) -> None:
-        subprocess.run(
-            ["wmctrl", "-ir", window_id, "-b", "remove,fullscreen"],
-            check=False,
-            timeout=10,
-        )
-        subprocess.run(
-            [
-                "wmctrl",
-                "-ir",
-                window_id,
-                "-e",
-                f"0,{output.x},{output.y},{output.width},{output.height}",
-            ],
-            check=False,
-            timeout=10,
-        )
-        subprocess.run(
-            ["wmctrl", "-ir", window_id, "-b", "add,fullscreen,above"],
-            check=False,
-            timeout=10,
-        )
 
     def launch_player(self, output: Output, url: str) -> Player:
-        before = self.window_ids()
         profile = self.profile_root / output.output_key
         profile.mkdir(parents=True, exist_ok=True)
         process = subprocess.Popen(
@@ -435,63 +444,62 @@ class Controller:
             stderr=subprocess.STDOUT,
             start_new_session=False,
         )
-        window_id = ""
-        deadline = time.monotonic() + 20
-        while time.monotonic() < deadline:
-            new_windows = self.window_ids() - before
-            if new_windows:
-                window_id = sorted(new_windows)[-1]
-                self.place_window(window_id, output)
-                break
-            time.sleep(0.5)
-        if not window_id:
-            if process.poll() is None:
-                process.terminate()
-            raise RuntimeError(f"Chrome window did not appear for {output.connector}")
         self.log(f"Started {output.connector} at {output.width}x{output.height}+{output.x}+{output.y}")
         return Player(
             process=process,
             url=url,
             geometry=(output.x, output.y, output.width, output.height),
-            window_id=window_id,
+            profile=profile,
         )
 
     def sync_players(self, outputs: list[Output], targets: dict[str, str]) -> None:
         current = {output.output_key: output for output in outputs}
-        live_windows = self.window_ids()
         for key in list(self.players):
             player = self.players[key]
             output = current.get(key)
             geometry = (output.x, output.y, output.width, output.height) if output else None
-            window_missing = bool(player.window_id) and player.window_id not in live_windows
-            launcher_failed = not player.window_id and player.process.poll() is not None
             if (
                 not output
                 or key not in targets
-                or window_missing
-                or launcher_failed
                 or player.url != targets[key]
                 or player.geometry != geometry
             ):
-                if player.process.poll() is None:
-                    player.process.terminate()
+                self.stop_player(player)
                 self.players.pop(key, None)
+        if self.screens_paused:
+            return
         for output in outputs:
             if output.output_key in targets and output.output_key not in self.players:
                 self.players[output.output_key] = self.launch_player(
                     output, targets[output.output_key]
                 )
 
+    @staticmethod
+    def profile_process_ids(profile: Path, proc_root: Path = Path("/proc")) -> set[int]:
+        wanted = f"--user-data-dir={profile}".encode()
+        found: set[int] = set()
+        for entry in proc_root.glob("[0-9]*"):
+            try:
+                arguments = (entry / "cmdline").read_bytes().split(b"\0")
+                if wanted in arguments:
+                    found.add(int(entry.name))
+            except (OSError, ValueError):
+                continue
+        return found
+
+    def stop_player(self, player: Player) -> None:
+        pids = self.profile_process_ids(player.profile) if player.profile else set()
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        if player.process.poll() is None:
+            player.process.terminate()
+
     def stop_players(self) -> None:
         for player in self.players.values():
-            if player.window_id:
-                subprocess.run(
-                    ["wmctrl", "-ic", player.window_id],
-                    check=False,
-                    timeout=10,
-                )
-            if player.process.poll() is None:
-                player.process.terminate()
+            self.stop_player(player)
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline and any(
             player.process.poll() is None for player in self.players.values()
@@ -509,6 +517,7 @@ class Controller:
         last_heartbeat = 0.0
         assignments: list[dict[str, Any]] = []
         consecutive_errors = 0
+        self.set_cursor_hidden(not self.screens_paused)
         try:
             while not self.stop_requested:
                 try:
@@ -539,6 +548,7 @@ class Controller:
                 time.sleep(DISPLAY_REFRESH_SECONDS)
         finally:
             self.stop_players()
+            self.set_cursor_hidden(False)
         return 0
 
 

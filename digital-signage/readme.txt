@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.2.2
+Stable tag: 3.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,7 +24,7 @@ Digital Signage CMS gives you:
 * **REST API** (`/wp-json/ds/v1/...`) for the player and for external kiosk hardware such as a Raspberry Pi running a browser in kiosk mode.
 * A shared **Digital Signage Team** and **Signage Manager** role for people who need access to all signage content and settings without full WordPress administrator access.
 * **Multi-display controllers** — one generic Linux or Windows PC can drive several connected displays, with a different Screen, channel, schedule and rotation on every output.
-* **Fleet management** — grouped controller health, detailed telemetry, output mapping, command history, verified signage updates, OS update commands and Linux wake/sleep schedules.
+* **Fleet management** — grouped controller health, detailed telemetry, output mapping, command history, verified signage updates, OS update commands and remote kiosk/desktop controls.
 
 == Installation ==
 
@@ -45,6 +45,13 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 3.3.0 =
+* Ubuntu launches Chrome once per assigned output at boot without window detection or automatic browser-health relaunch loops.
+* Added persistent Start Kiosk Screens and Close Screens / Show Desktop controls to the WordPress controller page.
+* Kiosk mode hides the mouse cursor while desktop mode restores it for local setup work.
+* Disabled automatic blanking, locking, suspend, and hibernation controller-wide; no automatic reboot or watchdog was added.
+* WordPress-triggered signage updates now run through a non-blocking system service and report their latest result while preserving settings.
 
 = 3.2.2 =
 * Fixed Chrome kiosk windows repeatedly opening and closing when the initial launcher process exits after handing off a live browser window.

@@ -4,6 +4,7 @@
 import importlib.util
 import pathlib
 import sys
+import tempfile
 import unittest
 
 MODULE_PATH = pathlib.Path(__file__).parents[1] / "ds_ubuntu_controller.py"
@@ -72,7 +73,7 @@ class AssignmentTests(unittest.TestCase):
         )
         self.assertEqual({"hdmi-1": "https://example.test/pair/?kiosk=1"}, targets)
 
-    def test_failed_player_restarts_without_restarting_working_output(self):
+    def test_exited_launcher_never_triggers_automatic_relaunch(self):
         class FakeProcess:
             def __init__(self, return_code=None):
                 self.return_code = return_code
@@ -87,12 +88,12 @@ class AssignmentTests(unittest.TestCase):
 
         controller = CONTROLLER.Controller.__new__(CONTROLLER.Controller)
         working = FakeProcess()
-        failed = FakeProcess(1)
+        handed_off = FakeProcess(0)
         controller.players = {
             "dp-1": CONTROLLER.Player(working, "https://example.test/one", (0, 0, 1920, 1080)),
-            "hdmi-1": CONTROLLER.Player(failed, "https://example.test/two", (1920, 0, 1920, 1080)),
+            "hdmi-1": CONTROLLER.Player(handed_off, "https://example.test/two", (1920, 0, 1920, 1080)),
         }
-        controller.window_ids = lambda: set()
+        controller.screens_paused = False
         launched = []
 
         def launch(output, url):
@@ -105,28 +106,40 @@ class AssignmentTests(unittest.TestCase):
             {"dp-1": "https://example.test/one", "hdmi-1": "https://example.test/two"},
         )
         self.assertIs(working, controller.players["dp-1"].process)
-        self.assertEqual([("hdmi-1", "https://example.test/two")], launched)
+        self.assertIs(handed_off, controller.players["hdmi-1"].process)
+        self.assertEqual([], launched)
 
-    def test_chrome_launcher_exit_does_not_replace_a_live_window(self):
-        class ExitedLauncher:
-            def poll(self):
-                return 0
-
-            def terminate(self):
-                raise AssertionError("live Chrome window must not be terminated")
-
+    def test_url_change_is_an_explicit_relaunch_condition(self):
         controller = CONTROLLER.Controller.__new__(CONTROLLER.Controller)
-        player = CONTROLLER.Player(
-            ExitedLauncher(),
-            "https://example.test/one",
-            (0, 0, 1920, 1080),
-            "0x100001",
-        )
+        player = CONTROLLER.Player(object(), "https://example.test/old", (0, 0, 1920, 1080))
         controller.players = {"dp-1": player}
-        controller.window_ids = lambda: {"0x100001"}
-        controller.launch_player = lambda _output, _url: self.fail("live window was relaunched")
+        controller.screens_paused = False
+        stopped = []
+        controller.stop_player = lambda item: stopped.append(item)
+        controller.launch_player = lambda output, url: CONTROLLER.Player(object(), url, (output.x, output.y, output.width, output.height))
+        controller.sync_players(self.outputs[:1], {"dp-1": "https://example.test/new"})
+        self.assertEqual([player], stopped)
+        self.assertEqual("https://example.test/new", controller.players["dp-1"].url)
+
+    def test_desktop_mode_prevents_player_launch(self):
+        controller = CONTROLLER.Controller.__new__(CONTROLLER.Controller)
+        controller.players = {}
+        controller.screens_paused = True
+        controller.launch_player = lambda _output, _url: self.fail("desktop mode launched Chrome")
         controller.sync_players(self.outputs, {"dp-1": "https://example.test/one"})
-        self.assertIs(player, controller.players["dp-1"])
+        self.assertEqual({}, controller.players)
+
+    def test_profile_process_lookup_matches_exact_profile_argument(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            proc = pathlib.Path(temporary)
+            (proc / "101").mkdir()
+            (proc / "101" / "cmdline").write_bytes(b"chrome\0--user-data-dir=/profiles/dp-1\0")
+            (proc / "202").mkdir()
+            (proc / "202" / "cmdline").write_bytes(b"chrome\0--user-data-dir=/profiles/dp-10\0")
+            self.assertEqual(
+                {101},
+                CONTROLLER.Controller.profile_process_ids(pathlib.Path("/profiles/dp-1"), proc),
+            )
 
 
 class ChromeCommandTests(unittest.TestCase):
@@ -178,7 +191,8 @@ class ValidationTests(unittest.TestCase):
         self.assertNotIn("DISPLAY=:0", launcher)
         self.assertIn("Exec=/usr/local/bin/ds-ubuntu-autostart", desktop)
         self.assertIn("X-GNOME-Autostart-enabled=true", desktop)
-        self.assertIn("unclutter -idle 0.1 -root", launcher)
+        controller_source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertIn('["unclutter", "-idle", "0.1", "-root"]', controller_source)
         self.assertIn('"SigninAllowed": false', installer)
         self.assertIn('"SyncDisabled": true', installer)
         self.assertIn('"PasswordManagerEnabled": false', installer)
@@ -186,6 +200,21 @@ class ValidationTests(unittest.TestCase):
     def test_controller_has_a_nonblocking_single_instance_lock(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn("fcntl.LOCK_EX | fcntl.LOCK_NB", source)
+
+    def test_no_window_detection_or_automatic_browser_health_restart(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("wmctrl", source)
+        self.assertNotIn("window_ids", source)
+        self.assertNotIn("Chrome window did not appear", source)
+
+    def test_installer_hard_disables_sleep_and_uses_nonblocking_update_service(self):
+        root = pathlib.Path(__file__).parents[1]
+        installer = (root / "install-kiosk.sh").read_text(encoding="utf-8")
+        root_command = (root / "digital-signage-root-command").read_text(encoding="utf-8")
+        self.assertIn("AllowSuspend=no", installer)
+        self.assertIn("AllowHibernation=no", installer)
+        self.assertIn("IdleAction=ignore", installer)
+        self.assertIn("systemctl start --no-block digital-signage-ubuntu-update.service", root_command)
 
 
 class GdmConfigurationTests(unittest.TestCase):

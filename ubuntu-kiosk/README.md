@@ -42,12 +42,12 @@ argument: XRandR supplies every monitor's desktop geometry automatically.
 
 The installer configures GDM Xorg autologin, removes the incompatible Pi
 `tty1` startup, installs graphical-session autostart, keeps a managed Git
-checkout under `/opt/bykutt-digital-signage`, and disables screen blanking while
-signage is running. It installs no daily reboot timer or automatic reboot
-watchdog. Chrome starts automatically after every boot and opens one kiosk
-window on every detected monitor.
+checkout under `/opt/bykutt-digital-signage`, and hard-disables screen locking,
+blanking, automatic suspend, and hibernation. It installs no daily reboot timer
+or automatic reboot watchdog. Chrome starts automatically after every boot and
+is launched once for every detected monitor.
 
-The cursor is hidden after the graphical session starts. Chrome runs without
+The cursor is hidden in kiosk mode and restored in desktop mode. Chrome runs without
 sign-in, sync, saved passwords, autofill, profile selection, or GNOME login
 keyring access, so an unattended screen does not wait for authentication.
 
@@ -71,7 +71,16 @@ sudo digital-signage-update
 The updater accepts only a clean fast-forward update from the configured
 repository and branch. It preserves the site URL, kiosk user, controller
 identity/token, monitor assignments, Chrome profiles, and other settings. The
-same update can be queued from the Controller page in WordPress.
+same update can be queued from the Controller page in WordPress. It runs in a
+non-blocking system service, so controller heartbeats continue and the latest
+update status/result appears in telemetry.
+
+## Kiosk and desktop mode
+
+The WordPress Controller page provides **Close Screens / Show Desktop** for
+local coding or setup and **Start Kiosk Screens** to launch all assigned outputs
+again. The chosen mode is saved across reboot. Desktop mode restores the mouse
+cursor; kiosk mode hides it. **Restart Players** is the manual restart command.
 
 ## Status and logs
 
@@ -81,9 +90,10 @@ pgrep -af 'google-chrome|chromium'
 xrandr --query
 ```
 
-Chrome player health follows the actual X11 window rather than Chrome's
-short-lived launcher process, preventing open/close loops. Missing windows and
-the controller still restart after real failures. Repeated
+There is deliberately no Chrome window detection and no browser-health
+relaunch. At boot the controller issues one Chrome launch per assigned output
+and trusts it. A player is relaunched only by an explicit Start/Restart command,
+an assignment URL or geometry change, or reconnecting an output. Controller
 errors stay in the logs and WordPress telemetry; they never trigger an
 automatic computer reboot.
 

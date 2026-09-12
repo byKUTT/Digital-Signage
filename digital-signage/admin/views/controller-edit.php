@@ -3,18 +3,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 $online = $controller->last_seen && ( time() - strtotime( $controller->last_seen . ' UTC' ) ) <= DS_Controllers::ONLINE_SECONDS;
-$schedule = wp_parse_args(
-	is_array( $schedule ) ? $schedule : array(),
-	array( 'enabled' => false, 'timezone' => wp_timezone_string() ?: 'UTC', 'days' => array( 1, 2, 3, 4, 5 ), 'wake_time' => '07:00', 'sleep_time' => '22:00' )
-);
 $telemetry_labels = array(
 	'cpu_model' => __( 'CPU', 'digital-signage' ), 'cpu_cores' => __( 'CPU cores', 'digital-signage' ), 'cpu_load_percent' => __( 'CPU load %', 'digital-signage' ),
 	'cpu_temp_c' => __( 'CPU temperature °C', 'digital-signage' ), 'memory_total_mb' => __( 'Memory total MB', 'digital-signage' ), 'memory_free_mb' => __( 'Memory free MB', 'digital-signage' ),
 	'disk_total_mb' => __( 'Disk total MB', 'digital-signage' ), 'disk_free_mb' => __( 'Disk free MB', 'digital-signage' ), 'uptime_seconds' => __( 'Uptime seconds', 'digital-signage' ),
 	'gpu' => __( 'Graphics', 'digital-signage' ), 'browser' => __( 'Browser', 'digital-signage' ), 'architecture' => __( 'Architecture', 'digital-signage' ), 'kernel' => __( 'Kernel', 'digital-signage' ),
-	'network' => __( 'Network', 'digital-signage' ), 'browser_running' => __( 'Players running', 'digital-signage' ), 'rtc_wake_supported' => __( 'RTC wake supported', 'digital-signage' ),
-	'suspend_supported' => __( 'Suspend supported', 'digital-signage' ), 'os_update_supported' => __( 'OS updates supported', 'digital-signage' ),
+	'network' => __( 'Network', 'digital-signage' ), 'browser_running' => __( 'Players launched', 'digital-signage' ), 'screens_paused' => __( 'Desktop mode active', 'digital-signage' ),
+	'os_update_supported' => __( 'OS updates supported', 'digital-signage' ),
 	'connected_outputs' => __( 'Connected outputs', 'digital-signage' ), 'player_processes' => __( 'Browser player processes', 'digital-signage' ),
+	'update_status' => __( 'Software update status', 'digital-signage' ), 'update_result' => __( 'Software update result', 'digital-signage' ),
 	'automatic_reboot_enabled' => __( 'Automatic computer reboot', 'digital-signage' ),
 );
 ?>
@@ -79,6 +76,11 @@ $telemetry_labels = array(
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="ds-controller-actions">
 				<input type="hidden" name="action" value="ds_controller_command" /><input type="hidden" name="controller_id" value="<?php echo esc_attr( $id ); ?>" /><?php wp_nonce_field( 'ds_controller_command' ); ?>
 				<button class="ds-btn" name="command_type" value="restart_players"><?php esc_html_e( 'Restart Players', 'digital-signage' ); ?></button>
+				<?php if ( ! empty( $telemetry['screens_paused'] ) ) : ?>
+					<button class="ds-btn ds-btn-primary" name="command_type" value="start_players"><?php esc_html_e( 'Start Kiosk Screens', 'digital-signage' ); ?></button>
+				<?php else : ?>
+					<button class="ds-btn" name="command_type" value="stop_players" onclick="return confirm('<?php echo esc_js( __( 'Close all kiosk screens and show the desktop?', 'digital-signage' ) ); ?>');"><?php esc_html_e( 'Close Screens / Show Desktop', 'digital-signage' ); ?></button>
+				<?php endif; ?>
 				<button class="ds-btn" name="command_type" value="refresh_displays"><?php esc_html_e( 'Detect Displays Again', 'digital-signage' ); ?></button>
 				<button class="ds-btn" name="command_type" value="software_update"><?php esc_html_e( 'Update Signage Software', 'digital-signage' ); ?></button>
 				<?php if ( ! empty( $telemetry['os_update_supported'] ) ) : ?><button class="ds-btn" name="command_type" value="system_update"><?php esc_html_e( 'Install OS Updates', 'digital-signage' ); ?></button><?php endif; ?>
@@ -87,26 +89,6 @@ $telemetry_labels = array(
 			<p class="ds-hint"><?php esc_html_e( 'Commands are delivered to the controller agent, acknowledged, and retained in the history below.', 'digital-signage' ); ?></p>
 		</div>
 	</div>
-
-	<?php if ( 'linux' === $controller->platform ) : ?>
-	<div class="ds-panel">
-		<h2><?php esc_html_e( 'Automatic wake and sleep', 'digital-signage' ); ?></h2>
-		<p class="ds-hint"><?php esc_html_e( 'The Linux PC suspends to RAM at the sleep time and programs its RTC to wake at the next active-day wake time. Firmware/BIOS settings must permit RTC wake.', 'digital-signage' ); ?></p>
-		<?php if ( empty( $telemetry['suspend_supported'] ) || empty( $telemetry['rtc_wake_supported'] ) ) : ?><div class="ds-notice ds-notice-error"><?php esc_html_e( 'This controller has not confirmed both suspend and RTC-wake support. The agent will refuse an unsafe schedule.', 'digital-signage' ); ?></div><?php endif; ?>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<input type="hidden" name="action" value="ds_save_power_schedule" /><input type="hidden" name="controller_id" value="<?php echo esc_attr( $id ); ?>" /><?php wp_nonce_field( 'ds_save_power_schedule' ); ?>
-			<div class="ds-settings-grid">
-				<label class="ds-field"><span><input type="checkbox" name="enabled" value="1" <?php checked( ! empty( $schedule['enabled'] ) ); ?> /> <?php esc_html_e( 'Enable schedule', 'digital-signage' ); ?></span></label>
-				<div class="ds-field"><label for="wake_time"><?php esc_html_e( 'Wake time', 'digital-signage' ); ?></label><input class="ds-input" type="time" id="wake_time" name="wake_time" value="<?php echo esc_attr( $schedule['wake_time'] ); ?>" /></div>
-				<div class="ds-field"><label for="sleep_time"><?php esc_html_e( 'Sleep time', 'digital-signage' ); ?></label><input class="ds-input" type="time" id="sleep_time" name="sleep_time" value="<?php echo esc_attr( $schedule['sleep_time'] ); ?>" /></div>
-				<div class="ds-field"><label for="timezone"><?php esc_html_e( 'Time zone', 'digital-signage' ); ?></label><select class="ds-input" id="timezone" name="timezone"><?php echo wp_timezone_choice( $schedule['timezone'], get_user_locale() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></select></div>
-			</div>
-			<div class="ds-weekdays"><?php $day_names = array( __( 'Sun', 'digital-signage' ), __( 'Mon', 'digital-signage' ), __( 'Tue', 'digital-signage' ), __( 'Wed', 'digital-signage' ), __( 'Thu', 'digital-signage' ), __( 'Fri', 'digital-signage' ), __( 'Sat', 'digital-signage' ) ); foreach ( $day_names as $day_number => $day_name ) : ?><label><input type="checkbox" name="days[]" value="<?php echo esc_attr( $day_number ); ?>" <?php checked( in_array( $day_number, array_map( 'absint', (array) $schedule['days'] ), true ) ); ?> /> <?php echo esc_html( $day_name ); ?></label><?php endforeach; ?></div>
-			<button class="ds-btn ds-btn-primary" type="submit"><?php esc_html_e( 'Save Power Schedule', 'digital-signage' ); ?></button>
-		</form>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="ds-inline-form"><input type="hidden" name="action" value="ds_controller_command" /><input type="hidden" name="controller_id" value="<?php echo esc_attr( $id ); ?>" /><?php wp_nonce_field( 'ds_controller_command' ); ?><button class="ds-btn" name="command_type" value="power_test"><?php esc_html_e( 'Test 2-minute Suspend/Wake', 'digital-signage' ); ?></button></form>
-	</div>
-	<?php endif; ?>
 
 	<div class="ds-panel">
 		<h2><?php esc_html_e( 'Command history', 'digital-signage' ); ?></h2>

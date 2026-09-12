@@ -15,10 +15,34 @@ elif [ -n "${1:-}" ]; then
 fi
 
 settings_file="/etc/digital-signage-ubuntu/settings.json"
+status_file="/etc/digital-signage-ubuntu/update-status.json"
+
+write_status() {
+	python3 - "$status_file" "$1" "$2" <<'PY'
+import json, os, sys, time
+path, status, message = sys.argv[1:]
+temporary = path + ".tmp"
+with open(temporary, "w", encoding="utf-8") as handle:
+    json.dump({"status": status, "message": message[:500], "updated_at": int(time.time())}, handle, sort_keys=True)
+    handle.write("\n")
+os.chmod(temporary, 0o644)
+os.replace(temporary, path)
+PY
+}
+
 if [ ! -r "$settings_file" ]; then
 	echo "Ubuntu controller settings are missing. Run install-kiosk.sh first." >&2
 	exit 1
 fi
+update_completed=0
+on_exit() {
+	status=$?
+	if [ "$status" -ne 0 ] && [ "$update_completed" -eq 0 ]; then
+		write_status "failed" "Update command failed with exit status ${status}. Check systemctl status digital-signage-ubuntu-update.service."
+	fi
+}
+trap on_exit EXIT
+write_status "running" "Git update is running."
 
 readarray -t settings < <(python3 - "$settings_file" <<'PY'
 import json, sys
@@ -82,4 +106,6 @@ PY
 	fi
 fi
 
+write_status "succeeded" "Digital Signage update completed and settings were preserved."
+update_completed=1
 echo "Digital Signage is updated. Existing identity and settings were preserved."

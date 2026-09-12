@@ -55,7 +55,7 @@ esac
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
-	python3 git ca-certificates curl x11-xserver-utils wmctrl xdotool unclutter dbus-x11 gdm3
+	python3 git ca-certificates curl sudo x11-xserver-utils unclutter dbus-x11 gdm3
 
 browser_bin=""
 for browser_candidate in google-chrome-stable google-chrome; do
@@ -157,6 +157,9 @@ install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/update-kiosk.sh" \
 	/usr/local/sbin/digital-signage-update
 install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/digital-signage-root-command" \
 	/usr/local/sbin/digital-signage-root-command
+install -o root -g root -m 644 \
+	"$managed_repo/ubuntu-kiosk/systemd/digital-signage-ubuntu-update.service" \
+	/etc/systemd/system/digital-signage-ubuntu-update.service
 
 mkdir -p /etc/opt/chrome/policies/managed /etc/chromium/policies/managed /etc/chromium-browser/policies/managed /etc/xdg/autostart
 for policy_root in /etc/opt/chrome/policies/managed /etc/chromium/policies/managed /etc/chromium-browser/policies/managed; do
@@ -195,9 +198,25 @@ rm -f /etc/systemd/system/digital-signage-ubuntu.service /usr/local/bin/ds-ubunt
 
 sudoers_file="/etc/sudoers.d/digital-signage-ubuntu"
 install -o root -g root -m 440 /dev/stdin "$sudoers_file" <<EOF
-$kiosk_user ALL=(root) NOPASSWD: /usr/local/sbin/digital-signage-root-command reboot, /usr/local/sbin/digital-signage-root-command software-update, /usr/local/sbin/digital-signage-root-command system-update
+$kiosk_user ALL=(root) NOPASSWD: /usr/local/sbin/digital-signage-root-command reboot, /usr/local/sbin/digital-signage-root-command software-update, /usr/local/sbin/digital-signage-root-command system-update, /usr/local/sbin/digital-signage-root-command check
 EOF
 visudo -cf "$sudoers_file" >/dev/null
+
+mkdir -p /etc/systemd/logind.conf.d /etc/systemd/sleep.conf.d
+install -o root -g root -m 644 /dev/stdin /etc/systemd/logind.conf.d/bykutt-digital-signage.conf <<'LOGIND'
+[Login]
+IdleAction=ignore
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+LOGIND
+install -o root -g root -m 644 /dev/stdin /etc/systemd/sleep.conf.d/bykutt-digital-signage.conf <<'SLEEP'
+[Sleep]
+AllowSuspend=no
+AllowHibernation=no
+AllowSuspendThenHibernate=no
+AllowHybridSleep=no
+SLEEP
 
 if systemctl list-unit-files ds-kiosk.service >/dev/null 2>&1; then
 	systemctl disable --now ds-kiosk.service >/dev/null 2>&1 || true
@@ -205,6 +224,7 @@ fi
 systemctl unmask getty@tty1.service >/dev/null 2>&1 || true
 systemctl set-default graphical.target
 systemctl daemon-reload
+runuser -u "$kiosk_user" -- sudo -n /usr/local/sbin/digital-signage-root-command check >/dev/null
 
 if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
 	pid_file="$profile_root/controller.pid"
@@ -218,7 +238,7 @@ if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
 fi
 
 echo
-echo "Digital Signage Ubuntu controller 3.2.2 with stable Chrome boot autostart is installed."
+echo "Digital Signage Ubuntu controller 3.3.0 is installed."
 echo "No automatic reboot timer or reboot watchdog was installed."
 echo "Reboot once to activate Xorg autologin: sudo reboot"
 echo "Future updates: sudo digital-signage-update"

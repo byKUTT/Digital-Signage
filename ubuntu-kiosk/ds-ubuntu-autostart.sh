@@ -39,7 +39,9 @@ xset -dpms >/dev/null 2>&1 || true
 gsettings set org.gnome.desktop.session idle-delay 0 >/dev/null 2>&1 || true
 gsettings set org.gnome.desktop.screensaver lock-enabled false >/dev/null 2>&1 || true
 gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' >/dev/null 2>&1 || true
-unclutter -idle 0.1 -root >/dev/null 2>&1 &
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0 >/dev/null 2>&1 || true
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' >/dev/null 2>&1 || true
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0 >/dev/null 2>&1 || true
 
 while true; do
 	"$controller"
