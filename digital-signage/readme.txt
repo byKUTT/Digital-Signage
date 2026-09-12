@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 4.0.0
+Stable tag: 4.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -45,6 +45,14 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 4.1.1 =
+* Fixed WP_Post conversion warnings in frontend access filtering.
+* Added group-scoped screens, controllers, channels, schedules, settings, media, and Screen Manager accounts.
+* Completed the frontend manager with creation, editing, pairing, telemetry, logs, calendar schedules, and verified deletion.
+* Software updates now show an Updating screen on every output, report the final result, and reboot after success.
+* Sleep schedules now use the synchronized WordPress server clock and server timezone, with actionable DPMS errors in logs.
+* Standardized portal schedule and activity timestamps on 24-hour server time.
 
 = 4.0.0 =
 * Added the authenticated `/signage-manager/` frontend portal with a simplified overview, screens, channels, controllers, and people experience.

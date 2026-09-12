@@ -1,0 +1,29 @@
+.ds-server-time {
+	color: var(--ds-muted);
+	font-size: 13px;
+}
+.ds-server-time strong {
+	color: var(--ds-text);
+	font-variant-numeric: tabular-nums;
+}
+.ds-time {
+	font-variant-numeric: tabular-nums;
+}
+.ds-day-picks {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	grid-column: 1 / -1;
+}
+.ds-day-picks label {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 6px 9px;
+	border: 1px solid var(--ds-line);
+	border-radius: 999px;
+	font-size: 12px;
+}
+.ds-day-picks input {
+	margin: 0;
+}

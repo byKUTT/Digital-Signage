@@ -18,6 +18,7 @@ class DS_Roles {
 	private static $instance = null;
 
 	const ROLE = 'ds_signage_manager';
+	const SCREEN_MANAGER_ROLE = 'ds_screen_manager';
 	const CAP  = 'manage_digital_signage';
 	const TEAM_OPTION = 'ds_team_user_ids';
 
@@ -35,6 +36,8 @@ class DS_Roles {
 	}
 
 	public static function add_role() {
+		add_role( self::SCREEN_MANAGER_ROLE, __( 'Screen Manager', 'digital-signage' ), array( 'read' => true, 'upload_files' => true, self::CAP => true ) );
+		if ( get_role( self::SCREEN_MANAGER_ROLE ) ) { get_role( self::SCREEN_MANAGER_ROLE )->add_cap( self::CAP ); get_role( self::SCREEN_MANAGER_ROLE )->add_cap( 'upload_files' ); }
 		if ( ! get_role( self::ROLE ) ) {
 			add_role(
 				self::ROLE,

@@ -92,6 +92,11 @@ to be typed as confirmation. It saves the new WordPress URL, clears the old
 pairing identity, acknowledges the old controller, and reboots; the device then
 shows a fresh pairing code on the new site.
 
+Schedule times are always evaluated against the WordPress server clock and
+WordPress timezone, not the Ubuntu computer's local clock. Times use 24-hour
+`HH:MM` format. A failed X11/DPMS command is reported in controller telemetry
+and logs instead of being treated as a successful screen-off action.
+
 ## Kiosk and desktop mode
 
 The WordPress Controller page provides **Close Screens / Show Desktop** for

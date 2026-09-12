@@ -299,6 +299,7 @@ class DS_Controllers {
 			'schedule'    => $controller ? json_decode( (string) $controller->power_schedule, true ) : null,
 			'command'     => self::next_command( $controller_id ),
 			'server_time' => time(),
+			'server_timezone' => wp_timezone_string() ?: 'UTC',
 		);
 	}
 
@@ -463,7 +464,7 @@ class DS_Controllers {
 
 	public static function save_schedule( $controller_id, array $input ) {
 		global $wpdb;
-		$timezone = sanitize_text_field( $input['timezone'] ?? wp_timezone_string() );
+		$timezone = wp_timezone_string() ?: 'UTC';
 		if ( ! in_array( $timezone, timezone_identifiers_list(), true ) ) {
 			$timezone = 'UTC';
 		}
@@ -544,5 +545,14 @@ class DS_Controllers {
 	public static function unlink_screen( $screen_id ) {
 		global $wpdb;
 		$wpdb->update( self::table( 'displays' ), array( 'screen_id' => 0 ), array( 'screen_id' => absint( $screen_id ) ), array( '%d' ), array( '%d' ) );
+	}
+
+	public static function delete( $controller_id ) {
+		global $wpdb; $controller_id = absint( $controller_id );
+		foreach ( self::get_displays( $controller_id ) as $display ) { if ( $display->screen_id ) { delete_post_meta( $display->screen_id, 'ds_controller_id' ); delete_post_meta( $display->screen_id, 'ds_controller_output' ); } }
+		$wpdb->delete( self::table( 'commands' ), array( 'controller_id' => $controller_id ), array( '%d' ) );
+		$wpdb->delete( self::table( 'displays' ), array( 'controller_id' => $controller_id ), array( '%d' ) );
+		$wpdb->delete( self::controllers_table(), array( 'id' => $controller_id ), array( '%d' ) );
+		$map = (array) get_option( DS_Groups::CONTROLLER_OPTION, array() ); unset( $map[ $controller_id ] ); update_option( DS_Groups::CONTROLLER_OPTION, $map, false );
 	}
 }

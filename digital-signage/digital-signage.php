@@ -3,7 +3,7 @@
  * Plugin Name:       Digital Signage CMS
  * Plugin URI:        https://github.com/bykutt/digital-signage
  * Description:       Turns WordPress into a full digital signage platform — manage channels, screens, playlists and schedules from wp-admin, and drive TVs/kiosks/tablets from a chrome-less fullscreen player.
- * Version:           4.0.0
+ * Version:           4.1.1
  * Requires at least: 5.9
  * Requires PHP:      7.4
  * Author:            byKUTT
@@ -18,12 +18,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'DS_VERSION', '4.0.0' );
+define( 'DS_VERSION', '4.1.1' );
 define( 'DS_PLUGIN_FILE', __FILE__ );
 define( 'DS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'DS_DB_VERSION', '2.0.0' );
-define( 'DS_DEVICE_VERSION', '4.0.0' );
+define( 'DS_DEVICE_VERSION', '4.1.1' );
 
 /**
  * Autoload plugin classes.
@@ -69,6 +69,7 @@ function ds_bootstrap() {
 
 	DS_CPT::instance();
 	DS_Roles::instance();
+	DS_Groups::instance();
 	DS_Settings::instance();
 	DS_Admin::instance();
 	DS_CRUD::instance();

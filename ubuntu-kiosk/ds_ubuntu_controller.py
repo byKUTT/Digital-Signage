@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "4.0.0"
+VERSION = "4.1.1"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
 HEARTBEAT_SECONDS = 10
@@ -227,9 +227,18 @@ class Controller:
         self.stop_requested = False
         self.connected_output_count = 0
         self.display_sleeping: bool | None = None
+        self.server_time_offset = 0.0
+        self.server_timezone = str(self.state.get("server_timezone") or "UTC")
 
     def log(self, message: str) -> None:
-        line = time.strftime("%Y-%m-%d %H:%M:%S ") + message
+        try:
+            zone = ZoneInfo(self.server_timezone)
+            stamp = datetime.datetime.fromtimestamp(time.time() + self.server_time_offset, zone).strftime(
+                "%Y-%m-%d %H:%M:%S "
+            )
+        except (KeyError, ValueError, TypeError):
+            stamp = time.strftime("%Y-%m-%d %H:%M:%S ")
+        line = stamp + message
         print(line, flush=True)
         self.recent_log = (self.recent_log + [line])[-30:]
 
@@ -419,6 +428,36 @@ class Controller:
         result = (completed.stdout + completed.stderr).strip()
         return completed.returncode == 0, result
 
+    def show_update_screen(self, outputs: list[Output]) -> None:
+        """Replace signage with a local update status on every output."""
+        page = self.profile_root / "updating.html"
+        page.write_text(
+            """<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Updating</title><style>*{box-sizing:border-box}body{margin:0;background:#101512;color:#fff;font:600 clamp(28px,5vw,72px)/1.1 system-ui;display:grid;place-items:center;min-height:100vh;text-align:center}small{display:block;color:#aeb9b1;font:400 clamp(14px,1.7vw,24px)/1.4 system-ui;margin-top:18px}</style><main>Updating…<small>Please wait. This screen will restart automatically.</small></main>""",
+            encoding="utf-8",
+        )
+        self.stop_players()
+        for output in outputs:
+            self.players[output.output_key] = self.launch_player(output, page.as_uri())
+        self.log("Showing software update status on all displays")
+
+    def wait_for_software_update(self, started_at: int) -> tuple[bool, str]:
+        status_path = self.settings_path.with_name("update-status.json")
+        deadline = time.monotonic() + 1800
+        while time.monotonic() < deadline:
+            try:
+                status = load_json(status_path)
+                if int(status.get("updated_at", 0)) >= started_at - 2:
+                    state = str(status.get("status", ""))
+                    message = str(status.get("message", ""))[:500]
+                    if state == "succeeded":
+                        return True, message
+                    if state == "failed":
+                        return False, message
+            except (OSError, TypeError, ValueError):
+                pass
+            time.sleep(2)
+        return False, "Software update timed out after 30 minutes"
+
     def apply_command(self, command: dict[str, Any]) -> None:
         command_id = int(command.get("id", 0))
         command_type = str(command.get("type", ""))
@@ -480,20 +519,45 @@ class Controller:
                 save_private_json(self.identity_path, self.identity)
                 raise RuntimeError(f"URL switch reboot failed; old settings restored: {result}")
             return
+        if command_type == "software_update":
+            self.show_update_screen(self.outputs())
+            started_at = int(time.time())
+            ok, result = self.run_root_command("software-update")
+            if ok:
+                ok, result = self.wait_for_software_update(started_at)
+            self.ack(command_id, "succeeded" if ok else "failed", result)
+            if ok:
+                self.log("Software update completed; rebooting")
+                reboot_ok, reboot_result = self.run_root_command("reboot")
+                if reboot_ok:
+                    self.stop_requested = True
+                else:
+                    raise RuntimeError(f"Update succeeded but reboot failed: {reboot_result}")
+            else:
+                self.stop_players()
+                self.force_refresh = True
+            return
         root_name = {
             "reboot": "reboot",
-            "software_update": "software-update",
             "system_update": "system-update",
         }[command_type]
         ok, result = self.run_root_command(root_name)
         self.ack(command_id, "succeeded" if ok else "failed", result)
 
-    def apply_display_schedule(self, schedule: dict[str, Any] | None) -> None:
+    @staticmethod
+    def run_display_power_command(arguments: list[str]) -> None:
+        completed = subprocess.run(arguments, check=False, capture_output=True, text=True, timeout=10)
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or "unknown X11 error").strip()
+            raise RuntimeError(f"Display power command failed: {' '.join(arguments)}: {detail}")
+
+    def apply_display_schedule(self, schedule: dict[str, Any] | None, server_epoch: float | None = None) -> None:
         if not isinstance(schedule, dict) or not schedule.get("enabled"):
             should_sleep = False
         else:
             try:
-                now = datetime.datetime.now(ZoneInfo(str(schedule.get("timezone") or "UTC")))
+                zone = ZoneInfo(str(schedule.get("timezone") or "UTC"))
+                now = datetime.datetime.fromtimestamp(server_epoch, zone) if server_epoch is not None else datetime.datetime.now(zone)
                 days = {int(day) for day in schedule.get("days", [])}
                 wake_hour, wake_minute = map(int, str(schedule.get("wake_time", "07:00")).split(":"))
                 sleep_hour, sleep_minute = map(int, str(schedule.get("sleep_time", "22:00")).split(":"))
@@ -509,12 +573,12 @@ class Controller:
         if self.display_sleeping is should_sleep:
             return
         if should_sleep:
-            subprocess.run(["xset", "+dpms"], check=False, timeout=10)
-            subprocess.run(["xset", "dpms", "force", "off"], check=False, timeout=10)
+            self.run_display_power_command(["xset", "+dpms"])
+            self.run_display_power_command(["xset", "dpms", "force", "off"])
             self.log("Display sleep schedule turned screens off")
         else:
-            subprocess.run(["xset", "dpms", "force", "on"], check=False, timeout=10)
-            subprocess.run(["xset", "-dpms"], check=False, timeout=10)
+            self.run_display_power_command(["xset", "dpms", "force", "on"])
+            self.run_display_power_command(["xset", "-dpms"])
             self.log("Display sleep schedule turned screens on")
         self.display_sleeping = should_sleep
 
@@ -613,6 +677,17 @@ class Controller:
                     now = time.monotonic()
                     if self.force_refresh or now - last_heartbeat >= HEARTBEAT_SECONDS:
                         state = self.heartbeat(outputs)
+                        if isinstance(state.get("server_time"), (int, float)):
+                            self.server_time_offset = float(state["server_time"]) - time.time()
+                        received_timezone = str(state.get("server_timezone") or "UTC")
+                        try:
+                            ZoneInfo(received_timezone)
+                            self.server_timezone = received_timezone
+                            if self.state.get("server_timezone") != received_timezone:
+                                self.state["server_timezone"] = received_timezone
+                                save_private_json(self.state_path, self.state)
+                        except (KeyError, ValueError):
+                            self.server_timezone = "UTC"
                         assignments = list(state.get("assignments") or [])
                         schedule = state.get("schedule") if isinstance(state.get("schedule"), dict) else None
                         command = state.get("command")
@@ -621,7 +696,7 @@ class Controller:
                         last_heartbeat = now
                         self.force_refresh = False
                     self.sync_players(outputs, reconcile_targets(outputs, assignments))
-                    self.apply_display_schedule(schedule)
+                    self.apply_display_schedule(schedule, time.time() + self.server_time_offset)
                     consecutive_errors = 0
                     self.last_error = ""
                 except (OSError, ValueError, RuntimeError, subprocess.SubprocessError, urllib.error.URLError) as error:

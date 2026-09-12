@@ -122,7 +122,7 @@ class DS_REST {
 		$zones    = DS_Schedule_Resolver::get_active_playlist( $channel_id );
 		$layout   = get_post_meta( $channel_id, 'ds_layout_template', true ) ?: 'fullscreen';
 		$zone_bg  = get_post_meta( $channel_id, 'ds_zone_bg_color', true );
-		$settings = DS_Settings::get_all();
+		$settings = DS_Groups::settings_for_post( $channel_id );
 
 		$response = rest_ensure_response(
 			array(
@@ -202,7 +202,7 @@ class DS_REST {
 		$zones      = $channel_id ? DS_Schedule_Resolver::get_active_playlist( $channel_id ) : array();
 		$layout     = $channel_id ? ( get_post_meta( $channel_id, 'ds_layout_template', true ) ?: 'fullscreen' ) : 'fullscreen';
 		$zone_bg    = $channel_id ? get_post_meta( $channel_id, 'ds_zone_bg_color', true ) : '';
-		$settings   = DS_Settings::get_all();
+		$settings   = DS_Groups::settings_for_post( $screen->ID );
 
 		$remote_command = get_post_meta( $screen->ID, 'ds_remote_command', true );
 		$remote_ts      = (int) get_post_meta( $screen->ID, 'ds_remote_command_ts', true );
@@ -538,7 +538,7 @@ class DS_REST {
 	public static function slide_to_array( $slide ) {
 		$type    = get_post_meta( $slide->ID, 'ds_slide_type', true ) ?: 'image';
 		$media   = absint( get_post_meta( $slide->ID, 'ds_media_id', true ) );
-		$settings = DS_Settings::get_all();
+		$settings = DS_Groups::settings_for_post( $slide->ID );
 
 		$duration_override = get_post_meta( $slide->ID, 'ds_duration_override', true );
 		$duration           = $duration_override ? absint( $duration_override ) : absint( $settings[ 'duration_' . $type ] ?? 10 );

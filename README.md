@@ -63,8 +63,9 @@ hibernation are disabled. Successful remote software updates and verified URL
 migrations reboot automatically; there is no daily reboot or watchdog. See `ubuntu-kiosk/README.md` for recovery, assignment,
 diagnostics, and uninstall instructions.
 
-Version 4.0.0 adds display sleep schedules, verified WordPress URL migration,
-and automatic reboot after successful Git updates.
+Version 4.1.1 adds group-scoped frontend management, a complete controller
+status view, calendar scheduling, server-clock display sleep, and visible
+on-screen update progress followed by an automatic reboot.
 
 ### VIDAA 9 TV without external hardware
 

@@ -6,6 +6,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 MODULE_PATH = pathlib.Path(__file__).parents[1] / "ds_ubuntu_controller.py"
 SPEC = importlib.util.spec_from_file_location("ds_ubuntu_controller", MODULE_PATH)
@@ -220,8 +221,25 @@ class ValidationTests(unittest.TestCase):
 
     def test_remote_update_reboots_only_after_success(self):
         updater = (pathlib.Path(__file__).parents[1] / "update-kiosk.sh").read_text(encoding="utf-8")
+        service = (pathlib.Path(__file__).parents[1] / "systemd/digital-signage-ubuntu-update.service").read_text(encoding="utf-8")
         self.assertIn('if [ "$restart_service" -eq 1 ]; then', updater)
         self.assertIn("systemctl reboot", updater)
+        self.assertIn("digital-signage-update --no-restart", service)
+        self.assertIn("show_update_screen", MODULE_PATH.read_text(encoding="utf-8"))
+
+    def test_sleep_schedule_uses_supplied_server_epoch(self):
+        controller = CONTROLLER.Controller.__new__(CONTROLLER.Controller)
+        controller.display_sleeping = None
+        controller.last_error = ""
+        controller.log = lambda _message: None
+        schedule = {"enabled": True, "timezone": "UTC", "days": [0], "wake_time": "07:00", "sleep_time": "22:00"}
+        with mock.patch.object(CONTROLLER.subprocess, "run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stderr = ""
+            run.return_value.stdout = ""
+            controller.apply_display_schedule(schedule, 1789340400)  # 2026-09-13 23:00 UTC.
+            self.assertTrue(controller.display_sleeping)
+            self.assertIn(["xset", "dpms", "force", "off"], [call.args[0] for call in run.call_args_list])
 
     def test_controller_supports_remote_url_switch_and_display_schedule(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
