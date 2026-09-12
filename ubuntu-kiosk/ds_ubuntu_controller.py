@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "4.1.2"
+VERSION = "4.2.0"
 DEFAULT_SITE = "https://screens.kutt.ee"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
@@ -470,7 +470,6 @@ class Controller:
             "reboot",
             "software_update",
             "system_update",
-            "power_test",
             "switch_url",
         }
         if not command_id or command_type not in allowed:
@@ -499,9 +498,6 @@ class Controller:
         if command_type == "refresh_displays":
             self.force_refresh = True
             self.ack(command_id, "succeeded", "Display discovery requested")
-            return
-        if command_type == "power_test":
-            self.ack(command_id, "failed", "Automatic suspend/wake is disabled on Ubuntu")
             return
         if command_type == "switch_url":
             payload = command.get("payload") if isinstance(command.get("payload"), dict) else {}

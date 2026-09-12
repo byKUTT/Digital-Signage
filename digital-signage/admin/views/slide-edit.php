@@ -20,7 +20,7 @@ $html     = $id ? get_post_meta( $id, 'ds_content_html', true ) : '';
 $feed     = $id ? get_post_meta( $id, 'ds_feed_url', true ) : '';
 $weather  = $id ? get_post_meta( $id, 'ds_weather_location', true ) : '';
 $api_key  = $id ? get_post_meta( $id, 'ds_weather_api_key', true ) : '';
-$playmode = $id ? ( get_post_meta( $id, 'ds_video_play_mode', true ) ?: 'fixed_duration' ) : 'fixed_duration';
+$playmode = $id ? ( get_post_meta( $id, 'ds_video_play_mode', true ) ?: 'until_end' ) : 'until_end';
 $duration = $id ? get_post_meta( $id, 'ds_duration_override', true ) : '';
 $fit      = $id ? ( get_post_meta( $id, 'ds_fit', true ) ?: 'cover' ) : 'cover';
 $zone     = $id ? ( get_post_meta( $id, 'ds_zone', true ) ?: 'main' ) : 'main';
@@ -117,7 +117,7 @@ $day_labels = array( 'mon' => __( 'Mon', 'digital-signage' ), 'tue' => __( 'Tue'
 				<div class="ds-type-field" data-type="video">
 					<div class="ds-field">
 						<label><?php esc_html_e( 'Video playback', 'digital-signage' ); ?></label>
-						<label class="ds-radio-label"><input type="radio" name="video_play_mode" value="full_length" <?php checked( $playmode, 'full_length' ); ?> /> <?php esc_html_e( 'Play full length (advance on video end)', 'digital-signage' ); ?></label>
+						<label class="ds-radio-label"><input type="radio" name="video_play_mode" value="until_end" <?php checked( in_array( $playmode, array( 'until_end', 'full_length' ), true ) ); ?> /> <?php esc_html_e( 'Play full length (advance on video end)', 'digital-signage' ); ?></label>
 						<label class="ds-radio-label"><input type="radio" name="video_play_mode" value="fixed_duration" <?php checked( $playmode, 'fixed_duration' ); ?> /> <?php esc_html_e( 'Use fixed duration below', 'digital-signage' ); ?></label>
 					</div>
 				</div>

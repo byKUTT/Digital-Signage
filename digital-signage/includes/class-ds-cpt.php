@@ -70,6 +70,7 @@ class DS_CPT {
 		register_post_type( 'ds_screen', array_merge( $common, array( 'label' => __( 'Screens', 'digital-signage' ) ) ) );
 		register_post_type( 'ds_slide', array_merge( $common, array( 'label' => __( 'Slides', 'digital-signage' ) ) ) );
 		register_post_type( 'ds_schedule', array_merge( $common, array( 'label' => __( 'Schedules', 'digital-signage' ) ) ) );
+		register_post_type( 'ds_design', array_merge( $common, array( 'label' => __( 'Designs', 'digital-signage' ) ) ) );
 	}
 
 	public function register_taxonomies() {

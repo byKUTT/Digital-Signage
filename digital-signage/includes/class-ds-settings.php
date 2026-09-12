@@ -53,7 +53,8 @@ class DS_Settings {
 				$allowed     = array( 'none', 'fade', 'slide', 'zoom' );
 				$out[ $key ] = isset( $input[ $key ] ) && in_array( $input[ $key ], $allowed, true ) ? $input[ $key ] : $default;
 			} elseif ( 'timezone' === $key ) {
-				$out[ $key ] = isset( $input[ $key ] ) ? sanitize_text_field( $input[ $key ] ) : $default;
+				$timezone = isset( $input[ $key ] ) ? sanitize_text_field( $input[ $key ] ) : $default;
+				$out[ $key ] = in_array( $timezone, timezone_identifiers_list(), true ) ? $timezone : $default;
 			} else {
 				$out[ $key ] = isset( $input[ $key ] ) ? sanitize_text_field( $input[ $key ] ) : $default;
 			}

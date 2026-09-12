@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 4.1.2
+Stable tag: 4.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -45,6 +45,14 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 4.2.0 =
+* Added the bundled Vellum designer with landscape, portrait, and square signage canvases, saved group designs, preview rendering, and one-click channel publishing.
+* Added a separate `bin/update-vellum.sh` command for refreshing the locally bundled editor from the official Vellum repository.
+* Slides can now be renamed and edited from the frontend, select or upload WordPress media, override duration, and play videos to the end by default.
+* Slide deletion is immediate and no longer requires a typed verification phrase.
+* Moved display sleep scheduling into each controller's settings and replaced schedule text fields with native 24-hour time pickers.
+* Added searchable IANA city timezones and removed the unsupported one-off display power test.
 
 = 4.1.2 =
 * Fixed first-use Group access denied failures by creating a personal workspace automatically.

@@ -63,10 +63,23 @@ hibernation are disabled. Successful remote software updates and verified URL
 migrations reboot automatically; there is no daily reboot or watchdog. See `ubuntu-kiosk/README.md` for recovery, assignment,
 diagnostics, and uninstall instructions.
 
-Version 4.1.2 adds automatic personal workspaces and device ownership, keeps
-unpaired controllers hidden until their code is claimed, adds frontend account
-screens and a Screen Manager toolbar shortcut, and defaults new devices to
-`https://screens.kutt.ee`.
+Version 4.2.0 adds a locally bundled Vellum design studio, saved group designs,
+one-click channel publishing, editable media-based slides, native 24-hour time
+pickers, searchable city timezones, and controller-specific sleep settings.
+
+### Updating the bundled Vellum designer
+
+Run this on the WordPress server from the repository root. It downloads only
+the allow-listed runtime files from the official Vellum repository and records
+the exact upstream commit in `digital-signage/vendor/vellum/UPSTREAM_COMMIT`:
+
+```bash
+sudo bash digital-signage/bin/update-vellum.sh
+```
+
+Commit and deploy the changed vendor files with the plugin. Vellum remains
+local-first in the browser; publishing through Digital Signage saves both its
+native document and a rendered PNG inside the active group.
 
 ### VIDAA 9 TV without external hardware
 

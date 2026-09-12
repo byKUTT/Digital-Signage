@@ -74,7 +74,8 @@ $s = DS_Settings::get_all();
 				</div>
 				<div class="ds-field">
 					<label for="ds_timezone"><?php esc_html_e( 'Scheduling time zone', 'digital-signage' ); ?></label>
-					<input type="text" id="ds_timezone" name="ds_settings[timezone]" value="<?php echo esc_attr( $s['timezone'] ); ?>" class="ds-input" placeholder="e.g. America/New_York" />
+					<input type="text" id="ds_timezone" name="ds_settings[timezone]" value="<?php echo esc_attr( $s['timezone'] ); ?>" class="ds-input" list="ds-admin-timezones" autocomplete="off" placeholder="Search city" />
+					<datalist id="ds-admin-timezones"><?php foreach ( timezone_identifiers_list() as $timezone_name ) : $parts = explode( '/', $timezone_name ); ?><option value="<?php echo esc_attr( $timezone_name ); ?>"><?php echo esc_html( str_replace( '_', ' ', end( $parts ) ) ); ?></option><?php endforeach; ?></datalist>
 				</div>
 			</div>
 		</div>

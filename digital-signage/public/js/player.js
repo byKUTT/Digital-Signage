@@ -1003,7 +1003,7 @@
 				preload( zone.items[ nextIndex ], zone );
 			}
 
-			if ( video && 'full_length' === item.play_mode ) {
+			if ( video && 'fixed_duration' !== item.play_mode ) {
 				video.addEventListener( 'ended', function () { advanceZone( zoneName ); }, { once: true } );
 			} else {
 				zone.timer = setTimeout( function () { advanceZone( zoneName ); }, Math.max( 1, item.duration || 10 ) * 1000 );

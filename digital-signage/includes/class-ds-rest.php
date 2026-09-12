@@ -590,7 +590,7 @@ class DS_REST {
 				break;
 			case 'video':
 				$data['src']       = $media ? wp_get_attachment_url( $media ) : get_post_meta( $slide->ID, 'ds_content_url', true );
-				$data['play_mode'] = get_post_meta( $slide->ID, 'ds_video_play_mode', true ) ?: 'fixed_duration';
+				$data['play_mode'] = get_post_meta( $slide->ID, 'ds_video_play_mode', true ) ?: 'until_end';
 				break;
 			case 'webpage':
 				$data['url'] = esc_url_raw( get_post_meta( $slide->ID, 'ds_content_url', true ) );

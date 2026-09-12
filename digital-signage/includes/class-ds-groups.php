@@ -82,8 +82,16 @@ class DS_Groups {
 	public static function settings( $group_id ) { return wp_parse_args( (array) get_option( 'ds_group_settings_' . absint( $group_id ), array() ), DS_Activator::default_settings() ); }
 	public static function settings_for_post( $post_id ) { $group_id = self::post_group_id( $post_id ); return $group_id ? self::settings( $group_id ) : DS_Settings::get_all(); }
 	public static function save_settings( $group_id, array $input ) { update_option( 'ds_group_settings_' . absint( $group_id ), DS_Settings::instance()->sanitize( $input ), false ); }
-	public function tag_attachment( $attachment_id ) { $group_id = self::current_group_id(); if ( $group_id ) { self::set_post_group( $attachment_id, $group_id ); } }
+	public function tag_attachment( $attachment_id ) {
+		$requested = absint( $_REQUEST['ds_group'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$allowed = current_user_can( 'manage_options' ) || in_array( $requested, self::user_group_ids(), true );
+		$group_id = $requested && $allowed ? $requested : self::current_group_id();
+		if ( $group_id ) { self::set_post_group( $attachment_id, $group_id ); }
+	}
 	public function filter_media_query( $args ) {
+		$requested = absint( $args['ds_group'] ?? 0 );
+		unset( $args['ds_group'] );
+		if ( $requested && ( current_user_can( 'manage_options' ) || in_array( $requested, self::user_group_ids(), true ) ) ) { $args['meta_query'] = array( array( 'key' => self::POST_META, 'value' => $requested, 'compare' => '=', 'type' => 'NUMERIC' ) ); return $args; }
 		if ( current_user_can( 'manage_options' ) ) { return $args; }
 		$ids = self::user_group_ids(); $args['meta_query'] = array( array( 'key' => self::POST_META, 'value' => $ids, 'compare' => 'IN', 'type' => 'NUMERIC' ) ); return $args;
 	}

@@ -31,7 +31,7 @@ delete_option( 'ds_groups' );
 delete_option( 'ds_controller_groups' );
 delete_option( 'ds_controller_owners' );
 
-foreach ( array( 'ds_channel', 'ds_screen', 'ds_slide', 'ds_schedule' ) as $post_type ) {
+foreach ( array( 'ds_channel', 'ds_screen', 'ds_slide', 'ds_schedule', 'ds_design' ) as $post_type ) {
 	$posts = get_posts( array( 'post_type' => $post_type, 'posts_per_page' => -1, 'post_status' => 'any', 'fields' => 'ids' ) );
 	foreach ( $posts as $post_id ) {
 		wp_delete_post( $post_id, true );
