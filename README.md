@@ -63,9 +63,10 @@ hibernation are disabled. Successful remote software updates and verified URL
 migrations reboot automatically; there is no daily reboot or watchdog. See `ubuntu-kiosk/README.md` for recovery, assignment,
 diagnostics, and uninstall instructions.
 
-Version 4.1.1 adds group-scoped frontend management, a complete controller
-status view, calendar scheduling, server-clock display sleep, and visible
-on-screen update progress followed by an automatic reboot.
+Version 4.1.2 adds automatic personal workspaces and device ownership, keeps
+unpaired controllers hidden until their code is claimed, adds frontend account
+screens and a Screen Manager toolbar shortcut, and defaults new devices to
+`https://screens.kutt.ee`.
 
 ### VIDAA 9 TV without external hardware
 

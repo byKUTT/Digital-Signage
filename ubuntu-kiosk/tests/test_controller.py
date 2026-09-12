@@ -264,6 +264,21 @@ class ValidationTests(unittest.TestCase):
         self.assertIn("'linux' === $controller->platform", admin)
         self.assertIn("command_database", controller)
 
+    def test_new_controllers_are_hidden_until_paired_and_owned_after_pairing(self):
+        repo = pathlib.Path(__file__).parents[2]
+        controllers = (repo / "digital-signage/includes/class-ds-controllers.php").read_text(encoding="utf-8")
+        groups = (repo / "digital-signage/includes/class-ds-groups.php").read_text(encoding="utf-8")
+        portal = (repo / "digital-signage/includes/class-ds-portal.php").read_text(encoding="utf-8")
+        self.assertIn("WHERE paired_at IS NOT NULL", controllers)
+        self.assertNotIn("self::attach_legacy_screen( $controller_id", controllers)
+        self.assertIn("set_controller_owner", controllers)
+        self.assertIn("ensure_user_group", groups)
+        self.assertIn("get_current_user_id(), $group_id", portal)
+
+    def test_screens_kutt_ee_is_the_default_install_target(self):
+        installer = (pathlib.Path(__file__).parents[1] / "install-kiosk.sh").read_text(encoding="utf-8")
+        self.assertIn('site="${1:-https://screens.kutt.ee}"', installer)
+
 
 class GdmConfigurationTests(unittest.TestCase):
     def test_existing_daemon_settings_are_replaced_once(self):

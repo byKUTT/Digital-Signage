@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 4.1.1
+Stable tag: 4.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -45,6 +45,13 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 4.1.2 =
+* Fixed first-use Group access denied failures by creating a personal workspace automatically.
+* Controllers stay private and hidden until their on-screen code is paired by a signed-in user.
+* Paired controllers and generated display screens now retain their owner and workspace assignment.
+* Added branded frontend login and registration screens plus a Screen Manager admin-bar shortcut.
+* Set screens.kutt.ee as the default Ubuntu and Raspberry Pi controller website.
 
 = 4.1.1 =
 * Fixed WP_Post conversion warnings in frontend access filtering.

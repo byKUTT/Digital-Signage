@@ -71,7 +71,6 @@ class DS_Controllers {
 
 		$controller_id = (int) $wpdb->insert_id;
 		self::reconcile_displays( $controller_id, $outputs, false );
-		self::attach_legacy_screen( $controller_id, $legacy_screen_token );
 
 		return array(
 			'public_id'   => $public_id,
@@ -112,7 +111,7 @@ class DS_Controllers {
 		return hash_equals( (string) $controller->token_hash, self::token_hash( $token ) ) ? $controller : null;
 	}
 
-	public static function pair_by_code( $code, $name ) {
+	public static function pair_by_code( $code, $name, $owner_user_id = 0, $group_id = 0 ) {
 		global $wpdb;
 		$table = self::controllers_table();
 		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE pairing_code = %s AND paired_at IS NULL AND pairing_code_expires >= %s", strtoupper( sanitize_text_field( $code ) ), current_time( 'mysql', true ) ) );
@@ -131,6 +130,10 @@ class DS_Controllers {
 			array( '%s', '%s' ),
 			array( '%d' )
 		);
+		$owner_user_id = absint( $owner_user_id ?: get_current_user_id() );
+		$group_id      = absint( $group_id ?: DS_Groups::ensure_user_group( $owner_user_id ) );
+		DS_Groups::set_controller_owner( (int) $row->id, $owner_user_id );
+		DS_Groups::set_controller_group( (int) $row->id, $group_id );
 		self::ensure_display_screens( (int) $row->id, $name );
 		return (int) $row->id;
 	}
@@ -200,6 +203,8 @@ class DS_Controllers {
 	private static function ensure_display_screens( $controller_id, $controller_name ) {
 		global $wpdb;
 		$table = self::table( 'displays' );
+		$owner_id = DS_Groups::controller_owner_id( $controller_id );
+		$group_id = DS_Groups::controller_group_id( $controller_id );
 		$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE controller_id = %d AND is_connected = 1 ORDER BY id ASC", $controller_id ) );
 		foreach ( $rows as $index => $row ) {
 			if ( $row->screen_id && 'ds_screen' === get_post_type( $row->screen_id ) ) {
@@ -213,6 +218,8 @@ class DS_Controllers {
 					'orientation' => 'auto',
 				)
 			);
+			if ( $owner_id ) { wp_update_post( array( 'ID' => $screen_id, 'post_author' => $owner_id ) ); }
+			if ( $group_id ) { DS_Groups::set_post_group( $screen_id, $group_id ); }
 			update_post_meta( $screen_id, 'ds_pairing_token', wp_generate_password( 40, false, false ) );
 			update_post_meta( $screen_id, 'ds_controller_id', absint( $controller_id ) );
 			update_post_meta( $screen_id, 'ds_controller_output', $row->output_key );
@@ -334,7 +341,7 @@ class DS_Controllers {
 	public static function get_all() {
 		global $wpdb;
 		$table = self::controllers_table();
-		return $wpdb->get_results( "SELECT * FROM {$table} ORDER BY name ASC, hostname ASC" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->get_results( "SELECT * FROM {$table} WHERE paired_at IS NOT NULL ORDER BY name ASC, hostname ASC" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	public static function get_displays( $controller_id ) {
@@ -554,5 +561,6 @@ class DS_Controllers {
 		$wpdb->delete( self::table( 'displays' ), array( 'controller_id' => $controller_id ), array( '%d' ) );
 		$wpdb->delete( self::controllers_table(), array( 'id' => $controller_id ), array( '%d' ) );
 		$map = (array) get_option( DS_Groups::CONTROLLER_OPTION, array() ); unset( $map[ $controller_id ] ); update_option( DS_Groups::CONTROLLER_OPTION, $map, false );
+		$owners = (array) get_option( DS_Groups::CONTROLLER_OWNER_OPTION, array() ); unset( $owners[ $controller_id ] ); update_option( DS_Groups::CONTROLLER_OWNER_OPTION, $owners, false );
 	}
 }

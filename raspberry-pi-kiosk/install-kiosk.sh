@@ -46,7 +46,7 @@ if [ "$(id -u)" -ne 0 ]; then
 	exit 1
 fi
 
-SITE_URL="${1:-}"
+SITE_URL="${1:-https://screens.kutt.ee}"
 KIOSK_USER="${2:-${SUDO_USER:-pi}}"
 REGENERATE=0
 RESOLUTION_ARG=""
@@ -71,13 +71,6 @@ case "$KIOSK_USER" in
 	--regenerate|--resolution|--browser) KIOSK_USER="${SUDO_USER:-pi}" ;;
 esac
 
-if [ -z "$SITE_URL" ]; then
-	echo "Usage: sudo bash install-kiosk.sh <site-url> [kiosk-user] [--regenerate] [--resolution WxH] [--browser chromium|firefox]" >&2
-	echo "Example: sudo bash install-kiosk.sh https://example.com pi" >&2
-	echo "Example with a custom/uncommon resolution: sudo bash install-kiosk.sh https://example.com pi --resolution 1920x440" >&2
-	echo "Example using Firefox instead of Chromium: sudo bash install-kiosk.sh https://example.com pi --browser firefox" >&2
-	exit 1
-fi
 SITE_URL="${SITE_URL%/}"
 
 if [ -n "$RESOLUTION_ARG" ] && ! echo "$RESOLUTION_ARG" | grep -qE '^[0-9]{2,5}x[0-9]{2,5}$'; then

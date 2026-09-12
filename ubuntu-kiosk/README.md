@@ -33,11 +33,12 @@ sudo apt install -y git
 cd ~
 git clone https://github.com/byKUTT/Digital-Signage.git
 cd Digital-Signage/ubuntu-kiosk
-sudo bash install-kiosk.sh "https://test.kutt.ee" robin
+sudo bash install-kiosk.sh "https://screens.kutt.ee" robin
 sudo reboot
 ```
 
-Replace the site URL and `robin` if needed. Normal displays need no resolution
+`https://screens.kutt.ee` is the built-in default, so `sudo bash install-kiosk.sh`
+also works when run by the intended kiosk user through sudo. Replace `robin` if needed. Normal displays need no resolution
 argument: XRandR supplies every monitor's desktop geometry automatically.
 
 The installer configures GDM Xorg autologin, removes the incompatible Pi

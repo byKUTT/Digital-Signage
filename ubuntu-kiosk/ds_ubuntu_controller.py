@@ -23,7 +23,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "4.1.1"
+VERSION = "4.1.2"
+DEFAULT_SITE = "https://screens.kutt.ee"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
 HEARTBEAT_SECONDS = 10
@@ -204,7 +205,7 @@ class Controller:
         self.settings_path = settings_path
         self.identity_path = identity_path
         self.settings = load_json(settings_path)
-        self.site = validate_site_url(str(self.settings["site"]))
+        self.site = validate_site_url(str(self.settings.get("site") or DEFAULT_SITE))
         self.user_home = Path(str(self.settings["user_home"]))
         self.profile_root = Path(
             str(self.settings.get("profile_root") or self.user_home / ".local/share/digital-signage-ubuntu")

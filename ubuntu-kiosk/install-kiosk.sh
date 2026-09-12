@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-	echo "Usage: sudo bash install-kiosk.sh <site-url> <kiosk-user> [--upgrade]" >&2
+	echo "Usage: sudo bash install-kiosk.sh [site-url] [kiosk-user] [--upgrade]" >&2
 }
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -10,10 +10,10 @@ if [ "$(id -u)" -ne 0 ]; then
 	exit 1
 fi
 
-site="${1:-}"
-kiosk_user="${2:-}"
+site="${1:-https://screens.kutt.ee}"
+kiosk_user="${2:-${SUDO_USER:-}}"
 mode="${3:-}"
-if [ -z "$site" ] || [ -z "$kiosk_user" ] || { [ -n "$mode" ] && [ "$mode" != "--upgrade" ]; }; then
+if [ -z "$kiosk_user" ] || { [ -n "$mode" ] && [ "$mode" != "--upgrade" ]; }; then
 	usage
 	exit 2
 fi
@@ -241,7 +241,7 @@ if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
 fi
 
 echo
-echo "Digital Signage Ubuntu controller 4.1.1 is installed."
+echo "Digital Signage Ubuntu controller 4.1.2 is installed."
 echo "No automatic reboot timer or reboot watchdog was installed."
 echo "Reboot once to activate Xorg autologin: sudo reboot"
 echo "Future updates: sudo digital-signage-update"

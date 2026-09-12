@@ -9,6 +9,7 @@ class DS_Groups {
 	const USER_META = 'ds_group_ids';
 	const POST_META = 'ds_group_id';
 	const CONTROLLER_OPTION = 'ds_controller_groups';
+	const CONTROLLER_OWNER_OPTION = 'ds_controller_owners';
 	private static $instance = null;
 
 	public static function instance() { if ( null === self::$instance ) { self::$instance = new self(); } return self::$instance; }
@@ -19,17 +20,28 @@ class DS_Groups {
 
 	public static function all() { return (array) get_option( self::OPTION, array() ); }
 	public static function get( $id ) { $groups = self::all(); return $groups[ absint( $id ) ] ?? null; }
-	public static function create( $name ) {
+	public static function create( $name, $created_by = 0 ) {
 		$groups = self::all(); $id = $groups ? max( array_map( 'absint', array_keys( $groups ) ) ) + 1 : 1;
-		$groups[ $id ] = array( 'id' => $id, 'name' => sanitize_text_field( $name ), 'created_by' => get_current_user_id() );
+		$groups[ $id ] = array( 'id' => $id, 'name' => sanitize_text_field( $name ), 'created_by' => absint( $created_by ?: get_current_user_id() ) );
 		update_option( self::OPTION, $groups, false ); return $id;
 	}
 	public static function delete( $id ) { $groups = self::all(); unset( $groups[ absint( $id ) ] ); update_option( self::OPTION, $groups, false ); }
 	public static function user_group_ids( $user_id = 0 ) { return array_values( array_unique( array_filter( array_map( 'absint', (array) get_user_meta( $user_id ?: get_current_user_id(), self::USER_META, true ) ) ) ) ); }
+	public static function ensure_user_group( $user_id = 0 ) {
+		$user_id = absint( $user_id ?: get_current_user_id() );
+		if ( ! $user_id ) { return 0; }
+		$ids = array_values( array_filter( self::user_group_ids( $user_id ), array( __CLASS__, 'get' ) ) );
+		if ( $ids ) { return $ids[0]; }
+		$user = get_userdata( $user_id );
+		$name = $user && $user->display_name ? sprintf( __( "%s's screens", 'digital-signage' ), $user->display_name ) : __( 'My screens', 'digital-signage' );
+		$group_id = self::create( $name, $user_id );
+		self::add_user( $group_id, $user_id );
+		return $group_id;
+	}
 	public static function current_group_id() {
 		$requested = absint( $_REQUEST['group'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( $requested && ( current_user_can( 'manage_options' ) || in_array( $requested, self::user_group_ids(), true ) ) ) { return $requested; }
-		$ids = self::user_group_ids(); return $ids ? $ids[0] : 0;
+		if ( $requested && self::get( $requested ) && ( current_user_can( 'manage_options' ) || in_array( $requested, self::user_group_ids(), true ) ) ) { return $requested; }
+		$ids = array_values( array_filter( self::user_group_ids(), array( __CLASS__, 'get' ) ) ); return $ids ? $ids[0] : 0;
 	}
 	public static function add_user( $group_id, $user_id ) { $ids = self::user_group_ids( $user_id ); $ids[] = absint( $group_id ); update_user_meta( $user_id, self::USER_META, array_values( array_unique( $ids ) ) ); }
 	public static function remove_user( $group_id, $user_id ) { update_user_meta( $user_id, self::USER_META, array_values( array_diff( self::user_group_ids( $user_id ), array( absint( $group_id ) ) ) ) ); }
@@ -56,12 +68,14 @@ class DS_Groups {
 	}
 	private static function direct_post_access( $post ) { if ( ! $post instanceof WP_Post ) { return false; } $group_id = self::post_group_id( $post ); return $group_id ? in_array( $group_id, self::user_group_ids(), true ) : (int) $post->post_author === get_current_user_id(); }
 	public static function controller_group_id( $controller_id ) { $map = (array) get_option( self::CONTROLLER_OPTION, array() ); return absint( $map[ absint( $controller_id ) ] ?? 0 ); }
+	public static function controller_owner_id( $controller_id ) { $map = (array) get_option( self::CONTROLLER_OWNER_OPTION, array() ); return absint( $map[ absint( $controller_id ) ] ?? 0 ); }
+	public static function set_controller_owner( $controller_id, $user_id ) { $map = (array) get_option( self::CONTROLLER_OWNER_OPTION, array() ); $map[ absint( $controller_id ) ] = absint( $user_id ); update_option( self::CONTROLLER_OWNER_OPTION, $map, false ); }
 	public static function set_controller_group( $controller_id, $group_id ) {
 		$map = (array) get_option( self::CONTROLLER_OPTION, array() ); $map[ absint( $controller_id ) ] = absint( $group_id ); update_option( self::CONTROLLER_OPTION, $map, false );
 		foreach ( DS_Controllers::get_displays( $controller_id ) as $display ) { if ( $display->screen_id ) { self::set_post_group( $display->screen_id, $group_id ); } }
 	}
 	public static function can_access_controller( $controller_id ) {
-		if ( current_user_can( 'manage_options' ) || in_array( self::controller_group_id( $controller_id ), self::user_group_ids(), true ) ) { return true; }
+		if ( current_user_can( 'manage_options' ) || get_current_user_id() === self::controller_owner_id( $controller_id ) || in_array( self::controller_group_id( $controller_id ), self::user_group_ids(), true ) ) { return true; }
 		foreach ( DS_Controllers::get_displays( $controller_id ) as $display ) { if ( $display->screen_id && self::direct_post_access( get_post( $display->screen_id ) ) ) { return true; } }
 		return false;
 	}

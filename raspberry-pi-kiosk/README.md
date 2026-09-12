@@ -117,7 +117,7 @@ cd Digital-Signage/raspberry-pi-kiosk
 cd ~/Digital-Signage
 git pull origin claude/wordpress-digital-signage-plugin-mbfbdt
 cd raspberry-pi-kiosk
-sudo bash install-kiosk.sh "https://test.kutt.ee" robin --browser firefox --resolution 1920x440
+sudo bash install-kiosk.sh "https://screens.kutt.ee" robin --browser firefox --resolution 1920x440
 sudo reboot
 ```
 

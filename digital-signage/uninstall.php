@@ -27,6 +27,9 @@ delete_option( 'ds_db_version' );
 delete_option( 'ds_flush_rewrite_rules' );
 delete_option( 'ds_github_updater' );
 delete_option( 'ds_github_release_cache' );
+delete_option( 'ds_groups' );
+delete_option( 'ds_controller_groups' );
+delete_option( 'ds_controller_owners' );
 
 foreach ( array( 'ds_channel', 'ds_screen', 'ds_slide', 'ds_schedule' ) as $post_type ) {
 	$posts = get_posts( array( 'post_type' => $post_type, 'posts_per_page' => -1, 'post_status' => 'any', 'fields' => 'ids' ) );
