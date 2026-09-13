@@ -58,13 +58,40 @@ if [ "$mode" != "--upgrade" ]; then
 	apt-get install -y --no-install-recommends \
 		python3 git ca-certificates curl sudo x11-xserver-utils unclutter dbus-x11 gdm3
 else
-	for required_command in python3 git sudo xrandr unclutter dbus-launch; do
+	for required_command in python3 git sudo xrandr unclutter dbus-launch cp chown chmod tee visudo; do
 		if ! command -v "$required_command" >/dev/null 2>&1; then
 			echo "Upgrade cannot continue because $required_command is missing. Run the full installer once." >&2
 			exit 1
 		fi
 	done
 fi
+
+copy_managed_file() {
+	local source_path="$1"
+	local destination_path="$2"
+	local mode_bits="$3"
+	local owner_name="${4:-root}"
+	local group_name="${5:-root}"
+	if [ ! -r "$source_path" ]; then
+		echo "Required installer file is missing: $source_path" >&2
+		exit 1
+	fi
+	cp -- "$source_path" "$destination_path"
+	chown "$owner_name:$group_name" "$destination_path"
+	chmod "$mode_bits" "$destination_path"
+}
+
+write_managed_file() {
+	local destination_path="$1"
+	local mode_bits="$2"
+	local temporary_path
+	temporary_path="$(mktemp)"
+	tee "$temporary_path" >/dev/null
+	cp -- "$temporary_path" "$destination_path"
+	chown root:root "$destination_path"
+	chmod "$mode_bits" "$destination_path"
+	rm -f "$temporary_path"
+}
 
 browser_bin=""
 for browser_candidate in google-chrome-stable google-chrome; do
@@ -158,21 +185,15 @@ PY
 chown root:"$kiosk_group" "$config_root/settings.json"
 chmod 640 "$config_root/settings.json"
 
-install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/ds_ubuntu_controller.py" \
-	"$install_root/ds_ubuntu_controller.py"
-install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/ds-ubuntu-autostart.sh" \
-	/usr/local/bin/ds-ubuntu-autostart
-install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/update-kiosk.sh" \
-	/usr/local/sbin/digital-signage-update
-install -o root -g root -m 755 "$managed_repo/ubuntu-kiosk/digital-signage-root-command" \
-	/usr/local/sbin/digital-signage-root-command
-install -o root -g root -m 644 \
-	"$managed_repo/ubuntu-kiosk/systemd/digital-signage-ubuntu-update.service" \
-	/etc/systemd/system/digital-signage-ubuntu-update.service
+copy_managed_file "$managed_repo/ubuntu-kiosk/ds_ubuntu_controller.py" "$install_root/ds_ubuntu_controller.py" 755
+copy_managed_file "$managed_repo/ubuntu-kiosk/ds-ubuntu-autostart.sh" /usr/local/bin/ds-ubuntu-autostart 755
+copy_managed_file "$managed_repo/ubuntu-kiosk/update-kiosk.sh" /usr/local/sbin/digital-signage-update 755
+copy_managed_file "$managed_repo/ubuntu-kiosk/digital-signage-root-command" /usr/local/sbin/digital-signage-root-command 755
+copy_managed_file "$managed_repo/ubuntu-kiosk/systemd/digital-signage-ubuntu-update.service" /etc/systemd/system/digital-signage-ubuntu-update.service 644
 
 mkdir -p /etc/opt/chrome/policies/managed /etc/chromium/policies/managed /etc/chromium-browser/policies/managed /etc/xdg/autostart
 for policy_root in /etc/opt/chrome/policies/managed /etc/chromium/policies/managed /etc/chromium-browser/policies/managed; do
-	install -o root -g root -m 644 /dev/stdin "$policy_root/bykutt-digital-signage.json" <<'POLICY'
+	write_managed_file "$policy_root/bykutt-digital-signage.json" 644 <<'POLICY'
 {
   "AutofillAddressEnabled": false,
   "AutofillCreditCardEnabled": false,
@@ -190,14 +211,12 @@ for policy_root in /etc/opt/chrome/policies/managed /etc/chromium/policies/manag
 }
 POLICY
 	done
-install -o root -g root -m 644 \
-	"$managed_repo/ubuntu-kiosk/autostart/bykutt-digital-signage.desktop" \
-	/etc/xdg/autostart/bykutt-digital-signage.desktop
+copy_managed_file "$managed_repo/ubuntu-kiosk/autostart/bykutt-digital-signage.desktop" /etc/xdg/autostart/bykutt-digital-signage.desktop 644
 
 gdm_config="/etc/gdm3/custom.conf"
 gdm_backup="$backup_root/gdm-custom.conf"
 if [ -f "$gdm_config" ] && [ ! -f "$gdm_backup" ]; then
-	install -m 600 "$gdm_config" "$gdm_backup"
+	copy_managed_file "$gdm_config" "$gdm_backup" 600
 fi
 python3 "$managed_repo/ubuntu-kiosk/configure_gdm.py" "$gdm_config" "$kiosk_user"
 chmod 644 "$gdm_config"
@@ -206,7 +225,7 @@ systemctl disable --now digital-signage-ubuntu.service >/dev/null 2>&1 || true
 rm -f /etc/systemd/system/digital-signage-ubuntu.service /usr/local/bin/ds-ubuntu-session-wait
 
 sudoers_file="/etc/sudoers.d/digital-signage-ubuntu"
-install -o root -g root -m 440 /dev/stdin "$sudoers_file" <<EOF
+write_managed_file "$sudoers_file" 440 <<EOF
 Defaults:$kiosk_user !requiretty, listpw=never
 Cmnd_Alias DIGITAL_SIGNAGE_ROOT = /usr/local/sbin/digital-signage-root-command check, /usr/local/sbin/digital-signage-root-command software-update, /usr/local/sbin/digital-signage-root-command system-update, /usr/local/sbin/digital-signage-root-command reboot, /usr/local/sbin/digital-signage-root-command diagnostic-update, /usr/local/sbin/digital-signage-root-command diagnostic-controller, /usr/local/sbin/digital-signage-root-command diagnostic-network, /usr/local/sbin/digital-signage-root-command diagnostic-system
 $kiosk_user ALL=(root) NOPASSWD: DIGITAL_SIGNAGE_ROOT
@@ -214,14 +233,14 @@ EOF
 visudo -cf "$sudoers_file" >/dev/null
 
 mkdir -p /etc/systemd/logind.conf.d /etc/systemd/sleep.conf.d
-install -o root -g root -m 644 /dev/stdin /etc/systemd/logind.conf.d/bykutt-digital-signage.conf <<'LOGIND'
+write_managed_file /etc/systemd/logind.conf.d/bykutt-digital-signage.conf 644 <<'LOGIND'
 [Login]
 IdleAction=ignore
 HandleLidSwitch=ignore
 HandleLidSwitchExternalPower=ignore
 HandleLidSwitchDocked=ignore
 LOGIND
-install -o root -g root -m 644 /dev/stdin /etc/systemd/sleep.conf.d/bykutt-digital-signage.conf <<'SLEEP'
+write_managed_file /etc/systemd/sleep.conf.d/bykutt-digital-signage.conf 644 <<'SLEEP'
 [Sleep]
 AllowSuspend=no
 AllowHibernation=no
@@ -249,7 +268,7 @@ if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
 fi
 
 echo
-echo "Screens byKUTT Ubuntu controller 4.5.0 is installed."
+echo "Screens byKUTT Ubuntu controller 4.6.0 is installed."
 echo "No automatic reboot timer or reboot watchdog was installed."
 echo "Reboot once to activate Xorg autologin: sudo reboot"
 echo "Future updates: sudo digital-signage-update"

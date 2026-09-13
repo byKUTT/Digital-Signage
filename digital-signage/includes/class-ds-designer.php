@@ -34,6 +34,12 @@ class DS_Designer {
 		if ( strlen( $document ) > self::MAX_DOCUMENT_BYTES ) { wp_send_json_error( array( 'message' => __( 'The design file is too large.', 'digital-signage' ) ), 413 ); }
 		$decoded = json_decode( $document, true );
 		if ( ! is_array( $decoded ) || 'vellum' !== ( $decoded['format'] ?? '' ) || empty( $decoded['pages'] ) ) { wp_send_json_error( array( 'message' => __( 'Vellum returned an invalid document.', 'digital-signage' ) ), 400 ); }
+		$image_data = wp_unslash( $_POST['image'] ?? '' );
+		$image_bytes = preg_match( '#^data:image/png;base64,([A-Za-z0-9+/=]+)$#', (string) $image_data, $image_match ) ? (int) floor( strlen( $image_match[1] ) * 3 / 4 ) : 0;
+		$previous_document_bytes = $design_id ? strlen( (string) get_post_meta( $design_id, 'ds_vellum_document', true ) ) : 0;
+		$previous_preview_id = $design_id ? absint( get_post_meta( $design_id, 'ds_preview_attachment_id', true ) ) : 0;
+		$incoming_bytes = max( 0, strlen( $document ) - $previous_document_bytes + $image_bytes - DS_Storage::attachment_bytes( $previous_preview_id ) );
+		if ( ! DS_Storage::can_store( $group_id, $incoming_bytes ) ) { wp_send_json_error( array( 'message' => __( 'This group has reached its storage limit. Delete media or ask the site administrator for more space.', 'digital-signage' ) ), 413 ); }
 
 		$post_data = array( 'post_title' => $title, 'post_type' => 'ds_design', 'post_status' => 'publish' );
 		if ( $design_id ) { $post_data['ID'] = $design_id; } else { $post_data['post_author'] = get_current_user_id(); }
@@ -42,7 +48,7 @@ class DS_Designer {
 		DS_Groups::set_post_group( $design_id, $group_id );
 		update_post_meta( $design_id, 'ds_vellum_document', $document );
 
-		$attachment_id = $this->save_preview( wp_unslash( $_POST['image'] ?? '' ), $title, $group_id );
+		$attachment_id = $this->save_preview( $image_data, $title, $group_id );
 		if ( is_wp_error( $attachment_id ) ) { wp_send_json_error( array( 'message' => $attachment_id->get_error_message() ), 400 ); }
 		update_post_meta( $design_id, 'ds_preview_attachment_id', $attachment_id );
 
@@ -52,10 +58,11 @@ class DS_Designer {
 			if ( ! $channel_id || 'ds_channel' !== get_post_type( $channel_id ) || ! DS_Groups::can_access_post( $channel_id ) || $group_id !== DS_Groups::post_group_id( $channel_id ) ) { wp_send_json_error( array( 'message' => __( 'Choose a channel you can access.', 'digital-signage' ) ), 400 ); }
 			$slide_id = absint( get_post_meta( $design_id, 'ds_published_slide_id', true ) );
 			if ( $slide_id && ( 'ds_slide' !== get_post_type( $slide_id ) || ! DS_Groups::can_access_post( $slide_id ) ) ) { $slide_id = 0; }
-			$slide_id = DS_CRUD::save_slide( $slide_id, array( 'title' => $title, 'channel_id' => $channel_id, 'slide_type' => 'image', 'media_id' => $attachment_id, 'duration_override' => absint( $_POST['duration'] ?? 0 ), 'zone' => 'main', 'fit' => 'contain' ) );
+			$slide_id = DS_CRUD::save_slide( $slide_id, array( 'title' => $title, 'channel_id' => $channel_id, 'slide_type' => 'image', 'media_id' => $attachment_id, 'duration_override' => absint( $_POST['duration'] ?? 0 ), 'zone' => 'main', 'fit' => 'cover' ) );
 			DS_Groups::set_post_group( $slide_id, $group_id );
 			update_post_meta( $design_id, 'ds_published_slide_id', $slide_id );
 		}
+		if ( $previous_preview_id && $previous_preview_id !== $attachment_id ) { wp_delete_attachment( $previous_preview_id, true ); }
 
 		wp_send_json_success( array( 'designId' => $design_id, 'slideId' => $slide_id, 'previewUrl' => wp_get_attachment_url( $attachment_id ), 'message' => $slide_id ? __( 'Design saved and published.', 'digital-signage' ) : __( 'Design saved.', 'digital-signage' ) ) );
 	}

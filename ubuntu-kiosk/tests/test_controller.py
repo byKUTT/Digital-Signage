@@ -222,9 +222,9 @@ class ValidationTests(unittest.TestCase):
     def test_remote_update_reboots_only_after_success(self):
         updater = (pathlib.Path(__file__).parents[1] / "update-kiosk.sh").read_text(encoding="utf-8")
         service = (pathlib.Path(__file__).parents[1] / "systemd/digital-signage-ubuntu-update.service").read_text(encoding="utf-8")
-        self.assertIn('if [ "$restart_service" -eq 1 ]; then', updater)
         self.assertIn("systemctl reboot", updater)
-        self.assertIn("digital-signage-update --no-restart", service)
+        self.assertNotIn("--no-restart", updater)
+        self.assertIn("ExecStart=/usr/local/sbin/digital-signage-update", service)
         self.assertIn("show_update_screen", MODULE_PATH.read_text(encoding="utf-8"))
 
     def test_remote_update_reports_stage_and_skips_apt_during_upgrade(self):
@@ -356,6 +356,31 @@ class ValidationTests(unittest.TestCase):
         player = (repo / "digital-signage/public/js/player.js").read_text(encoding="utf-8")
         self.assertNotIn("sdk.scdn.co", spotify)
         self.assertNotIn("spotify", player.lower())
+
+    def test_group_media_picker_quota_and_single_slide_playback(self):
+        repo = pathlib.Path(__file__).parents[2]
+        storage = (repo / "digital-signage/includes/class-ds-storage.php").read_text(encoding="utf-8")
+        portal_js = (repo / "digital-signage/public/js/portal.js").read_text(encoding="utf-8")
+        player = (repo / "digital-signage/public/js/player.js").read_text(encoding="utf-8")
+        self.assertIn("DEFAULT_LIMIT = 2147483648", storage)
+        self.assertIn("ds_media_upload", storage)
+        self.assertNotIn("window.wp?.media", portal_js)
+        self.assertIn("media-library-dialog", portal_js)
+        self.assertIn("if ( 1 === zone.items.length ) { return; }", player)
+
+    def test_designer_matches_channel_resolution_and_publishes_cover_media(self):
+        repo = pathlib.Path(__file__).parents[2]
+        designer_js = (repo / "digital-signage/public/js/designer.js").read_text(encoding="utf-8")
+        designer_php = (repo / "digital-signage/includes/class-ds-designer.php").read_text(encoding="utf-8")
+        self.assertIn("resizeForChannel", designer_js)
+        self.assertIn("config.channelFormats", designer_js)
+        self.assertIn("'fit' => 'cover'", designer_php)
+
+    def test_installer_does_not_depend_on_the_install_binary(self):
+        installer = (pathlib.Path(__file__).parents[1] / "install-kiosk.sh").read_text(encoding="utf-8")
+        self.assertIn("copy_managed_file", installer)
+        self.assertIn("write_managed_file", installer)
+        self.assertNotIn("install -o", installer)
 
 
 class GdmConfigurationTests(unittest.TestCase):

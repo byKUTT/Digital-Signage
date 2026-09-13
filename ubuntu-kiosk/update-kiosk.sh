@@ -6,11 +6,8 @@ if [ "$(id -u)" -ne 0 ]; then
 	exit 1
 fi
 
-restart_service=1
-if [ "${1:-}" = "--no-restart" ]; then
-	restart_service=0
-elif [ -n "${1:-}" ]; then
-	echo "Usage: sudo digital-signage-update [--no-restart]" >&2
+if [ -n "${1:-}" ]; then
+	echo "Usage: sudo digital-signage-update" >&2
 	exit 2
 fi
 
@@ -102,9 +99,8 @@ git -C "$repository_path" reset --hard "origin/$branch"
 stage="reapplying the Ubuntu controller installation"
 DS_SKIP_SERVICE_RESTART=1 bash "$repository_path/ubuntu-kiosk/install-kiosk.sh" "$site" "$kiosk_user" --upgrade
 
-if [ "$restart_service" -eq 1 ]; then
-	stage="stopping the previous controller process"
-	controller_pid="$(python3 - "$settings_file" <<'PY'
+stage="stopping the previous controller process"
+controller_pid="$(python3 - "$settings_file" <<'PY'
 import json, pathlib, sys
 with open(sys.argv[1], encoding="utf-8") as handle:
     profile_root = pathlib.Path(str(json.load(handle).get("profile_root", "")))
@@ -116,17 +112,14 @@ except OSError:
     print("")
 PY
 )"
-	if [ -n "$controller_pid" ] && [ -r "/proc/$controller_pid/cmdline" ]; then
-		controller_command="$(tr '\0' ' ' < "/proc/$controller_pid/cmdline")"
-		case "$controller_command" in
-			*/digital-signage-ubuntu/ds_ubuntu_controller.py*) kill -TERM "$controller_pid" || true ;;
-		esac
-	fi
+if [ -n "$controller_pid" ] && [ -r "/proc/$controller_pid/cmdline" ]; then
+	controller_command="$(tr '\0' ' ' < "/proc/$controller_pid/cmdline")"
+	case "$controller_command" in
+		*/digital-signage-ubuntu/ds_ubuntu_controller.py*) kill -TERM "$controller_pid" || true ;;
+	esac
 fi
 
 write_status "succeeded" "Digital Signage was updated successfully. Device identity, URL, display assignments, schedules, and browser profiles were preserved."
 update_completed=1
 echo "Digital Signage is updated. Existing identity and settings were preserved."
-if [ "$restart_service" -eq 1 ]; then
-	systemctl reboot
-fi
+systemctl reboot

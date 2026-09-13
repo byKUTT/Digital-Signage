@@ -129,11 +129,21 @@ class DS_CRUD {
 
 	public static function save_slide( $id, array $data ) {
 		$channel_id = absint( $data['channel_id'] ?? 0 );
-		$old_channel_id = $id ? absint( get_post_meta( $id, 'ds_channel_id', true ) ) : 0;
 		$title      = trim( sanitize_text_field( $data['title'] ?? '' ) );
 		if ( '' === $title ) {
 			$title = self::next_slide_title( $channel_id, $id );
 		}
+		// A same-named addition replaces the existing playlist entry while its
+		// previously selected attachment remains in the group media library.
+		if ( ! $id && $channel_id && '' !== $title ) {
+			$candidates = get_posts( array( 'post_type' => 'ds_slide', 'post_status' => 'any', 'posts_per_page' => -1, 'meta_key' => 'ds_channel_id', 'meta_value' => $channel_id ) );
+			$channel_group_id = class_exists( 'DS_Groups' ) ? DS_Groups::post_group_id( $channel_id ) : 0;
+			foreach ( $candidates as $candidate ) {
+				$candidate_group_id = class_exists( 'DS_Groups' ) ? DS_Groups::post_group_id( $candidate->ID ) : $channel_group_id;
+				if ( $candidate_group_id === $channel_group_id && 0 === strcasecmp( trim( $candidate->post_title ), $title ) ) { $id = absint( $candidate->ID ); break; }
+			}
+		}
+		$old_channel_id = $id ? absint( get_post_meta( $id, 'ds_channel_id', true ) ) : 0;
 		$post_id = self::upsert_post( $id, 'ds_slide', $title );
 
 		$fields = array(

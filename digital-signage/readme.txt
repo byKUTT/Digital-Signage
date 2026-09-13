@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 4.5.0
+Stable tag: 4.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -53,6 +53,14 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 4.6.0 =
+* Replaced the conflicting WordPress media frame with a private, responsive group media picker and uploader.
+* Added a 2 GB default group quota covering media, generated previews, and saved Vellum documents, with site-admin limit controls.
+* Added channel-resolution-aware designer exports, edge-to-edge media cover, and same-name playlist replacement.
+* Prevented single-item channels from cycling and expanded embedded website capabilities.
+* Moved Spotify application credentials to site administration and added per-user Web Playback SDK controls with controller output selection.
+* Repaired the Ubuntu updater's managed-file installation and made every successful update finish with a reboot.
 
 = 4.5.0 =
 * Introduced the Screens byKUTT identity and rebuilt the frontend dashboard in the new deep-forest visual system.

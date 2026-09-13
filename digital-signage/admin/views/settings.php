@@ -85,6 +85,33 @@ $s = DS_Settings::get_all();
 
 	<?php if ( $can_manage_team ) : ?>
 		<div class="ds-panel">
+			<h2><?php esc_html_e( 'Group storage', 'digital-signage' ); ?></h2>
+			<p class="ds-hint"><?php esc_html_e( 'Each group includes 2 GB by default. Media files, generated design previews, and saved Vellum documents count toward the limit.', 'digital-signage' ); ?></p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="ds_save_storage_limits" /><?php wp_nonce_field( 'ds_save_storage_limits' ); ?>
+				<div class="ds-settings-grid"><?php foreach ( $storage_groups as $storage_group ) : $usage = DS_Storage::usage( $storage_group['id'] ); ?><div class="ds-field"><label for="ds_storage_<?php echo absint( $storage_group['id'] ); ?>"><?php echo esc_html( $storage_group['name'] ); ?></label><input class="ds-input ds-input-small" id="ds_storage_<?php echo absint( $storage_group['id'] ); ?>" type="number" min="0" step="0.25" name="storage_limit_gb[<?php echo absint( $storage_group['id'] ); ?>]" value="<?php echo esc_attr( round( $usage['limit'] / 1024 / 1024 / 1024, 2 ) ); ?>" /><span class="ds-hint"><?php echo esc_html( size_format( $usage['used'], 1 ) . ' used · ' . $usage['percent'] . '%' ); ?></span></div><?php endforeach; ?></div>
+				<button type="submit" class="ds-btn ds-btn-primary"><?php esc_html_e( 'Save storage limits', 'digital-signage' ); ?></button>
+			</form>
+		</div>
+
+		<div class="ds-panel">
+			<h2><?php esc_html_e( 'Spotify application', 'digital-signage' ); ?></h2>
+			<p class="ds-hint"><?php esc_html_e( 'Site-wide Web API and Web Playback SDK credentials. Users connect their own Spotify accounts from the frontend player.', 'digital-signage' ); ?></p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="ds_save_spotify_settings" />
+				<?php wp_nonce_field( 'ds_save_spotify_settings' ); ?>
+				<div class="ds-settings-grid">
+					<div class="ds-field"><label for="ds_spotify_client_id"><?php esc_html_e( 'Client ID', 'digital-signage' ); ?></label><input class="ds-input" id="ds_spotify_client_id" name="client_id" value="<?php echo esc_attr( $spotify_settings['client_id'] ?? '' ); ?>" autocomplete="off" /></div>
+					<div class="ds-field"><label for="ds_spotify_client_secret"><?php esc_html_e( 'Client secret', 'digital-signage' ); ?></label><input class="ds-input" type="password" id="ds_spotify_client_secret" name="client_secret" autocomplete="new-password" placeholder="<?php echo ! empty( $spotify_settings['client_secret'] ) ? esc_attr__( 'Saved — enter only to replace', 'digital-signage' ) : ''; ?>" /></div>
+					<div class="ds-field"><label for="ds_spotify_redirect"><?php esc_html_e( 'Redirect URI', 'digital-signage' ); ?></label><input class="ds-input" id="ds_spotify_redirect" value="<?php echo esc_attr( DS_Spotify::redirect_uri() ); ?>" readonly /><span class="ds-hint"><?php esc_html_e( 'Add this exact URI in the Spotify developer dashboard.', 'digital-signage' ); ?></span></div>
+				</div>
+				<button type="submit" class="ds-btn ds-btn-primary"><?php esc_html_e( 'Save Spotify application', 'digital-signage' ); ?></button>
+			</form>
+		</div>
+	<?php endif; ?>
+
+	<?php if ( $can_manage_team ) : ?>
+		<div class="ds-panel">
 			<h2><?php esc_html_e( 'Digital Signage Team', 'digital-signage' ); ?></h2>
 			<p class="ds-hint"><?php esc_html_e( 'Selected users share every channel, screen, slide, schedule, calendar, analytics page and Digital Signage setting. This does not make them WordPress administrators.', 'digital-signage' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">

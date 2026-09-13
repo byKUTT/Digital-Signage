@@ -1,6 +1,13 @@
 # Screens byKUTT product roadmap
 
-This map separates shipped 4.5.0 work from the next quality-of-life improvements. It is directional, not a promise that unfinished items are already available.
+This map separates shipped 4.6.0 work from the next quality-of-life improvements. It is directional, not a promise that unfinished items are already available.
+
+## Shipped in 4.6.0
+
+- Private group media library and picker with a 2 GB default quota and administrator capacity controls.
+- Channel-resolution-aware designer publishing, cover playback, stable single-item channels, and same-name replacement.
+- Per-user Spotify authorization and Web Playback controls with controller-as-output support.
+- Reliable Ubuntu managed-file installation and mandatory reboot after a successful software update.
 
 ## P0 — unattended reliability
 
@@ -21,7 +28,7 @@ This map separates shipped 4.5.0 work from the next quality-of-life improvements
 
 - Add proof-of-play reports by group, screen, campaign, and date with scheduled CSV delivery.
 - Add a group audit log for content edits, device actions, access changes, and deletions.
-- Add storage quotas, orphaned-media cleanup, and controller/browser compatibility reporting.
+- Add orphaned-media cleanup and controller/browser compatibility reporting.
 - Add role presets for owner, content editor, operator, viewer, and music-only access.
 
 ## Designer

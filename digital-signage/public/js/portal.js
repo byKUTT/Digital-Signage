@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		const type = slideForm.elements.slide_type.value;
 		slideForm.querySelector('.ds-slide-media').hidden = !['image', 'video'].includes(type);
 		slideForm.querySelector('.ds-slide-webpage').hidden = type !== 'webpage';
+		slideForm.elements.content_url.required = type === 'webpage';
 		slideForm.querySelector('.ds-slide-html').hidden = type !== 'html';
 		slideForm.querySelector('.ds-slide-video').hidden = type !== 'video';
 	};
@@ -77,21 +78,68 @@ document.addEventListener('DOMContentLoaded', () => {
 	}));
 	slideForm?.elements.slide_type.addEventListener('change', updateSlideFields);
 	slideForm?.querySelector('[data-select-media]')?.addEventListener('click', () => {
-		if (!window.wp?.media) return;
-		const picker = wp.media({ title: 'Select or upload media', button: { text: 'Use this media' }, multiple: false });
-		picker.on('open', () => picker.state().get('library')?.props.set('ds_group', window.DSPortal?.groupId || 0));
-		picker.on('select', () => {
-			const item = picker.state().get('selection').first().toJSON();
-			slideForm.elements.media_id.value = item.id;
-			slideForm.querySelector('.ds-media-selection').textContent = item.filename || item.title;
-			if (item.type === 'video') slideForm.elements.slide_type.value = 'video';
-			if (item.type === 'image') slideForm.elements.slide_type.value = 'image';
-			if (!slideForm.elements.title.value) slideForm.elements.title.value = item.title || item.filename;
-			updateSlideFields();
-		});
-		picker.open();
+		const mediaDialog = document.getElementById('media-library-dialog');
+		if (!mediaDialog) return;
+		slideDialog?.close();
+		mediaDialog.showModal();
 	});
-	if (window.wp?.Uploader?.defaults?.multipart_params) window.wp.Uploader.defaults.multipart_params.ds_group = window.DSPortal?.groupId || 0;
+	const mediaDialog = document.getElementById('media-library-dialog');
+	const restoreSlideDialog = () => {
+		mediaDialog?.close();
+		if (slideDialog && !slideDialog.open) slideDialog.showModal();
+	};
+	mediaDialog?.querySelector('[data-media-cancel]')?.addEventListener('click', restoreSlideDialog);
+	mediaDialog?.addEventListener('cancel', (event) => { event.preventDefault(); restoreSlideDialog(); });
+	const chooseMedia = (button) => {
+		if (!slideForm) return;
+		slideForm.elements.media_id.value = button.dataset.mediaId || '';
+		slideForm.querySelector('.ds-media-selection').textContent = button.dataset.mediaTitle || 'Selected media';
+		if (button.dataset.mediaType === 'video') slideForm.elements.slide_type.value = 'video';
+		if (button.dataset.mediaType === 'image') slideForm.elements.slide_type.value = 'image';
+		if (!slideForm.elements.title.value) slideForm.elements.title.value = button.dataset.mediaTitle || '';
+		updateSlideFields();
+		restoreSlideDialog();
+	};
+	mediaDialog?.addEventListener('click', (event) => {
+		const button = event.target.closest('[data-media-choice]');
+		if (button) chooseMedia(button);
+	});
+	mediaDialog?.querySelector('[data-media-dialog-upload]')?.addEventListener('submit', async (event) => {
+		event.preventDefault();
+		const form = event.currentTarget;
+		const file = form.elements.media_file.files[0];
+		const message = mediaDialog.querySelector('[data-media-upload-status]');
+		if (!file) return;
+		message.textContent = 'Uploading…';
+		const body = new FormData(form);
+		body.append('action', 'ds_media_upload');
+		body.append('nonce', window.DSPortal?.mediaNonce || '');
+		body.append('group_id', String(window.DSPortal?.groupId || 0));
+		try {
+			const response = await fetch(window.DSPortal?.ajaxUrl || '', { method: 'POST', credentials: 'same-origin', body });
+			const result = await response.json();
+			if (!response.ok || !result.success) throw new Error(result.data?.message || 'Upload failed.');
+			const item = result.data;
+			const button = document.createElement('button');
+			button.type = 'button';
+			button.className = 'ds-media-choice';
+			button.dataset.mediaChoice = '';
+			button.dataset.mediaId = String(item.id);
+			button.dataset.mediaTitle = item.title;
+			button.dataset.mediaType = item.type;
+			const preview = item.thumbnail || item.url;
+			if (preview && item.type === 'image') { const image = document.createElement('img'); image.src = preview; image.alt = ''; button.appendChild(image); }
+			else if (preview && item.type === 'video') { const video = document.createElement('video'); video.src = preview; video.muted = true; video.preload = 'metadata'; button.appendChild(video); }
+			else { const glyph = document.createElement('span'); glyph.className = 'ds-file-glyph'; glyph.textContent = String(item.type || 'file').toUpperCase(); button.appendChild(glyph); }
+			button.insertAdjacentHTML('beforeend', '<strong></strong><small></small>');
+			button.querySelector('strong').textContent = item.title;
+			button.querySelector('small').textContent = item.type;
+			mediaDialog.querySelector('[data-media-choices]').prepend(button);
+			form.reset();
+			const usage = item.usage;
+			message.textContent = usage ? `Upload complete · ${Math.round(usage.percent)}% used` : 'Upload complete. Select the new item below.';
+		} catch (error) { message.textContent = error.message; }
+	});
 	updateSlideFields();
 	document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
 		await navigator.clipboard.writeText(button.dataset.copy);
@@ -100,5 +148,10 @@ document.addEventListener('DOMContentLoaded', () => {
 	document.querySelectorAll('[data-music-filter]').forEach((input) => input.addEventListener('input', () => {
 		const query = input.value.trim().toLowerCase();
 		document.querySelectorAll('[data-music-item]').forEach((item) => { item.hidden = Boolean(query && !item.dataset.musicItem.includes(query)); });
+	}));
+	document.querySelectorAll('[data-template-tab]').forEach((tab) => tab.addEventListener('click', () => {
+		const selected = tab.dataset.templateTab;
+		document.querySelectorAll('[data-template-tab]').forEach((item) => item.setAttribute('aria-selected', item === tab ? 'true' : 'false'));
+		document.querySelectorAll('[data-template-panel]').forEach((panel) => { panel.hidden = panel.dataset.templatePanel !== selected; });
 	}));
 });

@@ -48,6 +48,8 @@ class DS_Admin {
 		add_action( 'admin_post_ds_remote_action', array( $this, 'handle_remote_action' ) );
 		add_action( 'admin_post_ds_device_command', array( $this, 'handle_device_command' ) );
 		add_action( 'admin_post_ds_save_settings', array( $this, 'handle_save_settings' ) );
+		add_action( 'admin_post_ds_save_spotify_settings', array( $this, 'handle_save_spotify_settings' ) );
+		add_action( 'admin_post_ds_save_storage_limits', array( $this, 'handle_save_storage_limits' ) );
 		add_action( 'admin_post_ds_save_team', array( $this, 'handle_save_team' ) );
 		add_action( 'admin_post_ds_save_controller', array( $this, 'handle_save_controller' ) );
 		add_action( 'admin_post_ds_controller_command', array( $this, 'handle_controller_command' ) );
@@ -315,7 +317,9 @@ class DS_Admin {
 		$can_manage_team = current_user_can( 'manage_options' );
 		$team_member_ids = DS_Roles::get_team_member_ids();
 		$team_users      = $can_manage_team ? get_users( array( 'orderby' => 'display_name', 'order' => 'ASC' ) ) : array();
-		$this->view( 'settings', compact( 'can_manage_team', 'team_member_ids', 'team_users' ) );
+		$spotify_settings = $can_manage_team ? DS_Spotify::settings() : array();
+		$storage_groups = $can_manage_team ? DS_Groups::all() : array();
+		$this->view( 'settings', compact( 'can_manage_team', 'team_member_ids', 'team_users', 'spotify_settings', 'storage_groups' ) );
 	}
 
 	private function view( $name, array $vars ) {
@@ -412,6 +416,29 @@ class DS_Admin {
 		$input = isset( $_POST['ds_settings'] ) ? (array) wp_unslash( $_POST['ds_settings'] ) : array();
 		update_option( 'ds_settings', DS_Settings::instance()->sanitize( $input ) );
 		wp_safe_redirect( admin_url( 'admin.php?page=ds-settings&ds_saved=1' ) );
+		exit;
+	}
+
+	public function handle_save_spotify_settings() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Only a site administrator can manage Spotify application credentials.', 'digital-signage' ) );
+		}
+		check_admin_referer( 'ds_save_spotify_settings' );
+		DS_Spotify::save_settings(
+			sanitize_text_field( wp_unslash( $_POST['client_id'] ?? '' ) ),
+			sanitize_text_field( wp_unslash( $_POST['client_secret'] ?? '' ) )
+		);
+		wp_safe_redirect( admin_url( 'admin.php?page=ds-settings&spotify_saved=1' ) );
+		exit;
+	}
+
+	public function handle_save_storage_limits() {
+		if ( ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'Only a site administrator can change group storage limits.', 'digital-signage' ) ); }
+		check_admin_referer( 'ds_save_storage_limits' );
+		foreach ( (array) ( $_POST['storage_limit_gb'] ?? array() ) as $group_id => $limit_gb ) {
+			DS_Storage::set_limit( absint( $group_id ), round( max( 0, (float) $limit_gb ) * 1024 * 1024 * 1024 ) );
+		}
+		wp_safe_redirect( admin_url( 'admin.php?page=ds-settings&storage_saved=1' ) );
 		exit;
 	}
 

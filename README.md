@@ -64,10 +64,12 @@ hibernation are disabled. Successful remote software updates and verified URL
 migrations reboot automatically; there is no daily reboot or watchdog. See `ubuntu-kiosk/README.md` for recovery, assignment,
 diagnostics, and uninstall instructions.
 
-Version 4.5.0 adds the Screens byKUTT identity, a licensed local background-music
-library with controller output assignment and automatic audio ducking, controller-scoped Spotify Connect controls, a restricted
-Spotify User role, 32 landscape and portrait starter designs, a refined editor
-and connection experience, and repaired non-interactive Ubuntu privileges.
+Version 4.6.0 adds the private group media library with a 2 GB default quota,
+channel-resolution-aware Vellum exports, edge-to-edge playback, stable single-item
+channels, per-user Spotify Web Playback controls, and a repaired always-rebooting
+Ubuntu updater. It also includes the Screens byKUTT identity, licensed local
+background music with automatic audio ducking, 32 landscape and portrait starter
+designs, and the refined editor and connection experience.
 Version 4.3.0 added QR-assisted binding and no-channel recovery, a full-screen
 Vellum workflow with reusable built-in templates and personal saved files, a
 site-admin-only remote diagnostics console, and an updater that reports its

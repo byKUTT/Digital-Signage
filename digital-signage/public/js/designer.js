@@ -87,6 +87,29 @@ document.addEventListener('DOMContentLoaded', () => {
 		vellum.fit();
 		vellum.render();
 	};
+	const resizeForChannel = (resolution) => {
+		const match = /^(\d{2,5})x(\d{2,5})$/.exec(resolution || '');
+		const vellum = api();
+		if (!match || !vellum?.ready) return false;
+		const width = Number(match[1]); const height = Number(match[2]);
+		const page = vellum.doc.data.pages.find((item) => item.id === vellum.doc.data.pageId) || vellum.doc.data.pages[0];
+		const root = page?.nodes?.find((item) => !item.parentId);
+		if (!root || (root.w === width && root.h === height)) return false;
+		const scaleX = width / root.w; const scaleY = height / root.h; const typeScale = Math.min(scaleX, scaleY);
+		page.nodes.forEach((item) => {
+			if (item.id === root.id) { item.w = width; item.h = height; item.name = `${width} × ${height}`; }
+			else {
+				item.x *= scaleX; item.y *= scaleY; item.w *= scaleX; item.h *= scaleY;
+				if (Number.isFinite(item.fontSize)) item.fontSize *= typeScale;
+				if (Number.isFinite(item.radius)) item.radius *= typeScale;
+				if (Number.isFinite(item.strokeWidth)) item.strokeWidth *= typeScale;
+			}
+			item.version = Number(item.version || 0) + 1;
+		});
+		vellum.doc.refresh(); vellum.fit(); vellum.render();
+		setStatus(`Canvas matched to channel at ${width} × ${height}`);
+		return true;
+	};
 	const waitUntilReady = () => new Promise((resolve, reject) => {
 		let attempts = 0;
 		const timer = setInterval(() => {
@@ -113,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	};
 	frame.addEventListener('load', initialize);
 	if (frame.contentDocument?.readyState === 'complete') initialize();
+	channel?.addEventListener('change', () => resizeForChannel(config.channelFormats?.[channel.value] || ''));
 
 	document.querySelectorAll('[data-design-format]').forEach((button) => button.addEventListener('click', () => {
 		const [width, height] = button.dataset.designFormat.split('x').map(Number);
@@ -130,6 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		const vellum = api();
 		if (!vellum?.ready) { setStatus('Designer is still loading.', true); return; }
 		if (publish && !channel.value) { setStatus('Choose a channel before publishing.', true); channel.focus(); return; }
+		if (channel.value) resizeForChannel(config.channelFormats?.[channel.value] || '');
 		const roots = vellum.doc.nodes.filter((item) => !item.parentId).map((item) => item.id);
 		if (!roots.length) { setStatus('Add a frame or object before saving.', true); return; }
 		document.querySelectorAll('[data-design-save]').forEach((button) => button.disabled = true);

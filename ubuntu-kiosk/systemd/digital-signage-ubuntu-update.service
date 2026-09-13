@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/digital-signage-update --no-restart
+ExecStart=/usr/local/sbin/digital-signage-update
 TimeoutStartSec=1800
 Nice=10
 IOSchedulingClass=idle
