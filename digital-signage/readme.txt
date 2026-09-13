@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 4.2.0
+Stable tag: 4.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -45,6 +45,12 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 4.3.0 =
+* Added QR-assisted controller binding, unassigned-display recovery, and no-channel reconnection through the authenticated frontend portal.
+* Rebuilt the Vellum workflow as a full-screen editor with save-and-close, personal saved files, and four built-in templates available to every group.
+* Added a site-administrator remote diagnostics console with fixed read-only checks and audited command output.
+* Made Ubuntu Git updates resilient to managed-source drift, skipped unnecessary package downloads during upgrades, and returned the real failing stage and recent service log.
 
 = 4.2.0 =
 * Added the bundled Vellum designer with landscape, portrait, and square signage canvases, saved group designs, preview rendering, and one-click channel publishing.

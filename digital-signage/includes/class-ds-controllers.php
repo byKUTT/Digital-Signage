@@ -398,7 +398,7 @@ class DS_Controllers {
 
 	public static function queue_command( $controller_id, $type, array $payload = array() ) {
 		global $wpdb;
-		$allowed = array( 'restart_players', 'stop_players', 'start_players', 'refresh_displays', 'reboot', 'software_update', 'system_update', 'switch_url' );
+		$allowed = array( 'restart_players', 'stop_players', 'start_players', 'refresh_displays', 'reboot', 'software_update', 'system_update', 'switch_url', 'diagnostic' );
 		$type    = sanitize_key( $type );
 		if ( ! in_array( $type, $allowed, true ) ) {
 			return new WP_Error( 'ds_command_type', __( 'Unsupported controller command.', 'digital-signage' ) );
@@ -546,6 +546,8 @@ class DS_Controllers {
 			'controller_name' => $controller->name ? $controller->name : $controller->hostname,
 			'output_label'    => $row ? ( $row->label ? $row->label : $row->connector ) : sanitize_text_field( $output_key ),
 			'player_url'      => $row && $row->screen_id ? DS_Player::get_player_url( $row->screen_id ) : '',
+			'pairing_url'     => DS_Portal::url( 'pair', array( 'code' => $controller->pairing_code ) ),
+			'manage_url'      => ! empty( $controller->paired_at ) ? DS_Portal::url( 'controllers', array( 'id' => absint( $controller->id ), 'group' => DS_Groups::controller_group_id( $controller->id ) ) ) : '',
 		);
 	}
 

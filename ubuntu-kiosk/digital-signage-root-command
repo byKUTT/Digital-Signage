@@ -24,6 +24,37 @@ case "${1:-}" in
 		apt-get update
 		apt-get -y upgrade
 		;;
+	diagnostic-update)
+		echo "Update service"
+		systemctl status digital-signage-ubuntu-update.service --no-pager --full || true
+		echo
+		echo "Recent update log"
+		journalctl --unit digital-signage-ubuntu-update.service --lines 80 --no-pager || true
+		;;
+	diagnostic-controller)
+		echo "Controller processes"
+		pgrep -af '/digital-signage-ubuntu/ds_ubuntu_controller.py' || echo "Controller process not found"
+		echo
+		echo "Display manager"
+		systemctl status gdm3 --no-pager --full || true
+		;;
+	diagnostic-network)
+		echo "Addresses"
+		ip -brief address || true
+		echo
+		echo "Routes"
+		ip route || true
+		;;
+	diagnostic-system)
+		echo "Uptime"
+		uptime
+		echo
+		echo "Memory"
+		free -h
+		echo
+		echo "Disk"
+		df -h / /opt 2>/dev/null || df -h /
+		;;
 	check)
 		echo "Digital Signage privileged command access is ready."
 		;;

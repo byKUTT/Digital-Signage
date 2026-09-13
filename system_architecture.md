@@ -29,20 +29,26 @@
   failures through telemetry. Managed browser policy and the `basic` password-store flag disable
   sign-in, sync, autofill, password saving, and GNOME keyring prompts.
 - Persisted settings and identity never live inside the managed Git checkout.
-  `sudo digital-signage-update` verifies the configured origin, refuses dirty
-  or divergent state, fast-forwards the configured branch, and reapplies the
-  installer in upgrade mode. Site, user, identity, output assignments, and
-  browser profiles remain unchanged. WordPress starts the updater through a
-  dedicated non-blocking oneshot system service; an atomic status file exposes
-  running/succeeded/failed results through controller telemetry.
+	`sudo digital-signage-update` verifies the configured origin, backs up tracked
+	managed-source edits, synchronizes the checkout to the configured remote branch,
+	and reapplies the installer in upgrade mode without rerunning routine APT package
+	downloads. Site, user, identity, output assignments, schedules, and browser
+	profiles remain unchanged. The atomic status file records the exact failing
+	stage and a bounded log tail. WordPress starts the updater through a
+	dedicated non-blocking oneshot system service; an atomic status file exposes
+	running/succeeded/failed results through controller telemetry.
 - Linux software-update commands are queued from WordPress without GitHub
   Release metadata because the Ubuntu updater consumes only its locally pinned,
   validated Git origin and branch. The kiosk user receives passwordless sudo
   access only to a fixed root helper whose internal action allowlist rejects
   arbitrary commands.
 - Routine admin views prioritize content, assignments, status, and the primary
-  kiosk action. Technical telemetry, logs, rare device controls, layout tuning,
-  and destructive actions use native accessible disclosure sections.
+	kiosk action. Technical telemetry, logs, rare device controls, layout tuning,
+	and destructive actions use native accessible disclosure sections.
+- Site administrators can queue four fixed read-only diagnostic requests: update
+	service/log, controller process, network, and system resources. The controller
+	executes these through the existing root-helper allowlist and stores their bounded
+	output in normal command history. There is deliberately no arbitrary web shell.
 - Controller-wide GNOME and systemd configuration disables idle locking,
   blanking, suspend, hybrid sleep, suspend-then-hibernate, and hibernation.
   There is no daily timer, watchdog escalation, `StartLimitAction`, browser
@@ -63,6 +69,26 @@
 - A paired player checks `/ds/v1/screen/{token}/changes` once per second. The response contains only the currently resolved channel ID and revision; the full playlist is fetched only when that key changes.
 - Checks are non-overlapping and back off to 15 seconds during network failure. The existing configurable full-playlist poll remains active for schedule-time transitions and recovery.
 - This short revision request is intentional instead of SSE: it avoids reserving a PHP-FPM worker per display and works through hosts/proxies that buffer streaming responses.
+
+## Pairing and no-channel recovery
+
+- Unpaired controller outputs and token players show QR codes that point to the
+	authenticated frontend pairing page with the rotating code prefilled. A claim
+	requires a signed-in user, the signage capability, and an active group.
+- A paired output with no Screen assignment shows a QR link to its group-scoped
+	controller editor. A paired Screen with no active channel shows a QR link to its
+	group-scoped Screen editor. These URLs reveal no content and preserve normal
+	portal authorization after login.
+
+## Design studio
+
+- The Designer landing surface lists the current user's saved designs (site admins
+	can see all designs in the active group) and four code-defined starter templates
+	available to every group. Templates become ordinary user-owned `ds_design` posts
+	on first save; the shared template definitions are never mutated.
+- Opening a template or saved design creates a viewport-fixed workspace around the
+	locally bundled Vellum iframe. Save & close returns to the design list, while Save
+	& publish continues to generate a group-scoped PNG slide for the selected channel.
 
 ## Slider rendering
 

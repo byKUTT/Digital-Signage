@@ -64,7 +64,17 @@ if ( in_array( $rotation, array( 90, 270 ), true ) && in_array( $orientation, ar
 		<div id="ds-zone-corner" class="ds-zone ds-zone-corner"></div>
 	</div>
 
-	<div id="ds-no-channel" class="ds-no-channel" hidden><?php esc_html_e( 'No channel selected', 'digital-signage' ); ?></div>
+	<div id="ds-no-channel" class="ds-no-channel" hidden>
+		<div class="ds-no-channel-card">
+			<div>
+				<h1><?php esc_html_e( 'No channel connected', 'digital-signage' ); ?></h1>
+				<p><?php esc_html_e( 'Scan to sign in, open this screen, and choose a channel. Your account must belong to the screen’s group.', 'digital-signage' ); ?></p>
+			</div>
+			<?php if ( ! empty( $manage_url ) ) : ?>
+				<div class="ds-no-channel-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=700x700&amp;margin=16&amp;data=<?php echo esc_attr( rawurlencode( esc_url_raw( $manage_url ) ) ); ?>" alt="<?php esc_attr_e( 'QR code to reconnect this screen', 'digital-signage' ); ?>"></div>
+			<?php endif; ?>
+		</div>
+	</div>
 
 	<div id="ds-offline-indicator" class="ds-offline-indicator" hidden></div>
 

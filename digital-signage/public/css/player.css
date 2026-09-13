@@ -52,10 +52,16 @@ html, body {
 .ds-no-channel {
 	position: fixed; inset: 0; z-index: 3;
 	display: flex; align-items: center; justify-content: center;
-	color: #4b5468; background: #0b0e14;
-	font-size: min(28px, 6vh, 6vw); font-weight: 300; text-align: center; padding: 0 5vw;
+	color: #f6f7f4; background: #0b0e14; padding: min(7vh, 6vw);
 }
 .ds-no-channel[hidden] { display: none; }
+.ds-no-channel-card { width:min(1100px,100%); display:grid; grid-template-columns:minmax(0,1fr) minmax(180px,32%); align-items:center; gap:min(7vw,84px); }
+.ds-no-channel h1 { margin:0 0 .3em; max-width:12ch; font-size:clamp(38px,6vw,92px); line-height:.94; letter-spacing:-.035em; }
+.ds-no-channel p { max-width:48ch; margin:0; color:#aeb7ad; font-size:clamp(16px,1.7vw,26px); line-height:1.45; }
+.ds-no-channel-qr { padding:min(2vw,22px); background:#fff; border-radius:14px; line-height:0; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+.ds-no-channel-qr img { display:block; width:100%; height:auto; }
+@media (orientation:portrait) { .ds-no-channel-card { grid-template-columns:1fr; text-align:center; justify-items:center; } .ds-no-channel h1 { max-width:11ch; } .ds-no-channel p { max-width:34ch; } .ds-no-channel-qr { width:min(68vw,420px); } }
+@media (max-height:480px) { .ds-no-channel-card { grid-template-columns:minmax(0,1fr) minmax(120px,24%); gap:4vw; } .ds-no-channel h1 { font-size:clamp(28px,10vh,56px); } .ds-no-channel p { font-size:clamp(12px,3vh,18px); } .ds-no-channel-qr { padding:10px; } }
 
 /* ---- Stage & zones ---- */
 .ds-stage { position: absolute; inset: 0; width: 100%; height: 100%; }

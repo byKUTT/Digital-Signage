@@ -227,6 +227,23 @@ class ValidationTests(unittest.TestCase):
         self.assertIn("digital-signage-update --no-restart", service)
         self.assertIn("show_update_screen", MODULE_PATH.read_text(encoding="utf-8"))
 
+    def test_remote_update_reports_stage_and_skips_apt_during_upgrade(self):
+        root = pathlib.Path(__file__).parents[1]
+        updater = (root / "update-kiosk.sh").read_text(encoding="utf-8")
+        installer = (root / "install-kiosk.sh").read_text(encoding="utf-8")
+        self.assertIn('Update failed during ${stage}', updater)
+        self.assertIn('git -C "$repository_path" reset --hard "origin/$branch"', updater)
+        self.assertIn('if [ "$mode" != "--upgrade" ]; then', installer)
+
+    def test_remote_diagnostics_are_fixed_and_not_an_arbitrary_shell(self):
+        root = pathlib.Path(__file__).parents[1]
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        helper = (root / "digital-signage-root-command").read_text(encoding="utf-8")
+        self.assertIn('"update": "diagnostic-update"', source)
+        self.assertIn("diagnostic-network)", helper)
+        self.assertIn("diagnostic-system)", helper)
+        self.assertIn("Unsupported privileged command.", helper)
+
     def test_sleep_schedule_uses_supplied_server_epoch(self):
         controller = CONTROLLER.Controller.__new__(CONTROLLER.Controller)
         controller.display_sleeping = None
@@ -274,6 +291,15 @@ class ValidationTests(unittest.TestCase):
         self.assertIn("set_controller_owner", controllers)
         self.assertIn("ensure_user_group", groups)
         self.assertIn("get_current_user_id(), $group_id", portal)
+
+    def test_pairing_and_no_channel_states_link_to_authenticated_portal(self):
+        repo = pathlib.Path(__file__).parents[2]
+        player = (repo / "digital-signage/includes/class-ds-player.php").read_text(encoding="utf-8")
+        template = (repo / "digital-signage/public/templates/player-template.php").read_text(encoding="utf-8")
+        controller_template = (repo / "digital-signage/public/templates/controller-pairing.php").read_text(encoding="utf-8")
+        self.assertIn("DS_Portal::url( 'pair'", player)
+        self.assertIn("QR code to reconnect this screen", template)
+        self.assertIn("data.manage_url", controller_template)
 
     def test_screens_kutt_ee_is_the_default_install_target(self):
         installer = (pathlib.Path(__file__).parents[1] / "install-kiosk.sh").read_text(encoding="utf-8")

@@ -55,8 +55,9 @@ keyring access, so an unattended screen does not wait for authentication.
 
 ## Pair and assign monitors
 
-After reboot, every detected monitor opens a controller pairing page. Enter its
-six-character code under **Digital Signage → Pair a Screen**. WordPress shows
+After reboot, every detected monitor opens a controller pairing page. Scan its
+QR code or enter the six-character code under **Signage Manager → Pair controller**.
+You must sign in and have an active group before the controller can be claimed. WordPress shows
 one Controller and creates one Screen per output, such as `DP-1` and `HDMI-1`.
 Assign a different Screen/channel to each output on the Controller page.
 
@@ -70,14 +71,23 @@ restores the correct player.
 sudo digital-signage-update
 ```
 
-The updater accepts only a clean fast-forward update from the configured
-repository and branch. It preserves the site URL, kiosk user, controller
-identity/token, monitor assignments, Chrome profiles, and other settings. The
+The updater validates the configured repository and branch, backs up tracked
+changes inside the managed source checkout, and synchronizes it to the newest
+remote revision. It preserves the site URL, kiosk user, controller identity/token,
+monitor assignments, schedules, Chrome profiles, and other settings. Routine
+upgrades do not refresh Ubuntu package indexes. The
 same update can be queued from the Controller page in WordPress. It runs in a
 non-blocking system service, so controller heartbeats continue and the latest
 update status/result appears in telemetry. A successful remote update reboots
 the controller so the new version starts cleanly; settings and identity remain
 unchanged.
+
+If an update fails, the controller returns the exact failing stage and the end
+of the service log instead of only an exit code. Site administrators can also
+open the controller in Signage Manager and run one of four read-only remote
+diagnostics: update service/log, controller process, network, or system resources.
+Their output is stored in command history. Arbitrary terminal commands are never
+accepted from WordPress.
 
 The installer creates and validates passwordless sudo access only for
 `/usr/local/sbin/digital-signage-root-command`. That helper has a fixed action

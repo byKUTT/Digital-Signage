@@ -1,8 +1,8 @@
 <?php
 /**
  * Shown fullscreen on an unpaired display: the code staff read off the TV
- * (or scan via QR code on their phone) and enter in wp-admin > Digital
- * Signage > Pair a Screen. Persists across reboots automatically: the
+ * (or scan via QR code on their phone) and enter in the authenticated frontend
+ * Signage Manager. Persists across reboots automatically: the
  * device always opens the same /signage/play/{token}/ URL (the token is
  * generated once by the kiosk installer and stored on the device).
  *
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $qr_data    = rawurlencode( $pairing_url );
 $qr_src     = 'https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&margin=16&data=' . $qr_data;
 $status_url = esc_url_raw( rest_url( 'ds/v1/pair/status/' . $token ) );
-$pair_base  = esc_url_raw( admin_url( 'admin.php?page=ds-pairing&code=' ) );
+$pair_base  = esc_url_raw( DS_Portal::url( 'pair', array( 'code' => '__CODE__' ) ) );
 $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 ?><!DOCTYPE html>
 <html lang="<?php echo esc_attr( get_locale() ); ?>">
@@ -48,7 +48,7 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 		.left { display:flex; flex-direction:column; justify-content:center; min-width:0; }
 		.eyebrow { font-size: clamp(10px, 1.3vw, 13px); letter-spacing: .1em; text-transform: uppercase; color: #6b7690; margin: 0 0 .8em; }
 		h1 { font-weight: 300; font-size: clamp(18px, 3vw, 34px); margin: 0 0 .2em; color: #cdd4e0; }
-		.code { font-size: clamp(40px, 9vw, 108px); font-weight: 800; letter-spacing: .1em; margin: .2em 0 .3em; background: linear-gradient(120deg, var(--ds-red), var(--ds-orange), var(--ds-yellow)); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1; transition: opacity .2s ease; }
+		.code { font-size: clamp(40px, 9vw, 108px); font-weight: 800; letter-spacing: .1em; margin: .2em 0 .3em; color: var(--ds-yellow); line-height: 1; transition: opacity .2s ease; }
 		.code.ds-rotating { opacity: .3; }
 		.countdown { font-size: clamp(11px, 1.2vw, 15px); color: #6b7690; margin: 0 0 .8em; }
 		.countdown b { color: #9aa4bc; font-variant-numeric: tabular-nums; }
@@ -113,9 +113,9 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 			<p class="countdown"><?php esc_html_e( 'New code in', 'digital-signage' ); ?> <b id="ds-countdown"><?php echo (int) $rotate_s; ?></b>s</p>
 
 			<ol class="steps">
-				<li><span class="num">1</span><span><?php esc_html_e( 'On your phone or computer, scan the QR code (or open wp-admin manually).', 'digital-signage' ); ?></span></li>
-				<li><span class="num">2</span><span><?php esc_html_e( 'Sign in to WordPress if asked — the pairing code will already be filled in.', 'digital-signage' ); ?></span></li>
-				<li><span class="num">3</span><span><?php esc_html_e( 'Name this screen and confirm. It will start playing automatically — no need to touch this device again.', 'digital-signage' ); ?></span></li>
+				<li><span class="num">1</span><span><?php esc_html_e( 'Scan the QR code with your phone or computer.', 'digital-signage' ); ?></span></li>
+				<li><span class="num">2</span><span><?php esc_html_e( 'Sign in and select a group. The pairing code is filled in automatically.', 'digital-signage' ); ?></span></li>
+				<li><span class="num">3</span><span><?php esc_html_e( 'Name the screen and confirm. It will join that group and start automatically.', 'digital-signage' ); ?></span></li>
 			</ol>
 		</div>
 
@@ -182,7 +182,7 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 				codeEl.classList.add( 'ds-rotating' );
 				setTimeout( function () {
 					codeEl.textContent = code;
-					qrEl.src = 'https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&margin=16&data=' + encodeURIComponent( pairBase + code );
+					qrEl.src = 'https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&margin=16&data=' + encodeURIComponent( pairBase.replace('__CODE__', code) );
 					codeEl.classList.remove( 'ds-rotating' );
 				}, 200 );
 			}

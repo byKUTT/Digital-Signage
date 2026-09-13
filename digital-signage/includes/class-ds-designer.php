@@ -36,7 +36,7 @@ class DS_Designer {
 		if ( ! is_array( $decoded ) || 'vellum' !== ( $decoded['format'] ?? '' ) || empty( $decoded['pages'] ) ) { wp_send_json_error( array( 'message' => __( 'Vellum returned an invalid document.', 'digital-signage' ) ), 400 ); }
 
 		$post_data = array( 'post_title' => $title, 'post_type' => 'ds_design', 'post_status' => 'publish' );
-		if ( $design_id ) { $post_data['ID'] = $design_id; }
+		if ( $design_id ) { $post_data['ID'] = $design_id; } else { $post_data['post_author'] = get_current_user_id(); }
 		$design_id = wp_insert_post( $post_data, true );
 		if ( is_wp_error( $design_id ) ) { wp_send_json_error( array( 'message' => $design_id->get_error_message() ), 500 ); }
 		DS_Groups::set_post_group( $design_id, $group_id );

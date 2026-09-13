@@ -53,9 +53,18 @@ case "$remote" in
 esac
 
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y --no-install-recommends \
-	python3 git ca-certificates curl sudo x11-xserver-utils unclutter dbus-x11 gdm3
+if [ "$mode" != "--upgrade" ]; then
+	apt-get update
+	apt-get install -y --no-install-recommends \
+		python3 git ca-certificates curl sudo x11-xserver-utils unclutter dbus-x11 gdm3
+else
+	for required_command in python3 git sudo xrandr unclutter dbus-launch; do
+		if ! command -v "$required_command" >/dev/null 2>&1; then
+			echo "Upgrade cannot continue because $required_command is missing. Run the full installer once." >&2
+			exit 1
+		fi
+	done
+fi
 
 browser_bin=""
 for browser_candidate in google-chrome-stable google-chrome; do
@@ -225,7 +234,7 @@ fi
 systemctl unmask getty@tty1.service >/dev/null 2>&1 || true
 systemctl set-default graphical.target
 systemctl daemon-reload
-for allowed_action in check software-update system-update reboot; do
+for allowed_action in check software-update system-update reboot diagnostic-update diagnostic-controller diagnostic-network diagnostic-system; do
 	runuser -u "$kiosk_user" -- sudo -n -l /usr/local/sbin/digital-signage-root-command "$allowed_action" >/dev/null
 done
 
@@ -241,7 +250,7 @@ if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
 fi
 
 echo
-echo "Digital Signage Ubuntu controller 4.2.0 is installed."
+echo "Digital Signage Ubuntu controller 4.3.0 is installed."
 echo "No automatic reboot timer or reboot watchdog was installed."
 echo "Reboot once to activate Xorg autologin: sudo reboot"
 echo "Future updates: sudo digital-signage-update"

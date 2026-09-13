@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "4.2.0"
+VERSION = "4.3.0"
 DEFAULT_SITE = "https://screens.kutt.ee"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
@@ -336,7 +336,7 @@ class Controller:
             "cursor_hidden": self.cursor_hidden,
             "cursor_error": self.cursor_error,
             "update_status": str(update_status.get("status", ""))[:100],
-            "update_result": str(update_status.get("message", ""))[:300],
+            "update_result": str(update_status.get("message", ""))[:3000],
             "connected_outputs": self.connected_output_count,
             "player_processes": len(self.players),
             "os_update_supported": True,
@@ -449,7 +449,7 @@ class Controller:
                 status = load_json(status_path)
                 if int(status.get("updated_at", 0)) >= started_at - 2:
                     state = str(status.get("status", ""))
-                    message = str(status.get("message", ""))[:500]
+                    message = str(status.get("message", ""))[:3500]
                     if state == "succeeded":
                         return True, message
                     if state == "failed":
@@ -471,6 +471,7 @@ class Controller:
             "software_update",
             "system_update",
             "switch_url",
+            "diagnostic",
         }
         if not command_id or command_type not in allowed:
             return
@@ -533,6 +534,21 @@ class Controller:
             else:
                 self.stop_players()
                 self.force_refresh = True
+            return
+        if command_type == "diagnostic":
+            payload = command.get("payload") if isinstance(command.get("payload"), dict) else {}
+            diagnostic = str(payload.get("diagnostic", ""))
+            root_commands = {
+                "update": "diagnostic-update",
+                "controller": "diagnostic-controller",
+                "network": "diagnostic-network",
+                "system": "diagnostic-system",
+            }
+            if diagnostic not in root_commands:
+                self.ack(command_id, "failed", "Unsupported diagnostic request")
+                return
+            ok, result = self.run_root_command(root_commands[diagnostic])
+            self.ack(command_id, "succeeded" if ok else "failed", result or "Diagnostic completed with no output")
             return
         root_name = {
             "reboot": "reboot",

@@ -253,7 +253,7 @@ class DS_Player {
 			);
 		}
 
-		$pairing_url = admin_url( 'admin.php?page=ds-pairing&code=' . rawurlencode( $code ) );
+		$pairing_url = DS_Portal::url( 'pair', array( 'code' => $code ) );
 
 		include DS_PLUGIN_DIR . 'public/templates/pairing-screen.php';
 	}
@@ -263,6 +263,8 @@ class DS_Player {
 		$is_preview  = false;
 		$preview_id  = 0;
 		$preview_nonce = '';
+		$screen_group_id = DS_Groups::post_group_id( $screen );
+		$manage_url  = DS_Portal::url( 'screens', array( 'id' => absint( $screen->ID ), 'group' => $screen_group_id ) );
 		include DS_PLUGIN_DIR . 'public/templates/player-template.php';
 	}
 
@@ -292,6 +294,7 @@ class DS_Player {
 		$is_preview    = true;
 		$preview_id    = $channel_id;
 		$preview_nonce = wp_create_nonce( 'wp_rest' );
+		$manage_url    = '';
 
 		include DS_PLUGIN_DIR . 'public/templates/player-template.php';
 		exit;

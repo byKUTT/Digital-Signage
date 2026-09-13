@@ -63,7 +63,10 @@ hibernation are disabled. Successful remote software updates and verified URL
 migrations reboot automatically; there is no daily reboot or watchdog. See `ubuntu-kiosk/README.md` for recovery, assignment,
 diagnostics, and uninstall instructions.
 
-Version 4.2.0 adds a locally bundled Vellum design studio, saved group designs,
+Version 4.3.0 adds QR-assisted binding and no-channel recovery, a full-screen
+Vellum workflow with reusable built-in templates and personal saved files, a
+site-admin-only remote diagnostics console, and an updater that reports its
+real failing stage while preserving device settings. Version 4.2.0 added a locally bundled Vellum design studio, saved group designs,
 one-click channel publishing, editable media-based slides, native 24-hour time
 pickers, searchable city timezones, and controller-specific sleep settings.
 
