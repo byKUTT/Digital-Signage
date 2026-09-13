@@ -49,6 +49,10 @@
 	service/log, controller process, network, and system resources. The controller
 	executes these through the existing root-helper allowlist and stores their bounded
 	output in normal command history. There is deliberately no arbitrary web shell.
+- The Ubuntu installer writes explicit argument-qualified sudoers entries for each
+	root-helper action and validates the policy by executing the harmless `check`
+	action as the kiosk user. Remote actions never depend on an interactive policy
+	agent or a password stored in WordPress.
 - Controller-wide GNOME and systemd configuration disables idle locking,
   blanking, suspend, hybrid sleep, suspend-then-hibernate, and hibernation.
   There is no daily timer, watchdog escalation, `StartLimitAction`, browser
@@ -89,6 +93,40 @@
 - Opening a template or saved design creates a viewport-fixed workspace around the
 	locally bundled Vellum iframe. Save & close returns to the design list, while Save
 	& publish continues to generate a group-scoped PNG slide for the selected channel.
+- Starter designs are generated from four visual families. Each family owns four
+	compositions with independent landscape and portrait canvases, for 32 editable
+	starting points. The catalog is data-driven and remains available to every group.
+
+## Spotify Connect control
+
+- Spotify is an optional controller-scoped interactive control surface. Site-level
+	Spotify application credentials authorize one Spotify account per controller;
+	access and refresh tokens are stored in non-autoloaded controller options.
+- The `ds_spotify_user` role owns only `control_digital_signage_spotify`. Explicit
+	controller IDs in user meta determine which Spotify panels that user can open;
+	the role cannot reach channels, screens, media, settings, groups, or controllers.
+- Browser actions call nonce-protected WordPress AJAX handlers. Server-side API
+	requests use a fixed Spotify endpoint/action map for device discovery, track
+	search, transfer, play, pause, previous, and next. Users never supply an API URL.
+- Spotify playback is not embedded in signage output, synchronized with slides, or
+	ducked around signage audio. Those uses conflict with Spotify platform policy.
+
+## Licensed background music
+
+- `DS_Music` stores group-owned playlists as `ds_music_playlist` posts and filters
+	audio attachments through the same group access boundary used by signage media.
+- A controller stores one playlist, one output key, volume, and shuffle state in a
+	non-autoloaded option. Only the Screen mapped to that output receives the music
+	payload, preventing every Chrome window on a multi-screen controller from playing
+	the same audio independently.
+- The player creates one local HTML audio element, advances the local playlist, and
+	carries its revision in the normal change key. A sound-enabled video claims a duck
+	reference when playback starts, fades music to zero over 1.5 seconds, and releases
+	that reference when it ends or is removed. Music returns only after all audible
+	videos release their claims.
+- Audio files are self-hosted. The portal links to Pixabay Music only as an external
+	browsing destination; it does not use or imply a Pixabay music API. Every upload
+	requires a recorded license and an explicit commercial-use confirmation.
 
 ## Slider rendering
 

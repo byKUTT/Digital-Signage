@@ -19,7 +19,9 @@ class DS_Roles {
 
 	const ROLE = 'ds_signage_manager';
 	const SCREEN_MANAGER_ROLE = 'ds_screen_manager';
+	const SPOTIFY_ROLE = 'ds_spotify_user';
 	const CAP  = 'manage_digital_signage';
+	const SPOTIFY_CAP = 'control_digital_signage_spotify';
 	const TEAM_OPTION = 'ds_team_user_ids';
 
 	public static function instance() {
@@ -36,6 +38,8 @@ class DS_Roles {
 	}
 
 	public static function add_role() {
+		add_role( self::SPOTIFY_ROLE, __( 'Spotify User', 'digital-signage' ), array( 'read' => true, self::SPOTIFY_CAP => true ) );
+		if ( get_role( self::SPOTIFY_ROLE ) ) { get_role( self::SPOTIFY_ROLE )->add_cap( self::SPOTIFY_CAP ); }
 		add_role( self::SCREEN_MANAGER_ROLE, __( 'Screen Manager', 'digital-signage' ), array( 'read' => true, 'upload_files' => true, self::CAP => true ) );
 		if ( get_role( self::SCREEN_MANAGER_ROLE ) ) { get_role( self::SCREEN_MANAGER_ROLE )->add_cap( self::CAP ); get_role( self::SCREEN_MANAGER_ROLE )->add_cap( 'upload_files' ); }
 		if ( ! get_role( self::ROLE ) ) {
@@ -55,6 +59,7 @@ class DS_Roles {
 		$admin = get_role( 'administrator' );
 		if ( $admin ) {
 			$admin->add_cap( self::CAP );
+			$admin->add_cap( self::SPOTIFY_CAP );
 		}
 
 		update_option( 'ds_roles_version', DS_VERSION );

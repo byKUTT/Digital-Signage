@@ -32,6 +32,7 @@
 		revisionKey: '',
 		zones: {}, // zoneName -> { items, index, timer }
 		online: true,
+		music: null,
 	};
 	var playlistRequest = null;
 	var changesRequestActive = false;
@@ -70,6 +71,13 @@
 		return /(?:^|[?&])kiosk=1(?:&|$)/.test( window.location.search );
 	}
 
+	function resumeBackgroundMusic() {
+		if ( state.music && state.music.audio.paused ) {
+			var promise = state.music.audio.play();
+			if ( promise && promise.catch ) { promise.catch( function () {} ); }
+		}
+	}
+
 	function initFullscreen() {
 		var overlay = document.getElementById( 'ds-start-overlay' );
 		var button  = document.getElementById( 'ds-start-button' );
@@ -82,6 +90,7 @@
 			requestFullscreen();
 			if ( overlay ) { overlay.classList.add( 'ds-hidden' ); }
 			resumeActiveVideo();
+			resumeBackgroundMusic();
 		};
 
 		document.addEventListener( 'keydown', startFromRemote );
@@ -113,6 +122,8 @@
 		button.addEventListener( 'click', function () {
 			requestFullscreen();
 			overlay.classList.add( 'ds-hidden' );
+			resumeActiveVideo();
+			resumeBackgroundMusic();
 		} );
 
 		// If auto-fullscreen worked instantly, hide overlay right away too.
@@ -202,6 +213,7 @@
 		var rotation = data && undefined !== data.rotation ? data.rotation : CONFIG.rotation;
 		return String( data && data.channel_id ? data.channel_id : 0 ) + ':' +
 			String( data && data.revision ? data.revision : 'legacy' ) + ':' +
+			String( data && data.music_revision ? data.music_revision : 'none' ) + ':' +
 			String( orientation ) + ':' + String( normalizeRotation( rotation ) );
 	}
 
@@ -297,9 +309,73 @@
 	/* Rendering                                                          */
 	/* ---------------------------------------------------------------- */
 
+	function fadeMusic( target, duration ) {
+		if ( ! state.music ) { return; }
+		clearInterval( state.music.fadeTimer );
+		var audio = state.music.audio;
+		var start = audio.volume;
+		var began = Date.now();
+		state.music.fadeTimer = setInterval( function () {
+			var progress = Math.min( 1, ( Date.now() - began ) / Math.max( 1, duration ) );
+			audio.volume = Math.max( 0, Math.min( 1, start + ( target - start ) * progress ) );
+			if ( progress >= 1 ) { clearInterval( state.music.fadeTimer ); }
+		}, 50 );
+	}
+
+	function playMusicTrack() {
+		if ( ! state.music || ! state.music.tracks.length ) { return; }
+		var music = state.music;
+		if ( music.shuffle && music.tracks.length > 1 ) {
+			var next = music.index;
+			while ( next === music.index ) { next = Math.floor( Math.random() * music.tracks.length ); }
+			music.index = next;
+		}
+		music.audio.src = music.tracks[ music.index ].src;
+		music.audio.volume = music.ducked ? 0 : music.volume;
+		var promise = music.audio.play();
+		if ( promise && promise.catch ) { promise.catch( function () {} ); }
+	}
+
+	function configureMusic( config, revision ) {
+		if ( state.music && config && config.tracks && config.tracks.length && state.music.revision === revision ) { return; }
+		// Duck ownership belongs to the current music engine. Clear markers before
+		// replacing or disabling it so an already-playing video can claim the new
+		// engine and cannot leave future music at full volume.
+		document.querySelectorAll( '[data-ds-music-ducked]' ).forEach( function ( video ) {
+			delete video.dataset.dsMusicDucked;
+		} );
+		if ( ! config || ! config.tracks || ! config.tracks.length ) {
+			if ( state.music ) { clearInterval( state.music.fadeTimer ); state.music.audio.pause(); state.music.audio.removeAttribute( 'src' ); }
+			state.music = null;
+			return;
+		}
+		if ( state.music ) { clearInterval( state.music.fadeTimer ); state.music.audio.pause(); }
+		var audio = new Audio();
+		audio.preload = 'auto';
+		state.music = { audio: audio, tracks: config.tracks, index: 0, volume: Math.max( 0, Math.min( 1, Number( config.volume ) || 0 ) ), shuffle: !! config.shuffle, duckMs: Number( config.duck_ms ) || 1500, ducked: 0, fadeTimer: null, revision: revision };
+		audio.addEventListener( 'ended', function () { if ( ! state.music ) { return; } state.music.index = ( state.music.index + 1 ) % state.music.tracks.length; playMusicTrack(); } );
+		playMusicTrack();
+		document.querySelectorAll( '.ds-slide.ds-active video' ).forEach( function ( video ) { if ( ! video.muted ) { duckMusicFor( video ); } } );
+	}
+
+	function duckMusicFor( video ) {
+		if ( ! state.music || ! video || video.dataset.dsMusicDucked ) { return; }
+		video.dataset.dsMusicDucked = '1';
+		state.music.ducked++;
+		fadeMusic( 0, state.music.duckMs );
+	}
+
+	function restoreMusicFor( video ) {
+		if ( ! state.music || ! video || ! video.dataset.dsMusicDucked ) { return; }
+		delete video.dataset.dsMusicDucked;
+		state.music.ducked = Math.max( 0, state.music.ducked - 1 );
+		if ( ! state.music.ducked ) { fadeMusic( state.music.volume, state.music.duckMs ); }
+	}
+
 	function applyPlaylist( data ) {
 		state.playlist = data;
 		state.revisionKey = playlistRevisionKey( data );
+		configureMusic( data.music, data.music_revision || 'none' );
 
 		var stage = document.getElementById( 'ds-stage' );
 		stage.className = 'ds-stage ds-layout-' + ( data.layout || 'fullscreen' );
@@ -478,7 +554,7 @@
 				var video = document.createElement( 'video' );
 				video.src = item.src || '';
 				video.preload = 'auto';
-				video.muted = true;
+				video.muted = ! item.play_sound;
 				video.playsInline = true;
 				video.setAttribute( 'playsinline', '' );
 				video.loop = 'fixed_duration' === item.play_mode;
@@ -574,6 +650,7 @@
 	 */
 	function stopTimers( container ) {
 		container.querySelectorAll( 'video' ).forEach( function ( video ) {
+			restoreMusicFor( video );
 			video.pause();
 			video.removeAttribute( 'src' );
 			video.load();
@@ -995,8 +1072,10 @@
 			} );
 
 			if ( video ) {
+				if ( ! video.muted ) { duckMusicFor( video ); }
 				var playPromise = video.play();
-				if ( playPromise && playPromise.catch ) { playPromise.catch( function () {} ); }
+				if ( playPromise && playPromise.catch ) { playPromise.catch( function () { restoreMusicFor( video ); } ); }
+				video.addEventListener( 'ended', function () { restoreMusicFor( video ); }, { once: true } );
 			}
 			logProofOfPlay( zoneName, item );
 			if ( zone.items.length > 1 ) {

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-13T00:00:00Z",
+  "title": "Design System: Screens byKUTT",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Signal Yellow", "canonical": "#e9ff54" },
+      "canvas": { "role": "neutral", "displayName": "Deep Forest", "canonical": "#081712" },
+      "signal-yellow": { "role": "tertiary", "displayName": "Pairing Signal", "canonical": "#e9ff54" }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Operational Title", "purpose": "Controller and player context." },
+      "label": { "displayName": "Control Label", "purpose": "Fields, metadata, and connection eyebrows." }
+    },
+    "shadows": [
+      { "name": "panel-ambient", "value": "0 20px 60px rgba(0,0,0,.16)", "purpose": "Low separation for portal panels." },
+      { "name": "template-hover", "value": "0 20px 38px rgba(22,32,24,.18)", "purpose": "Selection feedback for visual artifacts." },
+      { "name": "qr-offset", "value": "18px 22px 0 #e9ff54", "purpose": "Distance-visible QR emphasis." }
+    ],
+    "motion": [
+      { "name": "state-fast", "value": "180ms ease", "purpose": "Control and focus state changes." },
+      { "name": "artifact-lift", "value": "220ms cubic-bezier(.2,.8,.2,1)", "purpose": "Template selection feedback." }
+    ],
+    "breakpoints": [
+      { "name": "wide", "value": "1050px" },
+      { "name": "compact", "value": "720px" },
+      { "name": "phone", "value": "460px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The principal operational action.",
+      "html": "<button class=\"ds-button\">Save changes</button>",
+      "css": ".ds-button{border-radius:12px;background:#e9ff54;color:#102018;padding:10px 18px;transition:transform 180ms ease}.ds-button:hover{transform:translateY(-1px);background:#bdde31}.ds-button:focus-visible{outline:3px solid #7cc8ff;outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calm Control Room",
+    "overview": "A restrained operational workspace with oversized, high-contrast connection signals.",
+    "keyCharacteristics": ["deep-forest surfaces", "ivory typography", "signal-yellow actions", "large QR blocks", "responsive density"],
+    "rules": [
+      { "name": "The Signal Color Rule", "body": "Reserve acid yellow for primary actions and pairing; use Spotify green only for Spotify controls.", "section": "colors" },
+      { "name": "The Flat-by-Default Rule", "body": "Use stronger depth only for selectable artifacts and QR signals.", "section": "elevation" }
+    ],
+    "dos": ["Keep operational pages status-led.", "Preserve oversized QR contrast on every display ratio."],
+    "donts": ["Do not use signal colors as general decoration.", "Do not add decorative cards around ordinary settings rows."]
+  }
+}

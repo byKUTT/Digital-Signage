@@ -184,6 +184,7 @@ class DS_REST {
 			array(
 				'channel_id'  => $channel_id,
 				'revision'    => $this->get_channel_revision( $channel_id ),
+				'music_revision' => DS_Music::revision( $screen->ID ),
 				'orientation' => get_post_meta( $screen->ID, 'ds_orientation', true ) ?: 'landscape',
 				'rotation'    => absint( get_post_meta( $screen->ID, 'ds_content_rotation', true ) ),
 			)
@@ -219,6 +220,8 @@ class DS_REST {
 				'channel_id'     => $channel_id,
 				'channel_name'   => $channel_id ? get_the_title( $channel_id ) : '',
 				'revision'       => $this->get_channel_revision( $channel_id ),
+				'music_revision' => DS_Music::revision( $screen->ID ),
+				'music'          => DS_Music::player_config( $screen->ID ),
 				'layout'         => $layout,
 				'zone_bg'        => $zone_bg ?: '',
 				'zones'          => (object) $zones,
@@ -591,6 +594,7 @@ class DS_REST {
 			case 'video':
 				$data['src']       = $media ? wp_get_attachment_url( $media ) : get_post_meta( $slide->ID, 'ds_content_url', true );
 				$data['play_mode'] = get_post_meta( $slide->ID, 'ds_video_play_mode', true ) ?: 'until_end';
+				$data['play_sound'] = '0' !== (string) get_post_meta( $slide->ID, 'ds_play_sound', true );
 				break;
 			case 'webpage':
 				$data['url'] = esc_url_raw( get_post_meta( $slide->ID, 'ds_content_url', true ) );

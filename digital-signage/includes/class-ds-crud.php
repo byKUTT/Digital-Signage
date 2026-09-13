@@ -163,6 +163,7 @@ class DS_CRUD {
 		}
 
 		update_post_meta( $post_id, 'ds_content_html', wp_kses_post( $data['content_html'] ?? '' ) );
+		if ( isset( $data['slide_type'] ) && 'video' === sanitize_key( $data['slide_type'] ) ) { update_post_meta( $post_id, 'ds_play_sound', empty( $data['play_sound'] ) ? 0 : 1 ); }
 		update_post_meta( $post_id, 'ds_sched_days', array_map( 'sanitize_key', (array) ( $data['sched_days'] ?? array() ) ) );
 		delete_post_meta( $post_id, 'ds_transition_override' );
 

@@ -1,11 +1,11 @@
-=== Digital Signage CMS ===
+=== Screens byKUTT ===
 Contributors: bykutt
 Author: byKUTT
 Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 4.3.0
+Stable tag: 4.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,7 +13,7 @@ Turn WordPress into a full digital signage (CMS) platform for managing content o
 
 == Description ==
 
-Digital Signage CMS gives you:
+Screens byKUTT gives you:
 
 * **Channels** — named playlists of content ("Lobby Menu", "Cafeteria Board") assignable to one or more screens.
 * **Screens** — registered displays with orientation, 0°/90°/180°/270° content rotation, optional short player URLs, location and live online/offline status.
@@ -25,6 +25,14 @@ Digital Signage CMS gives you:
 * A shared **Digital Signage Team** and **Signage Manager** role for people who need access to all signage content and settings without full WordPress administrator access.
 * **Multi-display controllers** — one generic Linux or Windows PC can drive several connected displays, with a different Screen, channel, schedule and rotation on every output.
 * **Fleet management** — grouped controller health, detailed telemetry, output mapping, command history, verified signage updates, OS update commands and remote kiosk/desktop controls.
+* **Spotify Connect control** — an optional controller-scoped panel for authenticated Spotify Premium users to search songs and control an existing Spotify playback device. A Spotify User role can be limited to explicitly assigned controllers.
+* **Licensed background music** — a group-scoped local audio library with searchable styles, playlists, per-controller output assignment, and automatic 1.5-second ducking around slide audio.
+
+== External services ==
+
+The optional Spotify panel connects to Spotify Accounts (`accounts.spotify.com`) for OAuth authorization and the Spotify Web API (`api.spotify.com`) for device discovery, search, and user-triggered playback controls. Enabling it sends the connected Spotify account and playback requests to Spotify under Spotify's Developer Terms and Privacy Policy. It is disabled until a site administrator supplies Spotify application credentials and a user explicitly connects an account. Digital Signage does not synchronize Spotify audio with signage content and does not use Spotify for non-interactive broadcasting.
+
+The Music page contains an ordinary link to Pixabay Music (`pixabay.com/music/`) as one place to browse free audio. The plugin does not call a Pixabay API or send WordPress, group, controller, or user data to Pixabay. Audio is downloaded by the user and uploaded to their own WordPress media storage. Users remain responsible for checking and recording the license that applies to each track and intended commercial use.
 
 == Installation ==
 
@@ -45,6 +53,18 @@ For a private VIDAA 9 TV player, open `https://your-site.example/signage/tv/` in
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 4.5.0 =
+* Introduced the Screens byKUTT identity and rebuilt the frontend dashboard in the new deep-forest visual system.
+* Added group-scoped licensed music uploads, searchable track libraries, playlists, and per-controller audio-output assignment.
+* Added automatic 1.5-second background-music ducking while a signage video plays sound, with automatic restoration afterwards.
+
+= 4.4.0 =
+* Added controller-scoped Spotify Connect controls with a restricted Spotify User role.
+* Rebuilt the template library with 32 landscape and portrait starter designs.
+* Refined the Vellum workspace, portal controls, pairing, and reconnecting screens.
+* Repaired passwordless controller actions with explicit sudo command signatures and a real installation check.
+* Simplified deletion to one clear confirmation.
 
 = 4.3.0 =
 * Added QR-assisted controller binding, unassigned-display recovery, and no-channel reconnection through the authenticated frontend portal.

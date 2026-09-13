@@ -1,4 +1,4 @@
-# Digital Signage CMS — WordPress Plugin
+# Screens byKUTT — Digital Signage for WordPress
 
 A WordPress plugin that turns a WordPress install into a full digital signage (CMS) platform: manage channels, screens, playlists/slides and schedules from a fully custom wp-admin interface (not WordPress's native post editor), and drive TVs/kiosks/tablets from a chrome-less, auto-fullscreen frontend player.
 
@@ -15,6 +15,7 @@ The plugin source lives in [`digital-signage/`](digital-signage/) and is also pa
 - **Remote Raspberry Pi device management**: a screen running `ds-agent` (bundled with the Pi installer) can have its WiFi network, screen rotation, browser restart, reboot, and OS updates all controlled from that Screen's edit page in wp-admin — no SSH needed after initial setup.
 - **REST API** under `/wp-json/ds/v1/` for the player and for external kiosk hardware (e.g. a Raspberry Pi running a browser in kiosk mode).
 - **24-hour time and dd.mm.yyyy (Estonian) date formatting** throughout the player's clock widget and admin timestamps.
+- **Licensed background music**: upload commercially licensed audio into a group-private library, search by style, build playlists, assign one playlist to a controller output, and automatically fade music around slide audio.
 
 See [`digital-signage/readme.txt`](digital-signage/readme.txt) for the standard WordPress.org-style plugin readme, and the PHPDoc block at the top of each class in `digital-signage/includes/` for how each subsystem fits together.
 
@@ -63,7 +64,11 @@ hibernation are disabled. Successful remote software updates and verified URL
 migrations reboot automatically; there is no daily reboot or watchdog. See `ubuntu-kiosk/README.md` for recovery, assignment,
 diagnostics, and uninstall instructions.
 
-Version 4.3.0 adds QR-assisted binding and no-channel recovery, a full-screen
+Version 4.5.0 adds the Screens byKUTT identity, a licensed local background-music
+library with controller output assignment and automatic audio ducking, controller-scoped Spotify Connect controls, a restricted
+Spotify User role, 32 landscape and portrait starter designs, a refined editor
+and connection experience, and repaired non-interactive Ubuntu privileges.
+Version 4.3.0 added QR-assisted binding and no-channel recovery, a full-screen
 Vellum workflow with reusable built-in templates and personal saved files, a
 site-admin-only remote diagnostics console, and an updater that reports its
 real failing stage while preserving device settings. Version 4.2.0 added a locally bundled Vellum design studio, saved group designs,

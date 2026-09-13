@@ -268,8 +268,9 @@ class ValidationTests(unittest.TestCase):
         root = pathlib.Path(__file__).parents[1]
         installer = (root / "install-kiosk.sh").read_text(encoding="utf-8")
         helper = (root / "digital-signage-root-command").read_text(encoding="utf-8")
-        self.assertIn("NOPASSWD: /usr/local/sbin/digital-signage-root-command", installer)
-        self.assertIn("sudo -n -l /usr/local/sbin/digital-signage-root-command", installer)
+        self.assertIn("Cmnd_Alias DIGITAL_SIGNAGE_ROOT", installer)
+        self.assertIn("$kiosk_user ALL=(root) NOPASSWD: DIGITAL_SIGNAGE_ROOT", installer)
+        self.assertIn("sudo -n /usr/local/sbin/digital-signage-root-command check", installer)
         self.assertIn('case "${1:-}" in', helper)
         self.assertIn("Unsupported privileged command.", helper)
 
@@ -304,6 +305,57 @@ class ValidationTests(unittest.TestCase):
     def test_screens_kutt_ee_is_the_default_install_target(self):
         installer = (pathlib.Path(__file__).parents[1] / "install-kiosk.sh").read_text(encoding="utf-8")
         self.assertIn('site="${1:-https://screens.kutt.ee}"', installer)
+
+    def test_installer_executes_a_real_passwordless_privilege_check(self):
+        installer = (pathlib.Path(__file__).parents[1] / "install-kiosk.sh").read_text(encoding="utf-8")
+        self.assertIn("Cmnd_Alias DIGITAL_SIGNAGE_ROOT", installer)
+        self.assertIn('sudo -n /usr/local/sbin/digital-signage-root-command check', installer)
+        self.assertNotIn('sudo -n -l /usr/local/sbin/digital-signage-root-command "$allowed_action"', installer)
+
+    def test_spotify_access_is_controller_scoped_and_not_a_signage_role(self):
+        repo = pathlib.Path(__file__).parents[2]
+        spotify = (repo / "digital-signage/includes/class-ds-spotify.php").read_text(encoding="utf-8")
+        roles = (repo / "digital-signage/includes/class-ds-roles.php").read_text(encoding="utf-8")
+        self.assertIn("ds_spotify_controller_ids", spotify)
+        self.assertIn("control_digital_signage_spotify", roles)
+        self.assertIn("in_array( $controller_id, self::user_controller_ids(), true )", spotify)
+        self.assertNotIn("sdk.scdn.co", spotify)
+
+    def test_template_catalog_has_four_variations_and_two_orientations(self):
+        repo = pathlib.Path(__file__).parents[2]
+        designer = (repo / "digital-signage/public/js/designer.js").read_text(encoding="utf-8")
+        portal = (repo / "digital-signage/public/templates/portal.php").read_text(encoding="utf-8")
+        self.assertIn("[1,2,3,4]", designer)
+        self.assertIn("['landscape','portrait']", designer)
+        self.assertIn("Four visual families", portal)
+
+    def test_screens_bykutt_dashboard_uses_the_new_responsive_brand_system(self):
+        repo = pathlib.Path(__file__).parents[2]
+        portal = (repo / "digital-signage/public/templates/portal.php").read_text(encoding="utf-8")
+        styles = (repo / "digital-signage/public/css/ui-refresh.css").read_text(encoding="utf-8")
+        self.assertIn("screens-bykutt-mark.svg", portal)
+        self.assertIn("Every screen, in sync.", portal)
+        self.assertIn("--ds-canvas:#081712", styles)
+        self.assertIn("--ds-accent:#e9ff54", styles)
+        self.assertIn("@media(max-width:720px)", styles)
+
+    def test_local_licensed_music_is_group_scoped_and_ducks_slide_audio(self):
+        repo = pathlib.Path(__file__).parents[2]
+        music = (repo / "digital-signage/includes/class-ds-music.php").read_text(encoding="utf-8")
+        player = (repo / "digital-signage/public/js/player.js").read_text(encoding="utf-8")
+        portal = (repo / "digital-signage/public/templates/portal.php").read_text(encoding="utf-8")
+        self.assertIn("DS_Groups::post_group_id", music)
+        self.assertIn("'duck_ms' => 1500", music)
+        self.assertIn("fadeMusic( 0, state.music.duckMs )", player)
+        self.assertIn("fadeMusic( state.music.volume, state.music.duckMs )", player)
+        self.assertIn("I confirm this group may play this track commercially.", portal)
+
+    def test_spotify_is_not_synchronized_with_signage_playback(self):
+        repo = pathlib.Path(__file__).parents[2]
+        spotify = (repo / "digital-signage/includes/class-ds-spotify.php").read_text(encoding="utf-8")
+        player = (repo / "digital-signage/public/js/player.js").read_text(encoding="utf-8")
+        self.assertNotIn("sdk.scdn.co", spotify)
+        self.assertNotIn("spotify", player.lower())
 
 
 class GdmConfigurationTests(unittest.TestCase):

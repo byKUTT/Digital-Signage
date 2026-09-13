@@ -32,46 +32,50 @@ document.addEventListener('DOMContentLoaded', () => {
 		const root = node('frame', { name: `${width} × ${height}`, w: width, h: height, fill: background, clip: true });
 		return { format: 'vellum', version: 1, name, pages: [{ id: pageId, name, nodes: [root, ...children(root.id)] }], pageId, assets: {}, fonts: {}, components: {}, tokens: { colors: [], typography: [] } };
 	};
-	const templates = {
-		'daily-offers': () => documentFrom('Daily offers', 1920, 1080, '#10261d', (root) => [
-			node('rect', { parentId: root, name: 'Accent panel', x: 1180, y: 0, w: 740, h: 1080, fill: '#d8ff54' }),
-			text(root, 'Heading', 'TODAY\'S\nOFFERS', 110, 90, 980, 310, 146, '#f5f1e8', 750),
-			text(root, 'Date', 'FRESHLY MADE · ALL DAY', 118, 438, 850, 55, 34, '#9fc3af', 550),
-			text(root, 'Offer one', 'Lunch special', 118, 620, 700, 72, 55, '#f5f1e8', 650),
-			text(root, 'Offer one price', '€8.90', 118, 704, 700, 128, 112, '#f5f1e8', 760),
-			text(root, 'Offer two', 'Coffee + dessert', 1250, 150, 540, 150, 62, '#10261d', 650),
-			text(root, 'Offer two price', '€5.50', 1250, 360, 540, 150, 118, '#10261d', 760),
-			text(root, 'Footer', 'Available while supplies last', 1250, 900, 540, 70, 30, '#365341', 500)
-		]),
-		'weekly-menu': () => documentFrom('Weekly menu', 1920, 1080, '#f1e9dc', (root) => [
-			node('rect', { parentId: root, name: 'Header', x: 0, y: 0, w: 1920, h: 245, fill: '#e55e35' }),
-			text(root, 'Heading', 'THIS WEEK', 92, 65, 950, 120, 100, '#fff9ef', 740),
-			text(root, 'Subtitle', 'Lunch menu · 11:00–15:00', 1220, 92, 610, 60, 34, '#fff9ef', 500, 'right'),
-			text(root, 'Monday', 'MON\nRoast chicken · €9.50', 110, 340, 760, 170, 48, '#382b25', 650),
-			text(root, 'Tuesday', 'TUE\nCreamy salmon · €10.50', 1010, 340, 780, 170, 48, '#382b25', 650),
-			text(root, 'Wednesday', 'WED\nMushroom pasta · €8.90', 110, 640, 760, 170, 48, '#382b25', 650),
-			text(root, 'Thursday', 'THU\nBeef stew · €9.90', 1010, 640, 780, 170, 48, '#382b25', 650)
-		]),
-		'event': () => documentFrom('Event announcement', 1920, 1080, '#1f39d1', (root) => [
-			node('rect', { parentId: root, name: 'Event block', x: 1050, y: 90, w: 740, h: 900, fill: '#c8ff45', radius: 36 }),
-			text(root, 'Label', 'SPECIAL EVENT', 110, 105, 800, 60, 36, '#aab8ff', 650),
-			text(root, 'Heading', 'SUMMER\nNIGHT', 105, 250, 850, 360, 150, '#ffffff', 760),
-			text(root, 'Date', '24 AUGUST', 1160, 200, 520, 120, 75, '#142160', 740),
-			text(root, 'Time', '18:00', 1160, 400, 520, 160, 132, '#142160', 760),
-			text(root, 'Details', 'Live music\nSeasonal menu\nFree entry', 1160, 650, 520, 220, 46, '#142160', 600)
-		]),
-		'welcome': () => documentFrom('Welcome screen', 1080, 1920, '#431529', (root) => [
-			node('ellipse', { parentId: root, name: 'Sun', x: 565, y: 170, w: 360, h: 360, fill: '#ffcf4f' }),
-			node('rect', { parentId: root, name: 'Lower panel', x: 0, y: 1260, w: 1080, h: 660, fill: '#f6dce8' }),
-			text(root, 'Heading', 'WELCOME', 90, 620, 900, 190, 130, '#fff5ee', 760),
-			text(root, 'Message', 'We are open\nand happy to see you.', 95, 855, 850, 260, 58, '#eebed1', 580),
-			text(root, 'Hours', 'TODAY\n09:00–21:00', 90, 1400, 900, 260, 64, '#431529', 700),
-			text(root, 'Footer', 'Ask our team about today’s favourites', 90, 1750, 900, 80, 31, '#75465b', 500)
-		]),
-		'blank': () => documentFrom('Blank landscape', 1920, 1080, '#f4f0e8', (root) => [
-			text(root, 'Headline', 'Your message', 150, 135, 1620, 260, 118, '#182019', 680)
-		])
+	const templateCopy = {
+		offers: { name: 'Daily offers', heading: 'TODAY\'S\nOFFERS', detail: 'Lunch special', value: '€8.90', note: 'Freshly made · all day' },
+		menu: { name: 'Weekly menu', heading: 'THIS WEEK', detail: 'Roast chicken · €9.50\nCreamy salmon · €10.50\nMushroom pasta · €8.90', value: '11:00–15:00', note: 'MON · TUE · WED' },
+		event: { name: 'Event announcement', heading: 'SUMMER\nNIGHT', detail: 'Live music · seasonal menu', value: '18:00', note: '24 AUGUST' },
+		welcome: { name: 'Welcome screen', heading: 'WELCOME', detail: 'We are open and happy to see you.', value: '09:00–21:00', note: 'TODAY' }
 	};
+	const palettes = {
+		offers: [['#10261d','#d8ff54','#f5f1e8'],['#f2a33b','#20160d','#fff7e8'],['#172b61','#ff7466','#f8fbff'],['#f4eadf','#6e2724','#2a1d19']],
+		menu: [['#f1e9dc','#e55e35','#382b25'],['#d9e7dc','#173f35','#142c26'],['#17171a','#f3ce52','#faf7ee'],['#dce8f5','#1f4ba8','#15213a']],
+		event: [['#1f39d1','#c8ff45','#ffffff'],['#40144f','#ff8a5b','#fff5ef'],['#0d3234','#f5d76f','#f5fbf7'],['#f0e7dc','#ec384d','#201416']],
+		welcome: [['#431529','#ffcf4f','#fff5ee'],['#173d2c','#9de07d','#f7f3e8'],['#172b61','#90d8ed','#ffffff'],['#efe6d7','#d84932','#2c201b']]
+	};
+	const buildTemplate = (family, variation, orientation) => {
+		const portrait = orientation === 'portrait';
+		const width = portrait ? 1080 : 1920; const height = portrait ? 1920 : 1080;
+		const copy = templateCopy[family]; const colors = palettes[family][variation - 1];
+		const margin = Math.round(width * .07); const accentVertical = variation % 2 === 0;
+		return documentFrom(`${copy.name} ${variation} · ${portrait ? 'Portrait' : 'Landscape'}`, width, height, colors[0], (root) => {
+			const accent = portrait
+				? node('rect', { parentId: root, name: 'Accent field', x: accentVertical ? 0 : Math.round(width * .62), y: accentVertical ? Math.round(height * .72) : 0, w: accentVertical ? width : Math.round(width * .38), h: accentVertical ? Math.round(height * .28) : height, fill: colors[1] })
+				: node('rect', { parentId: root, name: 'Accent field', x: accentVertical ? 0 : Math.round(width * .68), y: accentVertical ? Math.round(height * .72) : 0, w: accentVertical ? width : Math.round(width * .32), h: accentVertical ? Math.round(height * .28) : height, fill: colors[1] });
+			const headingY = variation === 3 ? Math.round(height * .3) : margin;
+			const headingW = accentVertical ? Math.round(width * .86) : Math.round(width * .56);
+			const foreground = colors[2]; const accentText = colors[0];
+			return [
+				accent,
+				text(root, 'Heading', copy.heading, margin, headingY, headingW, Math.round(height * .3), portrait ? 112 : 142, foreground, 800),
+				text(root, 'Note', copy.note, margin, portrait ? Math.round(height * .4) : Math.round(height * .42), headingW, Math.round(height * .08), portrait ? 30 : 34, foreground, 600),
+				text(root, 'Primary detail', copy.detail, margin, portrait ? Math.round(height * .53) : Math.round(height * .6), accentVertical ? Math.round(width * .82) : Math.round(width * .52), Math.round(height * .2), portrait ? 42 : 52, foreground, 600),
+				text(root, 'Key value', copy.value, accentVertical ? margin : Math.round(width * .72), accentVertical ? Math.round(height * .78) : Math.round(height * .23), accentVertical ? Math.round(width * .82) : Math.round(width * .22), Math.round(height * .18), portrait ? 72 : 104, accentText, 800, accentVertical ? 'left' : 'center')
+			];
+		});
+	};
+	const templates = {
+		blank: () => documentFrom('Blank landscape', 1920, 1080, '#f4f0e8', (root) => [text(root, 'Headline', 'Your message', 150, 135, 1620, 260, 118, '#182019', 680)]),
+		'blank-portrait': () => documentFrom('Blank portrait', 1080, 1920, '#f4f0e8', (root) => [text(root, 'Headline', 'Your message', 90, 140, 900, 360, 96, '#182019', 680)])
+	};
+	Object.keys(templateCopy).forEach((family) => [1,2,3,4].forEach((variation) => ['landscape','portrait'].forEach((orientation) => {
+		templates[`${family}-${variation}-${orientation}`] = () => buildTemplate(family, variation, orientation);
+	})));
+	templates['daily-offers'] = templates['offers-1-landscape'];
+	templates['weekly-menu'] = templates['menu-1-landscape'];
+	templates.event = templates['event-1-landscape'];
+	templates.welcome = templates['welcome-1-portrait'];
 	const loadDocument = (documentData) => {
 		const vellum = api();
 		if (!vellum || !documentData) return;

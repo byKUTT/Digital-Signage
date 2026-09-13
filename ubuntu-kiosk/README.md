@@ -90,9 +90,19 @@ Their output is stored in command history. Arbitrary terminal commands are never
 accepted from WordPress.
 
 The installer creates and validates passwordless sudo access only for
-`/usr/local/sbin/digital-signage-root-command`. That helper has a fixed action
-allowlist, so the unattended account cannot use it to run arbitrary root commands.
+the exact `/usr/local/sbin/digital-signage-root-command` action signatures used
+by the controller. That helper has a fixed action allowlist, so the unattended
+account cannot use it to run arbitrary root commands.
 The Ubuntu login password is never stored in or sent through WordPress.
+
+Controllers installed before 4.4.0 may still prompt for interactive sudo. Repair
+that policy once from a local terminal, then future WordPress updates are unattended:
+
+```bash
+cd /opt/bykutt-digital-signage/ubuntu-kiosk
+sudo bash install-kiosk.sh "https://screens.kutt.ee" "$(whoami)" --upgrade
+sudo reboot
+```
 
 ## Display sleep schedule and URL migration
 

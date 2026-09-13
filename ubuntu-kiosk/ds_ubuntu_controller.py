@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "4.3.0"
+VERSION = "4.5.0"
 DEFAULT_SITE = "https://screens.kutt.ee"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
@@ -427,6 +427,8 @@ class Controller:
             timeout=1800,
         )
         result = (completed.stdout + completed.stderr).strip()
+        if completed.returncode != 0 and "authentication" in result.lower():
+            result = "Controller privilege policy is missing or stale. Run the current Ubuntu installer once with sudo to repair /etc/sudoers.d/digital-signage-ubuntu. " + result
         return completed.returncode == 0, result
 
     def show_update_screen(self, outputs: list[Output]) -> None:

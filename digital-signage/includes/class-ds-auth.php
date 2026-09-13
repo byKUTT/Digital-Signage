@@ -20,7 +20,7 @@ class DS_Auth {
 	public static function login_url( $redirect_to = '' ) { return add_query_arg( $redirect_to ? array( 'redirect_to' => $redirect_to ) : array(), home_url( self::LOGIN_PATH ) ); }
 	public static function register_url() { return home_url( self::REGISTER_PATH ); }
 	private function route() { $path = wp_parse_url( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) ), PHP_URL_PATH ); if ( untrailingslashit( (string) $path ) === untrailingslashit( self::LOGIN_PATH ) ) { return 'login'; } if ( untrailingslashit( (string) $path ) === untrailingslashit( self::REGISTER_PATH ) ) { return 'register'; } return ''; }
-	public function assets() { if ( $this->route() ) { wp_enqueue_style( 'ds-auth', DS_PLUGIN_URL . 'public/css/auth.css', array(), DS_VERSION ); } }
+	public function assets() { if ( $this->route() ) { wp_enqueue_style( 'ds-auth', DS_PLUGIN_URL . 'public/css/auth.css', array(), DS_VERSION ); wp_enqueue_style( 'ds-auth-refresh', DS_PLUGIN_URL . 'public/css/auth-refresh.css', array( 'ds-auth' ), DS_VERSION ); } }
 	public function render() {
 		$mode = $this->route();
 		if ( ! $mode ) { return; }
@@ -38,12 +38,13 @@ class DS_Auth {
 			'remember'      => ! empty( $_POST['remember'] ),
 		);
 		$user = wp_signon( $credentials, is_ssl() );
-		if ( is_wp_error( $user ) || ! user_can( $user, DS_Roles::CAP ) ) {
+		if ( is_wp_error( $user ) || ( ! user_can( $user, DS_Roles::CAP ) && ! user_can( $user, DS_Roles::SPOTIFY_CAP ) ) ) {
 			if ( $user instanceof WP_User ) { wp_logout(); }
 			wp_safe_redirect( add_query_arg( 'status', 'login_failed', self::login_url() ) ); exit;
 		}
-		DS_Groups::ensure_user_group( $user->ID );
-		$redirect_to = wp_validate_redirect( esc_url_raw( wp_unslash( $_POST['redirect_to'] ?? '' ) ), DS_Portal::url() );
+		if ( user_can( $user, DS_Roles::CAP ) ) { DS_Groups::ensure_user_group( $user->ID ); }
+		$default_redirect = user_can( $user, DS_Roles::CAP ) ? DS_Portal::url() : DS_Portal::url( 'spotify' );
+		$redirect_to = wp_validate_redirect( esc_url_raw( wp_unslash( $_POST['redirect_to'] ?? '' ) ), $default_redirect );
 		wp_safe_redirect( $redirect_to ); exit;
 	}
 

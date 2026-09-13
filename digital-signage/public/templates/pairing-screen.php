@@ -32,13 +32,13 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 	<meta charset="<?php bloginfo( 'charset' ); ?>" />
 	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 	<meta name="robots" content="noindex, nofollow" />
-	<title><?php esc_html_e( 'Pair this Screen', 'digital-signage' ); ?></title>
+	<title><?php esc_html_e( 'Screens byKUTT — Pair this screen', 'digital-signage' ); ?></title>
 	<style>
 		:root {
-			--ds-red: #f24957; --ds-orange: #ff9a3c; --ds-yellow: #ffe14d; --ds-pink: #fbdff0;
+			--ds-red: #8d2924; --ds-orange: #ff9a3c; --ds-yellow: #e9ff54; --ds-pink: #fbdff0;
 		}
 		* { box-sizing: border-box; }
-		html, body { margin:0; padding:0; width:100%; height:100%; background:#0b0e14; color:#fff; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
+		html, body { margin:0; padding:0; width:100%; height:100%; background:#173d31; color:#f8fbf7; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
 		/* Text is sized off the viewport WIDTH by default — right for a normal
 		   landscape TV and for a tall narrow screen (a portrait bar display),
 		   where width is the constrained dimension anyway. A short/wide bar
@@ -46,23 +46,23 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 		   height-based override below, since vw alone would badly overflow it. */
 		.wrap { display:grid; grid-template-columns: 1.1fr 0.9fr; align-items:center; height:100%; padding: 5vh 6vw; gap: 4vw; }
 		.left { display:flex; flex-direction:column; justify-content:center; min-width:0; }
-		.eyebrow { font-size: clamp(10px, 1.3vw, 13px); letter-spacing: .1em; text-transform: uppercase; color: #6b7690; margin: 0 0 .8em; }
-		h1 { font-weight: 300; font-size: clamp(18px, 3vw, 34px); margin: 0 0 .2em; color: #cdd4e0; }
-		.code { font-size: clamp(40px, 9vw, 108px); font-weight: 800; letter-spacing: .1em; margin: .2em 0 .3em; color: var(--ds-yellow); line-height: 1; transition: opacity .2s ease; }
+		.eyebrow { font-size: clamp(10px, 1.3vw, 13px); letter-spacing: .1em; text-transform: uppercase; color: #a8c5b5; margin: 0 0 .8em; font-weight:750; }
+		h1 { font-weight: 420; font-size: clamp(18px, 3vw, 34px); margin: 0 0 .2em; color: #dbe9e0; }
+		.code { font-size: clamp(40px, 9vw, 108px); font-weight: 850; letter-spacing: .08em; margin: .2em 0 .3em; color: var(--ds-yellow); line-height: 1; transition: opacity .2s ease; }
 		.code.ds-rotating { opacity: .3; }
-		.countdown { font-size: clamp(11px, 1.2vw, 15px); color: #6b7690; margin: 0 0 .8em; }
-		.countdown b { color: #9aa4bc; font-variant-numeric: tabular-nums; }
+		.countdown { font-size: clamp(11px, 1.2vw, 15px); color: #a8c5b5; margin: 0 0 .8em; }
+		.countdown b { color: #f8fbf7; font-variant-numeric: tabular-nums; }
 		.steps { list-style: none; margin: .5em 0 0; padding: 0; max-width: 560px; }
-		.steps li { display:flex; gap: 14px; align-items:flex-start; margin-bottom: .8em; font-size: clamp(12px, 1.4vw, 18px); color: #cdd4e0; }
+		.steps li { display:flex; gap: 14px; align-items:flex-start; margin-bottom: .8em; font-size: clamp(12px, 1.4vw, 18px); color: #dbe9e0; }
 		.steps .num {
 			flex-shrink:0; width: 1.8em; height: 1.8em; border-radius: 50%;
-			background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18);
-			display:flex; align-items:center; justify-content:center; font-weight:700; font-size: .85em; color: #fff;
+			background: var(--ds-yellow); border: 0;
+			display:flex; align-items:center; justify-content:center; font-weight:800; font-size: .85em; color: #173d31;
 		}
 		.right { display:flex; flex-direction:column; align-items:center; justify-content:center; gap: 18px; min-width:0; }
-		.qr-card { background:#fff; border-radius: 12px; padding: 20px; box-shadow: 0 12px 40px rgba(0,0,0,.35); line-height:0; }
+		.qr-card { background:#fff; border-radius: 22px; padding: 20px; box-shadow: 18px 22px 0 #e9ff54; line-height:0; }
 		.qr-card img { display:block; width: min(280px, 24vw); height: auto; }
-		.qr-caption { color:#8b93a7; font-size: clamp(10px, 1.1vw, 14px); text-align:center; max-width: 260px; }
+		.qr-caption { color:#b7cfc1; font-size: clamp(10px, 1.1vw, 14px); text-align:center; max-width: 260px; }
 		/* Narrow (portrait phone-ish kiosk): stop trying to fit two side-by-side
 		   columns and stack instead. */
 		@media (max-width: 900px) {
@@ -107,7 +107,7 @@ $rotate_s   = DS_REST::PAIRING_CODE_ROTATE_SECONDS;
 <body>
 	<div class="wrap">
 		<div class="left">
-			<p class="eyebrow"><?php echo esc_html( wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ) ); ?></p>
+			<p class="eyebrow"><?php esc_html_e( 'Screens byKUTT', 'digital-signage' ); ?></p>
 			<h1><?php esc_html_e( 'This screen is not yet paired.', 'digital-signage' ); ?></h1>
 			<div class="code" id="ds-code"><?php echo esc_html( $code ); ?></div>
 			<p class="countdown"><?php esc_html_e( 'New code in', 'digital-signage' ); ?> <b id="ds-countdown"><?php echo (int) $rotate_s; ?></b>s</p>

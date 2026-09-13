@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		slideForm.elements.media_id.value = '';
 		slideForm.elements.duration_override.value = '0';
 		slideForm.elements.video_play_mode.value = 'until_end';
+		slideForm.elements.play_sound.checked = true;
 		slideForm.querySelector('[data-slide-dialog-title]').textContent = 'Add slide';
 		slideForm.querySelector('.ds-media-selection').textContent = 'No media selected';
 		updateSlideFields();
@@ -41,8 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		const type = button.dataset.deleteType;
 		dialog.querySelector('[name="entity_type"]').value = type;
 		dialog.querySelector('[name="entity_id"]').value = button.dataset.deleteId;
-		dialog.querySelector('.ds-delete-copy').textContent = `This cannot be undone. Type DELETE ${type.toUpperCase()} to confirm.`;
-		dialog.querySelector('[name="verification"]').value = '';
+		dialog.querySelector('.ds-delete-copy').textContent = `The ${type} will be permanently removed. This cannot be undone.`;
 		dialog.showModal();
 	}));
 	document.querySelectorAll('[data-slide-edit]').forEach((button) => button.addEventListener('click', () => {
@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		slideForm.elements.content_html.value = button.dataset.contentHtml || '';
 		slideForm.elements.duration_override.value = button.dataset.duration || '0';
 		slideForm.elements.video_play_mode.value = button.dataset.playMode || 'until_end';
+		slideForm.elements.play_sound.checked = button.dataset.playSound !== '0';
 		slideForm.querySelector('[data-slide-dialog-title]').textContent = 'Edit slide';
 		slideForm.querySelector('.ds-media-selection').textContent = button.dataset.mediaUrl ? button.dataset.mediaUrl.split('/').pop() : 'No media selected';
 		updateSlideFields();
@@ -95,5 +96,9 @@ document.addEventListener('DOMContentLoaded', () => {
 	document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
 		await navigator.clipboard.writeText(button.dataset.copy);
 		const old = button.textContent; button.textContent = 'Copied'; setTimeout(() => button.textContent = old, 1200);
+	}));
+	document.querySelectorAll('[data-music-filter]').forEach((input) => input.addEventListener('input', () => {
+		const query = input.value.trim().toLowerCase();
+		document.querySelectorAll('[data-music-item]').forEach((item) => { item.hidden = Boolean(query && !item.dataset.musicItem.includes(query)); });
 	}));
 });

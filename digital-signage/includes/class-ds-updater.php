@@ -221,7 +221,7 @@ class DS_Updater {
 			return $result;
 		}
 		return (object) array(
-			'name'          => 'Digital Signage CMS',
+			'name'          => 'Screens byKUTT',
 			'slug'          => 'digital-signage',
 			'version'       => $release['version'],
 			'homepage'      => $release['html_url'],

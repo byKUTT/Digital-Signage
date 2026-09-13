@@ -49,7 +49,7 @@ if ( in_array( $rotation, array( 90, 270 ), true ) && in_array( $orientation, ar
 	<?php else : ?>
 		<div id="ds-start-overlay" class="ds-start-overlay">
 			<div class="ds-start-inner">
-				<p class="ds-start-title"><?php esc_html_e( 'Digital Signage Player', 'digital-signage' ); ?></p>
+				<p class="ds-start-title"><?php esc_html_e( 'Screens byKUTT', 'digital-signage' ); ?></p>
 				<p class="ds-start-sub"><?php echo esc_html( $screen->post_title ); ?></p>
 				<button id="ds-start-button" type="button" autofocus><?php esc_html_e( 'Press OK to Start', 'digital-signage' ); ?></button>
 				<p class="ds-start-hint"><?php esc_html_e( 'Required once to enable fullscreen playback on this TV or browser.', 'digital-signage' ); ?></p>
@@ -67,6 +67,7 @@ if ( in_array( $rotation, array( 90, 270 ), true ) && in_array( $orientation, ar
 	<div id="ds-no-channel" class="ds-no-channel" hidden>
 		<div class="ds-no-channel-card">
 			<div>
+				<span class="ds-no-channel-brand"><?php esc_html_e( 'Screens byKUTT', 'digital-signage' ); ?></span>
 				<h1><?php esc_html_e( 'No channel connected', 'digital-signage' ); ?></h1>
 				<p><?php esc_html_e( 'Scan to sign in, open this screen, and choose a channel. Your account must belong to the screen’s group.', 'digital-signage' ); ?></p>
 			</div>
