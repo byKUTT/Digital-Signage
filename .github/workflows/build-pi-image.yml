@@ -1,7 +1,7 @@
 name: Build Raspberry Pi Image
 
 # Builds a flashable Digital Signage .img using pi-gen (the Raspberry Pi
-# Foundation's own image-build tool) — see pi-image-build/README.md.
+# Foundation's own image-build tool) — see pi/image-build/README.md.
 # Runs on GitHub's runners because building an OS image needs real internet
 # access and root/loop-device privileges that most sandboxes don't grant.
 #
@@ -39,19 +39,19 @@ jobs:
 
       - name: Stage our kiosk files into pi-gen
         run: |
-          cp -r pi-image-build/stage-ds-kiosk pi-gen/
-          cp pi-image-build/config pi-gen/config
+          cp -r pi/image-build/stage-ds-kiosk pi-gen/
+          cp pi/image-build/config pi-gen/config
 
           FILES_DIR=pi-gen/stage-ds-kiosk/00-install-kiosk/files
           mkdir -p "$FILES_DIR/ds-agent" "$FILES_DIR/setup-portal"
-          cp raspberry-pi-kiosk/install-kiosk.sh "$FILES_DIR/"
-          cp raspberry-pi-kiosk/uninstall-kiosk.sh "$FILES_DIR/"
-          cp raspberry-pi-kiosk/ds-agent/ds-agent.py "$FILES_DIR/ds-agent/"
-          cp raspberry-pi-kiosk/ds-agent/ds-agent.service "$FILES_DIR/ds-agent/"
-          cp raspberry-pi-kiosk/setup-portal/ds-setup-portal.py "$FILES_DIR/setup-portal/"
-          cp raspberry-pi-kiosk/setup-portal/ds-setup-ap-up.sh "$FILES_DIR/setup-portal/"
-          cp raspberry-pi-kiosk/setup-portal/ds-setup-ap-down.sh "$FILES_DIR/setup-portal/"
-          cp raspberry-pi-kiosk/setup-portal/ds-setup.service "$FILES_DIR/setup-portal/"
+          cp pi/install-kiosk.sh "$FILES_DIR/"
+          cp pi/uninstall-kiosk.sh "$FILES_DIR/"
+          cp pi/ds-agent/ds-agent.py "$FILES_DIR/ds-agent/"
+          cp pi/ds-agent/ds-agent.service "$FILES_DIR/ds-agent/"
+          cp pi/setup-portal/ds-setup-portal.py "$FILES_DIR/setup-portal/"
+          cp pi/setup-portal/ds-setup-ap-up.sh "$FILES_DIR/setup-portal/"
+          cp pi/setup-portal/ds-setup-ap-down.sh "$FILES_DIR/setup-portal/"
+          cp pi/setup-portal/ds-setup.service "$FILES_DIR/setup-portal/"
 
       - name: Build image
         working-directory: pi-gen

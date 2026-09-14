@@ -1,0 +1,1235 @@
+/**
+ * Digital Signage frontend player.
+ * - Requests fullscreen on load, falls back to a "click to start" overlay if the
+ *   browser blocks auto-fullscreen (requires a user gesture).
+ * - Polls the DS REST API for the resolved playlist and re-renders zones/layout.
+ * - Each zone runs its own independent slide rotation with per-slide timing.
+ * - Preloads the next slide's media to avoid flicker.
+ * - Caches the last good playlist in localStorage and keeps playing it if the
+ *   network drops, retrying silently in the background.
+ * - Sends a heartbeat ("I'm alive") on an interval with resolution/orientation/IP.
+ * - Logs proof-of-play for each slide shown.
+ *
+ * No build step / framework: kept intentionally small for low-powered kiosk hardware.
+ */
+( function () {
+	'use strict';
+
+	var CONFIG = window.DS_PLAYER || {};
+	var CACHE_KEY = 'ds_playlist_cache_' + CONFIG.screenId;
+	var USER_AGENT = navigator.userAgent || '';
+	var IS_VIDAA = /VIDAA|Hisense/i.test( USER_AGENT );
+	var LOW_POWER_PROFILE = /(?:^|[?&])profile=pi3(?:-safe)?(?:&|$)/.test( window.location.search );
+	if ( IS_VIDAA ) {
+		document.documentElement.classList.add( 'ds-vidaa' );
+	}
+	if ( LOW_POWER_PROFILE ) {
+		document.documentElement.classList.add( 'ds-low-power' );
+	}
+
+	var state = {
+		playlist: null,
+		revisionKey: '',
+		zones: {}, // zoneName -> { items, index, timer }
+		online: true,
+		music: null,
+		spotify: null,
+		ducked: 0,
+	};
+	var playlistRequest = null;
+	var changesRequestActive = false;
+	var changesTimer = null;
+	var changesFailures = 0;
+
+	/* ---------------------------------------------------------------- */
+	/* Fullscreen handling                                               */
+	/* ---------------------------------------------------------------- */
+
+	function requestFullscreen() {
+		var el = document.documentElement;
+		var request = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+		if ( request ) {
+			try {
+				var result = request.call( el );
+				if ( result && result.catch ) {
+					result.catch( function () {
+						/* Blocked without a gesture — overlay stays visible. */
+					} );
+				}
+			} catch ( e ) { /* noop */ }
+		}
+	}
+
+	function isFullscreen() {
+		return !! ( document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement );
+	}
+
+	function isKioskBrowser() {
+		// Set by the Ubuntu and Raspberry Pi kiosk installers on the URL they launch.
+		// A browser started with --kiosk is already OS-level
+		// fullscreen with no chrome to hide — the Fullscreen API here would just need
+		// a user gesture the device has no mouse/keyboard/touch to provide, so there's
+		// nothing useful left for it to do.
+		return /(?:^|[?&])kiosk=1(?:&|$)/.test( window.location.search );
+	}
+
+	function resumeBackgroundMusic() {
+		if ( state.music && state.music.audio.paused ) {
+			var promise = state.music.audio.play();
+			if ( promise && promise.catch ) { promise.catch( function () {} ); }
+		}
+	}
+
+	function initFullscreen() {
+		var overlay = document.getElementById( 'ds-start-overlay' );
+		var button  = document.getElementById( 'ds-start-button' );
+		var startFromRemote = function ( event ) {
+			var key = event.key || '';
+			var code = event.keyCode || event.which;
+			if ( 'Enter' !== key && 'OK' !== key && ' ' !== key && 13 !== code && 32 !== code ) {
+				return;
+			}
+			requestFullscreen();
+			if ( overlay ) { overlay.classList.add( 'ds-hidden' ); }
+			resumeActiveVideo();
+			resumeBackgroundMusic();
+		};
+
+		document.addEventListener( 'keydown', startFromRemote );
+
+		if ( isKioskBrowser() ) {
+			if ( overlay ) { overlay.classList.add( 'ds-hidden' ); }
+			return;
+		}
+
+		// Try automatically first (works if the page itself was opened by a user gesture,
+		// e.g. a kiosk browser launched fresh, or on browsers that allow it for top-level nav).
+		requestFullscreen();
+
+		setTimeout( function () {
+			if ( isFullscreen() ) {
+				overlay.classList.add( 'ds-hidden' );
+			}
+		}, 400 );
+
+		// Signage screens are almost always unattended with no mouse/touch/keyboard —
+		// a screen that never gets clicked must still start playing. If nothing
+		// dismissed the overlay shortly after load (fullscreen was blocked and this
+		// isn't a recognized kiosk browser either), start playback behind it anyway
+		// instead of waiting forever for a click that will never come.
+		setTimeout( function () {
+			overlay.classList.add( 'ds-hidden' );
+		}, 4000 );
+
+		button.addEventListener( 'click', function () {
+			requestFullscreen();
+			overlay.classList.add( 'ds-hidden' );
+			resumeActiveVideo();
+			resumeBackgroundMusic();
+		} );
+
+		// If auto-fullscreen worked instantly, hide overlay right away too.
+		document.addEventListener( 'fullscreenchange', function () {
+			if ( isFullscreen() ) {
+				overlay.classList.add( 'ds-hidden' );
+			}
+		} );
+	}
+
+	function resumeActiveVideo() {
+		var activeVideo = document.querySelector( '.ds-slide.ds-active video' );
+		var result;
+		if ( ! activeVideo ) { return; }
+		activeVideo.muted = '1' !== activeVideo.dataset.playSound;
+		result = activeVideo.play();
+		if ( result && result.catch ) { result.catch( function () {} ); }
+	}
+
+	function resumePlayer() {
+		setOffline( false );
+		fetchPlaylist();
+		scheduleChangesCheck( 100 );
+		resumeActiveVideo();
+		if ( ! CONFIG.isPreview ) { sendHeartbeat(); }
+	}
+
+	/* ---------------------------------------------------------------- */
+	/* Networking helpers                                                 */
+	/* ---------------------------------------------------------------- */
+
+	function apiGet( path ) {
+		var headers = {};
+		if ( CONFIG.nonce ) {
+			headers['X-WP-Nonce'] = CONFIG.nonce; // Only needed for the cookie-authenticated preview endpoint.
+		}
+		return fetch( CONFIG.restUrl + path, { cache: 'no-store', credentials: 'same-origin', headers: headers } ).then( function ( r ) {
+			if ( ! r.ok ) {
+				throw new Error( 'HTTP ' + r.status );
+			}
+			return r.json();
+		} );
+	}
+
+	function apiPost( path, body ) {
+		if ( CONFIG.isPreview ) {
+			return Promise.resolve(); // Previewing in wp-admin never writes heartbeats/proof-of-play.
+		}
+		return fetch( CONFIG.restUrl + path, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify( body || {} ),
+		} ).catch( function () {
+			/* Best-effort; never let a failed heartbeat/proof-of-play break playback. */
+		} );
+	}
+
+	function setOffline( offline ) {
+		state.online = ! offline;
+		var indicator = document.getElementById( 'ds-offline-indicator' );
+		if ( indicator ) {
+			indicator.hidden = ! offline;
+		}
+	}
+
+	/* ---------------------------------------------------------------- */
+	/* Playlist fetch + cache                                            */
+	/* ---------------------------------------------------------------- */
+
+	function loadCachedPlaylist() {
+		try {
+			var raw = localStorage.getItem( CACHE_KEY );
+			return raw ? JSON.parse( raw ) : null;
+		} catch ( e ) {
+			return null;
+		}
+	}
+
+	function cachePlaylist( playlist ) {
+		try {
+			var safePlaylist = Object.assign( {}, playlist, { spotify: null } );
+			localStorage.setItem( CACHE_KEY, JSON.stringify( safePlaylist ) );
+		} catch ( e ) { /* storage full/unavailable — keep playing from memory */ }
+	}
+
+	function playlistRevisionKey( data ) {
+		var orientation = data && data.orientation ? data.orientation : ( CONFIG.orientation || 'auto' );
+		var rotation = data && undefined !== data.rotation ? data.rotation : CONFIG.rotation;
+		return String( data && data.channel_id ? data.channel_id : 0 ) + ':' +
+			String( data && data.revision ? data.revision : 'legacy' ) + ':' +
+			String( data && data.music_revision ? data.music_revision : 'none' ) + ':' +
+			String( data && data.spotify_revision ? data.spotify_revision : 'off' ) + ':' +
+			String( orientation ) + ':' + String( normalizeRotation( rotation ) );
+	}
+
+	function fetchPlaylist() {
+		if ( playlistRequest ) {
+			return playlistRequest;
+		}
+		var path = CONFIG.isPreview ? ( '/preview/' + CONFIG.previewChannelId ) : '/playlist';
+		playlistRequest = apiGet( path )
+			.then( function ( data ) {
+				setOffline( false );
+				if ( ! CONFIG.isPreview ) {
+					cachePlaylist( data );
+				}
+				applyPlaylist( data );
+				handleRemoteCommand( data );
+			} )
+			.catch( function () {
+				setOffline( true );
+				// Keep playing whatever is already rendered; if nothing has rendered yet
+				// (first load with no connection), fall back to the last cached playlist.
+				if ( ! state.playlist ) {
+					var cached = loadCachedPlaylist();
+					if ( cached ) {
+						applyPlaylist( cached );
+					}
+				}
+			} );
+		playlistRequest.then(
+			function () { playlistRequest = null; },
+			function () { playlistRequest = null; }
+		);
+		return playlistRequest;
+	}
+
+	function scheduleChangesCheck( delay ) {
+		if ( CONFIG.isPreview ) {
+			return;
+		}
+		clearTimeout( changesTimer );
+		changesTimer = setTimeout( checkForChanges, delay );
+	}
+
+	function checkForChanges() {
+		if ( changesRequestActive ) {
+			scheduleChangesCheck( 1000 );
+			return;
+		}
+
+		changesRequestActive = true;
+		apiGet( '/changes' )
+			.then( function ( data ) {
+				setOffline( false );
+				changesFailures = 0;
+				if ( playlistRevisionKey( data ) !== state.revisionKey ) {
+					return fetchPlaylist();
+				}
+			} )
+			.catch( function () {
+				changesFailures++;
+				setOffline( true );
+			} )
+			.then( function () {
+				changesRequestActive = false;
+				var retryDelay = changesFailures ? Math.min( 15000, 1000 * Math.pow( 2, changesFailures ) ) : 1000;
+				scheduleChangesCheck( retryDelay );
+			} );
+	}
+
+	function handleRemoteCommand( data ) {
+		if ( 'reload' !== data.remote_command && 'refresh' !== data.remote_command ) {
+			return;
+		}
+
+		// A proxy/page cache may repeat the same one-shot command even after the
+		// server consumed it. Persist its timestamp before reloading so one stale
+		// response cannot trap an unattended display in a reload loop.
+		var commandKey = data.remote_command + ':' + ( data.remote_ts || 'legacy' );
+		var storageKey = 'ds-last-remote-command';
+		try {
+			if ( sessionStorage.getItem( storageKey ) === commandKey ) {
+				return;
+			}
+			sessionStorage.setItem( storageKey, commandKey );
+		} catch ( e ) {
+			// Storage can be unavailable in hardened kiosk profiles. The REST
+			// endpoint still consumes commands, so retain the normal behavior.
+		}
+		window.location.reload();
+	}
+
+	/* ---------------------------------------------------------------- */
+	/* Rendering                                                          */
+	/* ---------------------------------------------------------------- */
+
+	function fadeMusic( target, duration ) {
+		if ( ! state.music ) { return; }
+		clearInterval( state.music.fadeTimer );
+		var audio = state.music.audio;
+		var start = audio.volume;
+		var began = Date.now();
+		state.music.fadeTimer = setInterval( function () {
+			var progress = Math.min( 1, ( Date.now() - began ) / Math.max( 1, duration ) );
+			audio.volume = Math.max( 0, Math.min( 1, start + ( target - start ) * progress ) );
+			if ( progress >= 1 ) { clearInterval( state.music.fadeTimer ); }
+		}, 50 );
+	}
+
+	function playMusicTrack() {
+		if ( ! state.music || ! state.music.tracks.length ) { return; }
+		var music = state.music;
+		if ( music.shuffle && music.tracks.length > 1 ) {
+			var next = music.index;
+			while ( next === music.index ) { next = Math.floor( Math.random() * music.tracks.length ); }
+			music.index = next;
+		}
+		music.audio.src = music.tracks[ music.index ].src;
+		music.audio.volume = state.ducked ? 0 : music.volume;
+		var promise = music.audio.play();
+		if ( promise && promise.catch ) { promise.catch( function () {} ); }
+	}
+
+	function configureMusic( config, revision ) {
+		if ( state.music && config && config.tracks && config.tracks.length && state.music.revision === revision ) { return; }
+		if ( ! config || ! config.tracks || ! config.tracks.length ) {
+			if ( state.music ) { clearInterval( state.music.fadeTimer ); state.music.audio.pause(); state.music.audio.removeAttribute( 'src' ); }
+			state.music = null;
+			return;
+		}
+		if ( state.music ) { clearInterval( state.music.fadeTimer ); state.music.audio.pause(); }
+		var audio = new Audio();
+		audio.preload = 'auto';
+		state.music = { audio: audio, tracks: config.tracks, index: 0, volume: Math.max( 0, Math.min( 1, Number( config.volume ) || 0 ) ), shuffle: !! config.shuffle, duckMs: Number( config.duck_ms ) || 1500, fadeTimer: null, revision: revision };
+		audio.addEventListener( 'ended', function () { if ( ! state.music ) { return; } state.music.index = ( state.music.index + 1 ) % state.music.tracks.length; playMusicTrack(); } );
+		playMusicTrack();
+		document.querySelectorAll( '.ds-slide.ds-active video' ).forEach( function ( video ) { if ( ! video.muted ) { duckMusicFor( video ); } } );
+	}
+
+	function duckMusicFor( video ) {
+		if ( ! video || video.dataset.dsMusicDucked ) { return; }
+		video.dataset.dsMusicDucked = '1';
+		state.ducked++;
+		if ( state.music ) { fadeMusic( 0, state.music.duckMs ); }
+		fadeSpotify( 0, 1500 );
+	}
+
+	function restoreMusicFor( video ) {
+		if ( ! video || ! video.dataset.dsMusicDucked ) { return; }
+		delete video.dataset.dsMusicDucked;
+		state.ducked = Math.max( 0, state.ducked - 1 );
+		if ( ! state.ducked ) {
+			if ( state.music ) { fadeMusic( state.music.volume, state.music.duckMs ); }
+			fadeSpotify( state.spotify ? state.spotify.volume : 0.5, 1500 );
+		}
+	}
+
+	function fadeSpotify( target, duration ) {
+		if ( ! state.spotify || ! state.spotify.player ) { return; }
+		clearInterval( state.spotify.fadeTimer );
+		var start = Number( state.spotify.currentVolume );
+		var began = Date.now();
+		state.spotify.fadeTimer = setInterval( function () {
+			var progress = Math.min( 1, ( Date.now() - began ) / Math.max( 1, duration ) );
+			var volume = Math.max( 0, Math.min( 1, start + ( target - start ) * progress ) );
+			state.spotify.currentVolume = volume;
+			state.spotify.player.setVolume( volume ).catch( function () {} );
+			if ( progress >= 1 ) { clearInterval( state.spotify.fadeTimer ); }
+		}, 50 );
+	}
+
+	function configureSpotify( config ) {
+		if ( ! config || ! config.enabled || ! config.access_token ) {
+			if ( state.spotify && state.spotify.player ) { state.spotify.player.disconnect(); }
+			state.spotify = null;
+			return;
+		}
+		if ( state.spotify && state.spotify.revision === config.revision ) { state.spotify.token = config.access_token; return; }
+		if ( state.spotify && state.spotify.player ) { state.spotify.player.disconnect(); }
+		state.spotify = { token: config.access_token, name: config.name, revision: config.revision, player: null, volume: 0.5, currentVolume: state.ducked ? 0 : 0.5, fadeTimer: null, deviceId: '' };
+		var start = function () {
+			if ( ! window.Spotify || ! window.Spotify.Player || ! state.spotify || state.spotify.player ) { return; }
+			var spotify = state.spotify;
+			spotify.player = new window.Spotify.Player( { name: spotify.name, getOAuthToken: function ( callback ) { callback( spotify.token ); }, volume: spotify.currentVolume } );
+			spotify.player.addListener( 'ready', function ( info ) { spotify.deviceId = info.device_id; sendHeartbeat(); } );
+			spotify.player.addListener( 'not_ready', function () { spotify.deviceId = ''; } );
+			spotify.player.connect();
+		};
+		if ( window.Spotify && window.Spotify.Player ) { start(); return; }
+		window.onSpotifyWebPlaybackSDKReady = start;
+		if ( ! document.querySelector( 'script[data-ds-spotify-sdk]' ) ) {
+			var script = document.createElement( 'script' ); script.src = 'https://sdk.scdn.co/spotify-player.js'; script.dataset.dsSpotifySdk = '1'; document.head.appendChild( script );
+		}
+	}
+
+	function applyPlaylist( data ) {
+		state.playlist = data;
+		state.revisionKey = playlistRevisionKey( data );
+		configureMusic( data.music, data.music_revision || 'none' );
+		configureSpotify( data.spotify );
+
+		var stage = document.getElementById( 'ds-stage' );
+		stage.className = 'ds-stage ds-layout-' + ( data.layout || 'fullscreen' );
+		if ( data.zone_bg ) {
+			stage.style.setProperty( '--ds-zone-bg', data.zone_bg );
+		}
+
+		var rotation = normalizeRotation( undefined !== data.rotation ? data.rotation : CONFIG.rotation );
+		document.documentElement.setAttribute( 'data-ds-rotation', String( rotation ) );
+		document.documentElement.setAttribute(
+			'data-ds-orientation',
+			resolveContentOrientation( data.orientation || CONFIG.orientation, rotation )
+		);
+
+		var zones = data.zones || {};
+		var seenZones = {};
+
+		Object.keys( zones ).forEach( function ( zoneName ) {
+			seenZones[ zoneName ] = true;
+			startZone( zoneName, zones[ zoneName ] || [] );
+		} );
+
+		// Stop rotations for zones that no longer have content.
+		Object.keys( state.zones ).forEach( function ( zoneName ) {
+			if ( ! seenZones[ zoneName ] ) {
+				stopZone( zoneName );
+			}
+		} );
+
+		// A screen with no channel assigned (or an assigned channel with no
+		// slides for right now) would otherwise just show a blank stage —
+		// make that state visible instead of looking like a dead/frozen screen.
+		var noChannelEl = document.getElementById( 'ds-no-channel' );
+		if ( noChannelEl ) {
+			noChannelEl.hidden = !! ( data.channel_id && Object.keys( zones ).length );
+		}
+	}
+
+	function normalizeRotation( value ) {
+		var rotation = parseInt( value, 10 );
+		return 90 === rotation || 180 === rotation || 270 === rotation ? rotation : 0;
+	}
+
+	function detectOrientation( rotation ) {
+		var portrait = window.innerHeight > window.innerWidth;
+		rotation = normalizeRotation( undefined === rotation ? document.documentElement.getAttribute( 'data-ds-rotation' ) : rotation );
+		if ( 90 === rotation || 270 === rotation ) {
+			portrait = ! portrait;
+		}
+		return portrait ? 'portrait' : 'landscape';
+	}
+
+	function resolveContentOrientation( orientation, rotation ) {
+		rotation = normalizeRotation( rotation );
+		if ( ! orientation || 'auto' === orientation ) {
+			return detectOrientation( rotation );
+		}
+		if ( ( 90 === rotation || 270 === rotation ) && ( 'landscape' === orientation || 'portrait' === orientation ) ) {
+			return 'landscape' === orientation ? 'portrait' : 'landscape';
+		}
+		return orientation;
+	}
+
+	function zoneEl( zoneName ) {
+		return document.getElementById( 'ds-zone-' + zoneName );
+	}
+
+	function startZone( zoneName, items ) {
+		var container = zoneEl( zoneName );
+		if ( ! container ) {
+			return; // Unknown zone name in this layout — ignore gracefully.
+		}
+
+		var existing = state.zones[ zoneName ];
+
+		// If the complete zone payload is unchanged, don't restart its rotation or
+		// continuous slider — polling stays invisible to the viewer.
+		if ( existing && sameItems( existing.items, items ) ) {
+			existing.items = items;
+			setZoneTransition( container, items );
+			return;
+		}
+
+		if ( existing ) {
+			clearTimeout( existing.timer );
+			stopTimers( container );
+			if ( existing.preloaded ) {
+				stopTimers( existing.preloaded.el );
+			}
+		}
+
+		container.innerHTML = '';
+		setZoneTransition( container, items );
+
+		state.zones[ zoneName ] = { items: items, index: 0, timer: null, els: {}, preloaded: null, renderSerial: 0 };
+
+		if ( ! items.length ) {
+			return;
+		}
+
+		if ( canUseInfiniteSlider( items ) ) {
+			renderInfiniteSlider( zoneName );
+		} else {
+			renderSlide( zoneName, 0 );
+		}
+	}
+
+	function setZoneTransition( container, items ) {
+		var transition = ( items[0] && items[0].transition ) || 'fade';
+		if ( 'infinite_slider' === transition ) {
+			transition = canUseInfiniteSlider( items ) ? 'none' : 'fade';
+		}
+		var transitionClass = 'ds-transition-' + transition;
+		var zoneName = container.id.replace( 'ds-zone-', '' );
+		container.className = 'ds-zone ds-zone-' + zoneName + ' ' + transitionClass;
+	}
+
+	function canUseInfiniteSlider( items ) {
+		return !! items.length && 'infinite_slider' === items[0].transition && items.every( function ( item ) {
+			return 'image' === item.type && !! item.src;
+		} );
+	}
+
+	function stopZone( zoneName ) {
+		var zone = state.zones[ zoneName ];
+		if ( zone ) {
+			clearTimeout( zone.timer );
+			if ( zone.preloaded ) {
+				stopTimers( zone.preloaded.el );
+			}
+		}
+		delete state.zones[ zoneName ];
+		var el = zoneEl( zoneName );
+		if ( el ) {
+			stopTimers( el );
+			el.innerHTML = '';
+		}
+	}
+
+	function sameItems( a, b ) {
+		return JSON.stringify( a ) === JSON.stringify( b );
+	}
+
+	function renderInfiniteSlider( zoneName ) {
+		var zone = state.zones[ zoneName ];
+		if ( ! zone || ! zone.items.length ) {
+			return;
+		}
+
+		var container = zoneEl( zoneName );
+		var slide = document.createElement( 'div' );
+		slide.className = 'ds-slide ds-active ds-infinite-slider-slide';
+		slide.dataset.slideId = 'infinite-slider';
+		slide.appendChild( buildInfiniteSliderEl( zone.items ) );
+		container.appendChild( slide );
+
+		zone.items.forEach( function ( item ) {
+			logProofOfPlay( zoneName, item );
+		} );
+	}
+
+	function buildSlideEl( item ) {
+		var el = document.createElement( 'div' );
+		el.className = 'ds-slide';
+		el.dataset.slideId = item.id;
+
+		switch ( item.type ) {
+			case 'image': {
+				var img = document.createElement( 'img' );
+				img.src = item.src || '';
+				img.alt = item.title || '';
+				el.appendChild( img );
+				break;
+			}
+			case 'video': {
+				var video = document.createElement( 'video' );
+				video.src = item.src || '';
+				video.preload = 'auto';
+				video.muted = ! item.play_sound;
+				video.dataset.playSound = item.play_sound ? '1' : '0';
+				video.playsInline = true;
+				video.setAttribute( 'playsinline', '' );
+				video.loop = 'fixed_duration' === item.play_mode;
+				el.appendChild( video );
+				break;
+			}
+			case 'webpage': {
+				var iframe = document.createElement( 'iframe' );
+				iframe.src = item.url || 'about:blank';
+				iframe.setAttribute( 'sandbox', 'allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation' );
+				iframe.setAttribute( 'allow', 'autoplay; fullscreen; encrypted-media' );
+				iframe.setAttribute( 'referrerpolicy', 'strict-origin-when-cross-origin' );
+				el.appendChild( iframe );
+				break;
+			}
+			case 'html': {
+				var wrap = document.createElement( 'div' );
+				wrap.className = 'ds-html-block';
+				wrap.innerHTML = item.html || '';
+				el.appendChild( wrap );
+				break;
+			}
+			case 'rss': {
+				el.appendChild( buildRssEl( item ) );
+				break;
+			}
+			case 'weather': {
+				el.appendChild( buildWeatherEl( item ) );
+				break;
+			}
+			case 'clock': {
+				el.appendChild( buildClockEl() );
+				break;
+			}
+			case 'pdf': {
+				var pdfFrame = document.createElement( 'iframe' );
+				pdfFrame.src = item.src || 'about:blank';
+				el.appendChild( pdfFrame );
+				break;
+			}
+			case 'social': {
+				var socialFrame = document.createElement( 'iframe' );
+				socialFrame.src = item.embed_url || 'about:blank';
+				socialFrame.setAttribute( 'sandbox', 'allow-scripts allow-same-origin' );
+				el.appendChild( socialFrame );
+				break;
+			}
+			case 'infinite_scroll': {
+				el.appendChild( buildSlidingCarouselEl( item ) );
+				break;
+			}
+			default: {
+				el.textContent = item.title || '';
+			}
+		}
+
+		return el;
+	}
+
+	// Estonian weekday/month names, used instead of relying on the kiosk browser's
+	// system locale (which varies per device) — every screen shows the same format:
+	// 24-hour time and dd.mm.yyyy dates, per house style.
+	var ET_WEEKDAYS = [ 'Pühapäev', 'Esmaspäev', 'Teisipäev', 'Kolmapäev', 'Neljapäev', 'Reede', 'Laupäev' ];
+
+	function pad2( n ) {
+		return ( n < 10 ? '0' : '' ) + n;
+	}
+
+	function buildClockEl() {
+		var wrap = document.createElement( 'div' );
+		wrap.className = 'ds-clock ds-has-timer';
+		var time = document.createElement( 'div' );
+		time.className = 'ds-time';
+		var date = document.createElement( 'div' );
+		date.className = 'ds-date';
+		wrap.appendChild( time );
+		wrap.appendChild( date );
+
+		function tick() {
+			var now = new Date();
+			time.textContent = pad2( now.getHours() ) + ':' + pad2( now.getMinutes() );
+			date.textContent = ET_WEEKDAYS[ now.getDay() ] + ', ' + pad2( now.getDate() ) + '.' + pad2( now.getMonth() + 1 ) + '.' + now.getFullYear();
+		}
+		tick();
+		var interval = setInterval( tick, 1000 );
+		wrap.dataset.dsTimerKind = 'interval';
+		wrap.dataset.dsTimerId = String( interval );
+		return wrap;
+	}
+
+	/**
+	 * Stops any interval/requestAnimationFrame loop started by an element this
+	 * player created (clock ticks, carousel animation) before it's
+	 * removed from the DOM — otherwise those loops keep running invisibly.
+	 */
+	function stopTimers( container ) {
+		container.querySelectorAll( 'video' ).forEach( function ( video ) {
+			restoreMusicFor( video );
+			video.pause();
+			video.removeAttribute( 'src' );
+			video.load();
+		} );
+		container.querySelectorAll( '.ds-has-timer' ).forEach( function ( el ) {
+			if ( el.dsCleanup ) {
+				el.dsCleanup();
+			}
+			var id = Number( el.dataset.dsTimerId );
+			if ( ! id ) {
+				return;
+			}
+			if ( 'raf' === el.dataset.dsTimerKind ) {
+				cancelAnimationFrame( id );
+			} else {
+				clearInterval( id );
+			}
+		} );
+	}
+
+	function buildInfiniteSliderEl( items ) {
+		var settings = items[0] || {};
+		return buildContinuousImageSlider(
+			items.map( function ( item ) { return item.src; } ),
+			{
+				className: 'ds-infinite-slider',
+				verticalSpacing: settings.slider_vertical_spacing,
+				horizontalSpacing: settings.slider_horizontal_spacing,
+				speed: settings.slider_speed,
+				borderRadius: settings.slider_border_radius,
+				direction: settings.slider_direction || 'auto',
+				widthMode: settings.slider_width_mode || 'full',
+				widthPercent: settings.slider_width_percent,
+			}
+		);
+	}
+
+	function buildSlidingCarouselEl( item ) {
+		return buildContinuousImageSlider(
+			item.images || [],
+			{
+				className: 'ds-infinite-scroll-gallery',
+				background: item.bg_color || '#000',
+				verticalSpacing: item.spacing,
+				horizontalSpacing: item.spacing,
+				speed: item.speed,
+				borderRadius: 0,
+				direction: 'auto',
+			}
+		);
+	}
+
+	/**
+	 * Dependency-free equivalent of the Motion Primitives Infinite Slider:
+	 * repeat one logical sequence until the viewport is covered, then move by
+	 * exactly one sequence length for a seamless continuous loop.
+	 */
+	function buildContinuousImageSlider( images, options ) {
+		var wrap = document.createElement( 'div' );
+		wrap.className = ( options.className || 'ds-continuous-slider' ) + ' ds-continuous-slider ds-has-timer';
+		if ( options.background ) {
+			wrap.style.background = options.background;
+		}
+
+		var track = document.createElement( 'div' );
+		track.className = 'ds-continuous-slider-track';
+		wrap.appendChild( track );
+
+		if ( ! images.length ) {
+			return wrap;
+		}
+
+		var speed = Math.max( 5, Number( options.speed ) || 60 ); // px/second
+		var borderRadius = Math.max( 0, Number( options.borderRadius ) || 0 );
+		var direction = [ 'up', 'down', 'left', 'right' ].indexOf( options.direction ) >= 0 ? options.direction : 'auto';
+		var reverse = 'down' === direction || 'right' === direction;
+		var sizeByWidth = [ 'full', 'custom' ].indexOf( options.widthMode ) >= 0;
+		var widthPercent = 'full' === options.widthMode ? 100 : Math.min( 100, Math.max( 10, Number( options.widthPercent ) || 100 ) );
+		var reduceMotion = 'matchMedia' in window && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
+		var position = 0;
+		var loopLength = 0;
+		var lastFrame = null;
+		var renderedCopies = 0;
+		var portrait = null;
+		var resizeObserver = null;
+		var resizeHandler = null;
+		var measureFrame = 0;
+		var compositorAnimation = null;
+		var animationDuration = 0;
+		var fallbackRunning = false;
+		var fallbackPaintTime = 0;
+		var fallbackFrameInterval = LOW_POWER_PROFILE ? ( 1000 / 30 ) : 0;
+		if ( sizeByWidth ) {
+			wrap.classList.add( 'ds-slider-width-sized' );
+		}
+		if ( 'function' === typeof track.animate && ! reduceMotion ) {
+			wrap.classList.add( 'ds-compositor-slider' );
+		}
+
+		function scheduleMeasure() {
+			if ( measureFrame ) {
+				return;
+			}
+			measureFrame = requestAnimationFrame( function () {
+				measureFrame = 0;
+				measure();
+			} );
+		}
+
+		function appendCopy() {
+			var firstCopy = 0 === renderedCopies;
+			images.forEach( function ( src ) {
+				var img = document.createElement( 'img' );
+				img.alt = '';
+				img.decoding = 'async';
+				img.loading = 'eager';
+				img.draggable = false;
+				if ( ! firstCopy ) {
+					img.setAttribute( 'aria-hidden', 'true' );
+				}
+				img.style.borderRadius = borderRadius + 'px';
+				if ( sizeByWidth && wrap.clientWidth ) {
+					img.style.width = ( wrap.clientWidth * widthPercent / 100 ) + 'px';
+					img.style.height = 'auto';
+					img.style.maxHeight = '100%';
+				}
+				// Repeated sequences reuse the same cached sources. Only the logical
+				// first sequence determines dimensions, avoiding clone load/layout
+				// bursts on a Raspberry Pi 3.
+				if ( firstCopy ) {
+					img.addEventListener( 'load', scheduleMeasure, { once: true } );
+				}
+				img.src = src;
+				track.appendChild( img );
+			} );
+			renderedCopies++;
+		}
+
+		function currentProgress() {
+			if ( compositorAnimation && animationDuration > 0 ) {
+				var currentTime = Number( compositorAnimation.currentTime ) || 0;
+				return ( ( currentTime % animationDuration ) + animationDuration ) % animationDuration / animationDuration;
+			}
+			if ( loopLength <= 0 ) {
+				return 0;
+			}
+			return reverse
+				? ( ( ( ( position + loopLength ) % loopLength ) + loopLength ) % loopLength ) / loopLength
+				: ( ( ( -position % loopLength ) + loopLength ) % loopLength ) / loopLength;
+		}
+
+		function transformAt( offset ) {
+			return portrait
+				? 'translate3d(0,' + offset + 'px,0)'
+				: 'translate3d(' + offset + 'px,0,0)';
+		}
+
+		function startMotion( progress ) {
+			position = reverse ? -loopLength + ( progress * loopLength ) : -progress * loopLength;
+			if ( reduceMotion ) {
+				track.style.transform = transformAt( position );
+				wrap.classList.add( 'ds-reduced-motion' );
+				return;
+			}
+
+			if ( 'function' === typeof track.animate ) {
+				if ( compositorAnimation ) {
+					compositorAnimation.cancel();
+				}
+				animationDuration = Math.max( 1, loopLength / speed * 1000 );
+				var startOffset = reverse ? -loopLength : 0;
+				var endOffset = reverse ? 0 : -loopLength;
+				track.style.transform = '';
+				compositorAnimation = track.animate(
+					[ { transform: transformAt( startOffset ) }, { transform: transformAt( endOffset ) } ],
+					{ duration: animationDuration, iterations: Infinity, easing: 'linear' }
+				);
+				compositorAnimation.currentTime = progress * animationDuration;
+				return;
+			}
+
+			if ( ! fallbackRunning ) {
+				fallbackRunning = true;
+				wrap.dataset.dsTimerKind = 'raf';
+				wrap.dataset.dsTimerId = String( requestAnimationFrame( frame ) );
+			}
+		}
+
+		function measure() {
+			var progress = currentProgress();
+			var previousLoopLength = loopLength;
+			var previousPortrait = portrait;
+			var measuredPortrait;
+			if ( 'up' === direction || 'down' === direction ) {
+				measuredPortrait = true;
+			} else if ( 'left' === direction || 'right' === direction ) {
+				measuredPortrait = false;
+			} else {
+				measuredPortrait = wrap.clientHeight > wrap.clientWidth;
+				if ( ! wrap.clientHeight || ! wrap.clientWidth ) {
+					measuredPortrait = 'portrait' === document.documentElement.getAttribute( 'data-ds-orientation' );
+				}
+			}
+			portrait = measuredPortrait;
+
+			track.className = 'ds-continuous-slider-track ' + ( portrait ? 'ds-continuous-vertical' : 'ds-continuous-horizontal' );
+			wrap.classList.toggle( 'ds-slider-vertical', portrait );
+			wrap.classList.toggle( 'ds-slider-horizontal', ! portrait );
+			var spacing = portrait
+				? options.verticalSpacing
+				: options.horizontalSpacing;
+			spacing = Math.max( 0, Number( spacing ) || 0 );
+			track.style.gap = spacing + 'px';
+			if ( sizeByWidth ) {
+				Array.prototype.forEach.call( track.children, function ( img ) {
+					img.style.width = ( wrap.clientWidth * widthPercent / 100 ) + 'px';
+					img.style.height = 'auto';
+					img.style.maxHeight = '100%';
+				} );
+			}
+
+			var firstSequence = Array.prototype.slice.call( track.children, 0, images.length );
+			var sequenceReady = firstSequence.every( function ( img ) {
+				return img.complete && img.naturalWidth > 0;
+			} );
+			if ( ! sequenceReady ) {
+				return;
+			}
+			var contentLength = firstSequence.reduce( function ( total, img ) {
+				var rect = img.getBoundingClientRect();
+				return total + ( portrait ? rect.height : rect.width );
+			}, 0 );
+			if ( contentLength <= 0 ) {
+				return;
+			}
+
+			loopLength = contentLength + ( spacing * images.length );
+			var viewportLength = portrait ? wrap.clientHeight : wrap.clientWidth;
+			var requiredCopies = Math.max( 2, Math.ceil( ( viewportLength + loopLength ) / loopLength ) + 1 );
+			while ( renderedCopies < requiredCopies ) {
+				appendCopy();
+			}
+			if ( ! compositorAnimation || previousPortrait !== portrait || Math.abs( previousLoopLength - loopLength ) > 0.5 ) {
+				startMotion( progress );
+			}
+			wrap.classList.add( 'ds-slider-ready' );
+		}
+
+		appendCopy();
+		appendCopy();
+
+		// Re-measure on image load and whenever the zone changes size/orientation.
+		if ( 'ResizeObserver' in window ) {
+			resizeObserver = new ResizeObserver( scheduleMeasure );
+			resizeObserver.observe( wrap );
+		} else {
+			resizeHandler = scheduleMeasure;
+			window.addEventListener( 'resize', resizeHandler );
+		}
+		wrap.dsCleanup = function () {
+			if ( measureFrame ) {
+				cancelAnimationFrame( measureFrame );
+			}
+			if ( compositorAnimation ) {
+				compositorAnimation.cancel();
+			}
+			if ( resizeObserver ) {
+				resizeObserver.disconnect();
+			}
+			if ( resizeHandler ) {
+				window.removeEventListener( 'resize', resizeHandler );
+			}
+		};
+		scheduleMeasure();
+
+		function frame( now ) {
+			if ( loopLength <= 0 ) {
+				lastFrame = null;
+				var waitingId = requestAnimationFrame( frame );
+				wrap.dataset.dsTimerId = String( waitingId );
+				return;
+			}
+			if ( null === lastFrame ) {
+				lastFrame = now;
+			}
+			if ( fallbackFrameInterval && fallbackPaintTime && now - fallbackPaintTime < fallbackFrameInterval ) {
+				wrap.dataset.dsTimerId = String( requestAnimationFrame( frame ) );
+				return;
+			}
+			var dt = Math.min( ( now - lastFrame ) / 1000, 0.05 );
+			lastFrame = now;
+			fallbackPaintTime = now;
+
+			if ( loopLength > 0 ) {
+				position += ( reverse ? 1 : -1 ) * speed * dt;
+				if ( reverse && position >= 0 ) {
+					position = -loopLength + ( position % loopLength );
+				} else if ( ! reverse && position <= -loopLength ) {
+					position = -( ( -position ) % loopLength );
+				}
+				track.style.transform = portrait
+					? 'translate3d(0,' + position + 'px,0)'
+					: 'translate3d(' + position + 'px,0,0)';
+			}
+
+			var id = requestAnimationFrame( frame );
+			wrap.dataset.dsTimerId = String( id );
+		}
+
+		return wrap;
+	}
+
+	function buildWeatherEl( item ) {
+		var wrap = document.createElement( 'div' );
+		wrap.className = 'ds-weather';
+		wrap.textContent = item.location || '';
+
+		if ( item.api_key && item.location ) {
+			fetch( 'https://api.openweathermap.org/data/2.5/weather?q=' + encodeURIComponent( item.location ) + '&units=metric&appid=' + encodeURIComponent( item.api_key ) )
+				.then( function ( r ) { return r.json(); } )
+				.then( function ( data ) {
+					if ( data && data.main ) {
+						wrap.innerHTML = '<div style="font-size:6vw">' + Math.round( data.main.temp ) + '&deg;C</div><div>' + ( data.weather && data.weather[0] ? data.weather[0].description : '' ) + '</div><div>' + ( item.location || '' ) + '</div>';
+					}
+				} )
+				.catch( function () { /* keep the plain location label on failure */ } );
+		}
+
+		return wrap;
+	}
+
+	function buildRssEl( item ) {
+		var wrap = document.createElement( 'div' );
+		wrap.className = 'ds-rss';
+		var track = document.createElement( 'div' );
+		track.className = 'ds-rss-track';
+		track.textContent = item.title || '';
+		wrap.appendChild( track );
+
+		if ( item.feed_url ) {
+			// Uses the WordPress REST proxy pattern is avoided here for simplicity; fetch directly
+			// (feed URL should be a JSON/RSS endpoint that permits CORS, or same-origin).
+			fetch( item.feed_url )
+				.then( function ( r ) { return r.text(); } )
+				.then( function ( text ) {
+					try {
+						var xml = new window.DOMParser().parseFromString( text, 'text/xml' );
+						var titles = Array.prototype.slice.call( xml.querySelectorAll( 'item > title, entry > title' ) ).slice( 0, 10 ).map( function ( n ) { return n.textContent; } );
+						if ( titles.length ) {
+							track.textContent = titles.join( '   •   ' );
+						}
+					} catch ( e ) { /* keep fallback title */ }
+				} )
+				.catch( function () { /* offline/CORS — keep fallback title */ } );
+		}
+
+		return wrap;
+	}
+
+	function preload( item, zone ) {
+		if ( ! item || ! zone || ( 'image' !== item.type && 'video' !== item.type ) ) {
+			return;
+		}
+		if ( zone.preloaded && String( zone.preloaded.item.id ) === String( item.id ) ) {
+			return;
+		}
+		if ( zone.preloaded ) {
+			stopTimers( zone.preloaded.el );
+		}
+		var el = buildSlideEl( item );
+		var video = el.querySelector( 'video' );
+		if ( video ) {
+			video.load();
+		}
+		zone.preloaded = { item: item, el: el };
+	}
+
+	function renderSlide( zoneName, index ) {
+		var zone = state.zones[ zoneName ];
+		if ( ! zone || ! zone.items.length ) {
+			return;
+		}
+
+		var container = zoneEl( zoneName );
+		var item = zone.items[ index ];
+		var serial = ++zone.renderSerial;
+		clearTimeout( zone.timer );
+
+		// Reuse the retained next-media element. Unlike a temporary detached video,
+		// this survives garbage collection and keeps its decoder/network buffer.
+		var newEl;
+		if ( zone.preloaded && String( zone.preloaded.item.id ) === String( item.id ) ) {
+			newEl = zone.preloaded.el;
+			zone.preloaded = null;
+		} else {
+			newEl = buildSlideEl( item );
+		}
+		container.appendChild( newEl );
+
+		var nextIndex = ( index + 1 ) % zone.items.length;
+		var video = newEl.querySelector( 'video' );
+		var singleItem = 1 === zone.items.length;
+		if ( video && singleItem ) {
+			// A one-item channel must remain alive indefinitely. Looping prevents an
+			// ended video from freezing on a blank final frame or restarting the zone.
+			video.loop = true;
+		}
+		var activated = false;
+		function activate() {
+			if ( activated || ! state.zones[ zoneName ] || zone.renderSerial !== serial ) {
+				return;
+			}
+			activated = true;
+			requestAnimationFrame( function () { newEl.classList.add( 'ds-active' ); } );
+
+			Array.prototype.filter.call( container.querySelectorAll( '.ds-slide' ), function ( slideEl ) {
+				return slideEl !== newEl;
+			} ).forEach( function ( prevEl ) {
+				prevEl.classList.remove( 'ds-active' );
+				prevEl.classList.add( 'ds-prev' );
+				setTimeout( function () {
+					stopTimers( prevEl );
+					prevEl.remove();
+				}, LOW_POWER_PROFILE ? 120 : 700 );
+			} );
+
+			if ( video ) {
+				if ( ! video.muted ) { duckMusicFor( video ); }
+				var playPromise = video.play();
+				if ( playPromise && playPromise.catch ) { playPromise.catch( function () { restoreMusicFor( video ); if ( ! singleItem ) { zone.timer = setTimeout( function () { advanceZone( zoneName ); }, Math.max( 3, item.duration || 10 ) * 1000 ); } } ); }
+				video.addEventListener( 'ended', function () { restoreMusicFor( video ); }, { once: true } );
+			}
+			logProofOfPlay( zoneName, item );
+			if ( singleItem ) { return; }
+			preload( zone.items[ nextIndex ], zone );
+
+			if ( video && 'fixed_duration' !== item.play_mode ) {
+				video.addEventListener( 'ended', function () { advanceZone( zoneName ); }, { once: true } );
+			} else {
+				zone.timer = setTimeout( function () { advanceZone( zoneName ); }, Math.max( 1, item.duration || 10 ) * 1000 );
+			}
+		}
+
+		if ( video && video.readyState < 3 ) {
+			video.addEventListener( 'canplay', activate, { once: true } );
+			video.addEventListener( 'loadeddata', activate, { once: true } );
+			video.addEventListener( 'error', activate, { once: true } );
+			video.load();
+			setTimeout( activate, 5000 );
+		} else {
+			activate();
+		}
+	}
+
+	function advanceZone( zoneName ) {
+		var zone = state.zones[ zoneName ];
+		if ( ! zone || ! zone.items.length ) {
+			return;
+		}
+		zone.index = ( zone.index + 1 ) % zone.items.length;
+		renderSlide( zoneName, zone.index );
+	}
+
+	function logProofOfPlay( zoneName, item ) {
+		if ( ! state.playlist ) {
+			return;
+		}
+		apiPost( '/proof', {
+			channel_id: state.playlist.channel_id,
+			slide_id: item.id,
+			zone: zoneName,
+			duration_seconds: item.duration || 0,
+		} );
+	}
+
+	/* ---------------------------------------------------------------- */
+	/* Heartbeat                                                          */
+	/* ---------------------------------------------------------------- */
+
+	function sendHeartbeat() {
+		apiPost( '/heartbeat', {
+			resolution: window.screen.width + 'x' + window.screen.height,
+			orientation: detectOrientation(),
+			user_agent: navigator.userAgent,
+			channel_id: state.playlist ? state.playlist.channel_id : 0,
+			app_version: ( IS_VIDAA ? 'vidaa-web/' : 'player-js/' ) + ( CONFIG.appVersion || 'unknown' ),
+			spotify_device_id: state.spotify ? state.spotify.deviceId : '',
+		} );
+	}
+
+	/* ---------------------------------------------------------------- */
+	/* Boot                                                               */
+	/* ---------------------------------------------------------------- */
+
+	function boot() {
+		if ( ! CONFIG.isPreview ) {
+			initFullscreen();
+		}
+
+		// Show cached content immediately if we have it, then fetch fresh in the background.
+		var cached = ! CONFIG.isPreview ? loadCachedPlaylist() : null;
+		if ( cached ) {
+			applyPlaylist( cached );
+		}
+
+		fetchPlaylist();
+		scheduleChangesCheck( 1000 );
+
+		var pollMs = Math.max( 10, CONFIG.pollInterval || 60 ) * 1000;
+		setInterval( fetchPlaylist, pollMs );
+
+		if ( ! CONFIG.isPreview ) {
+			sendHeartbeat();
+			var hbMs = Math.max( 10, CONFIG.heartbeatInterval || 30 ) * 1000;
+			setInterval( sendHeartbeat, hbMs );
+		}
+
+		window.addEventListener( 'online', resumePlayer );
+		window.addEventListener( 'offline', function () { setOffline( true ); } );
+		document.addEventListener( 'visibilitychange', function () {
+			if ( ! document.hidden ) { resumePlayer(); }
+		} );
+		window.addEventListener( 'pageshow', function ( event ) {
+			if ( event.persisted ) { resumePlayer(); }
+		} );
+		window.addEventListener( 'resize', function () {
+			if ( state.playlist && ( ! state.playlist.orientation || 'auto' === state.playlist.orientation ) ) {
+				document.documentElement.setAttribute( 'data-ds-orientation', detectOrientation() );
+			}
+		} );
+	}
+
+	if ( 'loading' === document.readyState ) {
+		document.addEventListener( 'DOMContentLoaded', boot );
+	} else {
+		boot();
+	}
+} )();

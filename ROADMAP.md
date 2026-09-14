@@ -1,8 +1,8 @@
 # Screens byKUTT product roadmap
 
-This map separates shipped 4.6.0 work from the next quality-of-life improvements. It is directional, not a promise that unfinished items are already available.
+This map separates shipped 4.7.0 work from the next quality-of-life improvements. It is directional, not a promise that unfinished items are already available.
 
-## Shipped in 4.6.0
+## Shipped in 4.7.0
 
 - Private group media library and picker with a 2 GB default quota and administrator capacity controls.
 - Channel-resolution-aware designer publishing, cover playback, stable single-item channels, and same-name replacement.

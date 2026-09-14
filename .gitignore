@@ -1,2 +1,6 @@
 __pycache__/
 *.pyc
+dist/
+*.zip
+*.tar.gz
+SHA256SUMS

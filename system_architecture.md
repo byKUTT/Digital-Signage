@@ -2,7 +2,7 @@
 
 ## Ubuntu multi-display controller
 
-- Ubuntu Desktop uses `ubuntu-kiosk/`; the Raspberry Pi installer remains
+- Ubuntu Desktop uses `ubuntu/`; the Raspberry Pi installer remains
   exclusive to Raspberry Pi OS. The Ubuntu installer migrates away from the
   Pi service by disabling `ds-kiosk.service`, unmasking `getty@tty1`, restoring
   `graphical.target`, and using the normal GDM Xorg session. It never starts a
@@ -61,9 +61,9 @@
 
 ## VIDAA/private smart-TV bootstrap
 
-- `/signage/tv/` is a stable browser entry point; it creates a pairing identity through `/ds/v1/pair/request`, stores the opaque token in localStorage (with a URL-fragment fallback), and checks `/ds/v1/pair/status/{token}` until paired.
+- `/tv/` is a stable browser entry point; it creates a pairing identity through `/ds/v1/pair/request`, stores the opaque token in localStorage (with a URL-fragment fallback), and checks `/ds/v1/pair/status/{token}` until paired.
 - The launcher is recognized both by its normal WordPress rewrite query variable and by an exact request-path fallback, so an in-place update cannot leave it behind a stale permalink-rule 404.
-- Once paired, the launcher redirects to the existing `/signage/play/{token}/` renderer. VIDAA, Raspberry Pi and Windows therefore share the same playlist, transition, heartbeat and live-revision code paths.
+- Once paired, the launcher redirects to the existing `/play/{token}/` renderer. VIDAA, Ubuntu, and Raspberry Pi therefore share the same playlist, transition, heartbeat, and live-revision code paths.
 - Holding OK/Enter for five seconds on the launcher clears only that browser's stored identity and requests a new one. Firmware-level power-on launch remains outside the web player's control.
 - VIDAA detection is progressive enhancement only: remote OK activation, TV focus styling, resume recovery and the `vidaa-web/{version}` heartbeat label. Playback must continue on unknown smart-TV user agents.
 
@@ -108,8 +108,12 @@
 - Browser actions call nonce-protected WordPress AJAX handlers. Server-side API
 	requests use a fixed Spotify endpoint/action map for device discovery, track
 	search, transfer, play, pause, previous, and next. Users never supply an API URL.
-- Spotify playback is not embedded in signage output, synchronized with slides, or
-	ducked around signage audio. Those uses conflict with Spotify platform policy.
+- A user can explicitly enable the controller's primary output as a Web Playback
+	SDK device. The short-lived access token is omitted from the offline playlist
+	cache, and the SDK is loaded only while that controller output is enabled.
+- Audible signage video fades controller-local Spotify playback to zero over 1.5
+	seconds and restores the previous volume after every audible video releases its
+	duck claim.
 
 ## Licensed background music
 

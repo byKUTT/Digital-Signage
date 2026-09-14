@@ -1,12 +1,10 @@
-# Screens byKUTT 4.5 implementation
+# Screens byKUTT 4.7 implementation
 
-- [x] Ubuntu privilege installation and controller invocation: make passwordless allow-listed actions verifiable with an actual non-interactive command.
-- [x] Controller-scoped Spotify Connect service, OAuth callbacks, restricted role/capability, and interactive frontend controls.
-- [x] Portal routing, permissions, controller people workflow, and responsive Spotify tab.
-- [x] Vellum wrapper hierarchy and responsive editor controls.
-- [x] Starter template catalog with four visual families, four variations per family, and landscape/portrait formats.
-- [x] Pairing, reconnect, and no-channel surfaces share the refreshed responsive visual system.
-- [x] Versions, documentation, architecture notes, and automated tests.
-- [x] Screens byKUTT brand system, responsive dark dashboard, overview hero, and refreshed sign-in surfaces.
-- [x] Group-scoped licensed music library, playlists, controller-output assignment, and 1.5-second local audio ducking.
-- [ ] Build release archives and publish the verified commit.
+- [x] Remove Windows sources and obsolete release archives; retain WordPress, Ubuntu, and Pi.
+- [x] Rename source folders to `wp/`, `ubuntu/`, and `pi/` while preserving installed-controller update compatibility.
+- [x] Shorten public routes to `/screens/`, `/tv/`, `/play/`, and `/preview/` with legacy aliases.
+- [x] Repair video start/end timing, single-item playback, cover sizing, and audible-video cleanup.
+- [x] Keep Spotify application credentials in site administration and expose the Ubuntu controller as a real playback target.
+- [x] Replace generic template thumbnails with exact image-led landscape and portrait previews generated from the shared template definitions.
+- [x] Update documentation, architecture, version metadata, archives, and automated tests.
+- [ ] Publish the verified commit and release artifacts to GitHub.

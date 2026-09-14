@@ -1,0 +1,122 @@
+{
+  "offers": {
+    "name": "Daily offers",
+    "heading": "TODAY'S\nOFFERS",
+    "detail": "Truffle prawn pasta",
+    "value": "€8.90",
+    "note": "FRESHLY MADE · ALL DAY",
+    "image": "offers.webp",
+    "palettes": [
+      [
+        "#10261d",
+        "#e6ff3b",
+        "#f8f6ed"
+      ],
+      [
+        "#b84b2f",
+        "#f3c35c",
+        "#fff7e8"
+      ],
+      [
+        "#172b61",
+        "#7cc8ff",
+        "#f8fbff"
+      ],
+      [
+        "#f4eadf",
+        "#6e2724",
+        "#2a1d19"
+      ]
+    ]
+  },
+  "menu": {
+    "name": "Cafe menu",
+    "heading": "GOOD\nCOFFEE",
+    "detail": "Flat white · Filter · Espresso",
+    "value": "FROM €2.80",
+    "note": "ROASTED THIS WEEK",
+    "image": "menu.webp",
+    "palettes": [
+      [
+        "#f1e9dc",
+        "#e55e35",
+        "#382b25"
+      ],
+      [
+        "#d9e7dc",
+        "#173f35",
+        "#142c26"
+      ],
+      [
+        "#17171a",
+        "#f3ce52",
+        "#faf7ee"
+      ],
+      [
+        "#dce8f5",
+        "#1f4ba8",
+        "#15213a"
+      ]
+    ]
+  },
+  "event": {
+    "name": "Event night",
+    "heading": "SUMMER\nNIGHT",
+    "detail": "Live music · Seasonal menu",
+    "value": "18:00",
+    "note": "24 AUGUST",
+    "image": "event.webp",
+    "palettes": [
+      [
+        "#1f39d1",
+        "#c8ff45",
+        "#ffffff"
+      ],
+      [
+        "#40144f",
+        "#ff8a5b",
+        "#fff5ef"
+      ],
+      [
+        "#0d3234",
+        "#f5d76f",
+        "#f5fbf7"
+      ],
+      [
+        "#f0e7dc",
+        "#ec384d",
+        "#201416"
+      ]
+    ]
+  },
+  "welcome": {
+    "name": "Welcome",
+    "heading": "WELCOME",
+    "detail": "Good things flow better together.",
+    "value": "09:00–21:00",
+    "note": "OPEN TODAY",
+    "image": "welcome.webp",
+    "palettes": [
+      [
+        "#431529",
+        "#ffcf4f",
+        "#fff5ee"
+      ],
+      [
+        "#173d2c",
+        "#9de07d",
+        "#f7f3e8"
+      ],
+      [
+        "#172b61",
+        "#90d8ed",
+        "#ffffff"
+      ],
+      [
+        "#efe6d7",
+        "#d84932",
+        "#2c201b"
+      ]
+    ]
+  }
+}
