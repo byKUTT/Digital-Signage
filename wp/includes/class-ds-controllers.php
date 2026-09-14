@@ -210,6 +210,9 @@ class DS_Controllers {
 			if ( $row->screen_id && 'ds_screen' === get_post_type( $row->screen_id ) ) {
 				continue;
 			}
+			if ( $group_id && ! DS_Groups::can_create_screen( $group_id ) ) {
+				continue;
+			}
 			$label     = $row->label ? $row->label : ( $row->connector ? $row->connector : sprintf( __( 'Display %d', 'digital-signage' ), $index + 1 ) );
 			$screen_id = DS_CRUD::save_screen(
 				0,

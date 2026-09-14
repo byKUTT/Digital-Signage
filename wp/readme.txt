@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 4.7.0
+Stable tag: 4.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -33,25 +33,34 @@ The optional Spotify panel connects to Spotify Accounts (`accounts.spotify.com`)
 
 The Music page contains an ordinary link to Pixabay Music (`pixabay.com/music/`) as one place to browse free audio. The plugin does not call a Pixabay API or send WordPress, group, controller, or user data to Pixabay. Audio is downloaded by the user and uploaded to their own WordPress media storage. Users remain responsible for checking and recording the license that applies to each track and intended commercial use.
 
+When a site administrator enables login protection, the custom login and registration pages load Google reCAPTCHA (`www.google.com/recaptcha/`) and send the visitor's response token and IP address to Google's verification endpoint. reCAPTCHA is disabled by default and requires administrator-supplied site and secret keys. Use is subject to Google's Privacy Policy and Terms of Service.
+
 == Installation ==
 
 1. Upload the `digital-signage` folder to `/wp-content/plugins/`.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
-3. Go to **Digital Signage → Settings** to set global slide durations, transitions, poll/heartbeat intervals and time zone.
-4. Go to **Digital Signage → Pair a Screen**, open the generated player URL on the target TV/tablet/browser, then either scan the QR code it displays with your phone or enter the code manually to link the device.
-5. Create a **Channel**, add **Slides** to it, then assign the channel to a **Screen** (or schedule it via **Schedules**).
+3. Open **Screens byKUTT → Global settings** in wp-admin to configure optional site-wide Spotify and reCAPTCHA keys.
+4. Open **Screen Manager** from the WordPress admin bar. Create a Channel and add media, webpages, or saved designs.
+5. Create a standalone browser Screen and open its stable player URL, or choose **Pair controller** and enter the code shown by an Ubuntu controller.
 
 For a private VIDAA 9 TV player, open `https://your-site.example/tv/` in the TV browser. The launcher creates a persistent TV identity and shows a six-character pairing code. Pair it in WordPress, bookmark the launcher, and use any Browser/App Auto Start option provided by the TV. Consumer VIDAA firmware may still require opening the bookmark after a cold boot. Press **OK** once if the browser asks to start fullscreen playback. For widest TV compatibility, use MP4 video encoded as H.264 with AAC audio; playback starts muted because TV browsers enforce autoplay rules.
 
 == Architecture notes ==
 
-* Channels, Screens, Slides and Schedules are custom post types (`ds_channel`, `ds_screen`, `ds_slide`, `ds_schedule`) used purely as a storage layer — there is no native WordPress post-editor screen for any of them (`show_ui => false`). Every list, create and edit screen is a fully custom admin UI (`includes/class-ds-admin.php` + `admin/views/*.php`) built from scratch, writing through `includes/class-ds-crud.php` and gated by a single `manage_digital_signage` capability rather than WordPress's per-post-type meta capabilities.
+* Channels, Screens, Slides and Schedules are custom post types used purely as a storage layer. Group members manage them in the authenticated frontend Screen Manager; wp-admin is reserved for site-wide fleet health, group limits, updates, guides, and service keys.
 * High-write, append-only data — heartbeats, the proof-of-play log, and pairing codes — live in three custom `$wpdb` tables (`ds_heartbeats`, `ds_proof_of_play`, `ds_pairing_codes`) created on activation via `dbDelta()`.
 * Scheduling housekeeping (expiring pairing codes, trimming the proof-of-play log, clearing stale manual overrides) runs on **WP-Cron**.
-* The wp-admin Screens dashboard uses WordPress's own **Heartbeat API** to live-refresh status badges while an admin has the page open.
+* The wp-admin Screens byKUTT dashboard gives site administrators one view of group capacity, live status, controller versions, updates, requests, and global services.
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 4.8.0 =
+* Added stable browser-player URLs for Screens created without a controller and Preview actions for both Screens and Channels.
+* Added a default two-Screen allowance per group, administrator overrides, and rate-limited Buy more requests for Screen or storage capacity.
+* Consolidated wp-admin into a premium responsive Overview, Guides, and Global settings area; routine content management remains in the frontend.
+* Added group storage/live-state summaries, outdated-controller visibility, copy-ready manual update commands, and global Spotify configuration status.
+* Added optional Google reCAPTCHA v2 protection for custom frontend login and registration with server-side validation.
 
 = 4.7.0 =
 * Reduced the Git source layout to `wp/`, `ubuntu/`, and `pi/`, removed Windows packages and historical ZIP files, and retained an Ubuntu update compatibility link.

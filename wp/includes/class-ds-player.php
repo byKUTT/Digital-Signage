@@ -4,8 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Renders the chrome-less fullscreen frontend player at /signage/play/{token}/,
- * and the equivalent wp-admin-only live preview at /signage/preview/{channel_id}/.
+ * Renders the chrome-less fullscreen frontend player at /play/{token}/,
+ * and the equivalent authenticated group preview at /preview/{channel_id}/.
  * Both bypass the active theme entirely (no header/footer/sidebar/admin bar) and
  * load a minimal, dependency-light HTML/CSS/JS shell that talks to the REST API.
  */
@@ -272,15 +272,15 @@ class DS_Player {
 	}
 
 	/**
-	 * /signage/preview/{channel_id}/ — same chrome-less renderer as the real player,
-	 * but requires a logged-in wp-admin user with the signage capability, and reads
+	 * /preview/{channel_id}/ — same chrome-less renderer as the real player,
+	 * but requires a logged-in group member with the signage capability, and reads
 	 * straight from the /preview/{id} REST route instead of a paired screen.
 	 */
 	private function maybe_render_preview( $channel_id ) {
 		nocache_headers();
 
 		if ( ! is_user_logged_in() ) {
-			auth_redirect(); // Sends them to wp-login.php, then back here.
+			wp_safe_redirect( DS_Auth::login_url( home_url( wp_unslash( $_SERVER['REQUEST_URI'] ?? '/' ) ) ) );
 			exit;
 		}
 		if ( ! current_user_can( DS_Roles::CAP ) ) {
@@ -289,6 +289,9 @@ class DS_Player {
 
 		if ( ! $channel_id || 'ds_channel' !== get_post_type( $channel_id ) ) {
 			wp_die( esc_html__( 'Channel not found.', 'digital-signage' ) );
+		}
+		if ( ! DS_Groups::can_access_post( $channel_id ) ) {
+			wp_die( esc_html__( 'You do not have permission to preview this channel.', 'digital-signage' ), '', array( 'response' => 403 ) );
 		}
 
 		$screen        = (object) array( 'ID' => 0, 'post_title' => get_the_title( $channel_id ) );

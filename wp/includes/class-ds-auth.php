@@ -22,7 +22,7 @@ class DS_Auth {
 	public static function login_url( $redirect_to = '' ) { return add_query_arg( $redirect_to ? array( 'redirect_to' => $redirect_to ) : array(), home_url( self::LOGIN_PATH ) ); }
 	public static function register_url() { return home_url( self::REGISTER_PATH ); }
 	private function route() { $path = untrailingslashit( (string) wp_parse_url( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) ), PHP_URL_PATH ) ); if ( in_array( $path, array( untrailingslashit( self::LOGIN_PATH ), untrailingslashit( self::LEGACY_LOGIN ) ), true ) ) { return 'login'; } if ( in_array( $path, array( untrailingslashit( self::REGISTER_PATH ), untrailingslashit( self::LEGACY_REGISTER ) ), true ) ) { return 'register'; } return ''; }
-	public function assets() { if ( $this->route() ) { wp_enqueue_style( 'ds-auth', DS_PLUGIN_URL . 'public/css/auth.css', array(), DS_VERSION ); wp_enqueue_style( 'ds-auth-refresh', DS_PLUGIN_URL . 'public/css/auth-refresh.css', array( 'ds-auth' ), DS_VERSION ); } }
+	public function assets() { if ( $this->route() ) { wp_enqueue_style( 'ds-auth', DS_PLUGIN_URL . 'public/css/auth.css', array(), DS_VERSION ); wp_enqueue_style( 'ds-auth-refresh', DS_PLUGIN_URL . 'public/css/auth-refresh.css', array( 'ds-auth' ), DS_VERSION ); if ( DS_Recaptcha::enabled() ) { wp_enqueue_script( 'google-recaptcha', 'https://www.google.com/recaptcha/api.js', array(), null, true ); } } }
 	public function render() {
 		$mode = $this->route();
 		if ( ! $mode ) { return; }
@@ -36,6 +36,8 @@ class DS_Auth {
 
 	public function handle_login() {
 		check_admin_referer( 'ds_front_login' );
+		$requested_redirect = wp_validate_redirect( esc_url_raw( wp_unslash( $_POST['redirect_to'] ?? '' ) ), '' );
+		if ( ! DS_Recaptcha::verify( wp_unslash( $_POST['g-recaptcha-response'] ?? '' ) ) ) { wp_safe_redirect( add_query_arg( array_filter( array( 'status' => 'captcha_failed', 'redirect_to' => $requested_redirect ) ), self::login_url() ) ); exit; }
 		$credentials = array(
 			'user_login'    => sanitize_text_field( wp_unslash( $_POST['user_login'] ?? '' ) ),
 			'user_password' => (string) wp_unslash( $_POST['user_password'] ?? '' ),
@@ -44,17 +46,18 @@ class DS_Auth {
 		$user = wp_signon( $credentials, is_ssl() );
 		if ( is_wp_error( $user ) || ( ! user_can( $user, DS_Roles::CAP ) && ! user_can( $user, DS_Roles::SPOTIFY_CAP ) ) ) {
 			if ( $user instanceof WP_User ) { wp_logout(); }
-			wp_safe_redirect( add_query_arg( 'status', 'login_failed', self::login_url() ) ); exit;
+			wp_safe_redirect( add_query_arg( array_filter( array( 'status' => 'login_failed', 'redirect_to' => $requested_redirect ) ), self::login_url() ) ); exit;
 		}
 		if ( user_can( $user, DS_Roles::CAP ) ) { DS_Groups::ensure_user_group( $user->ID ); }
 		$default_redirect = user_can( $user, DS_Roles::CAP ) ? DS_Portal::url() : DS_Portal::url( 'spotify' );
-		$redirect_to = wp_validate_redirect( esc_url_raw( wp_unslash( $_POST['redirect_to'] ?? '' ) ), $default_redirect );
+		$redirect_to = wp_validate_redirect( $requested_redirect, $default_redirect );
 		wp_safe_redirect( $redirect_to ); exit;
 	}
 
 	public function handle_register() {
 		check_admin_referer( 'ds_front_register' );
 		if ( ! empty( $_POST['website'] ) ) { wp_safe_redirect( self::register_url() ); exit; }
+		if ( ! DS_Recaptcha::verify( wp_unslash( $_POST['g-recaptcha-response'] ?? '' ) ) ) { wp_safe_redirect( add_query_arg( 'status', 'captcha_failed', self::register_url() ) ); exit; }
 		$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? 'unknown' ) );
 		$key = 'ds_register_' . md5( $ip ); $attempts = (int) get_transient( $key );
 		if ( $attempts >= 5 ) { wp_safe_redirect( add_query_arg( 'status', 'rate_limited', self::register_url() ) ); exit; }

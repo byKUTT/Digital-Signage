@@ -252,6 +252,9 @@ class DS_CRUD {
 		update_post_meta( $post_id, 'ds_channel_id', absint( $data['channel_id'] ?? 0 ) );
 		update_post_meta( $post_id, 'ds_orientation', sanitize_key( $data['orientation'] ?? 'landscape' ) );
 		update_post_meta( $post_id, 'ds_content_rotation', $rotation );
+		if ( ! get_post_meta( $post_id, 'ds_pairing_token', true ) ) {
+			update_post_meta( $post_id, 'ds_pairing_token', self::generate_screen_token() );
+		}
 
 		$short_enabled = ! empty( $data['short_url_enabled'] );
 		$short_code    = sanitize_text_field( get_post_meta( $post_id, 'ds_short_code', true ) );
@@ -270,6 +273,16 @@ class DS_CRUD {
 		}
 
 		return $post_id;
+	}
+
+	/** Generate an opaque stable player token for controller and browser Screens. */
+	private static function generate_screen_token() {
+		for ( $attempt = 0; $attempt < 10; $attempt++ ) {
+			$token = wp_generate_password( 40, false, false );
+			$existing = get_posts( array( 'post_type' => 'ds_screen', 'post_status' => 'any', 'posts_per_page' => 1, 'fields' => 'ids', 'meta_key' => 'ds_pairing_token', 'meta_value' => $token ) );
+			if ( ! $existing ) { return $token; }
+		}
+		return wp_generate_uuid4();
 	}
 
 	/**

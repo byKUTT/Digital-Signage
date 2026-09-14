@@ -10,6 +10,9 @@ class DS_Groups {
 	const POST_META = 'ds_group_id';
 	const CONTROLLER_OPTION = 'ds_controller_groups';
 	const CONTROLLER_OWNER_OPTION = 'ds_controller_owners';
+	const SCREEN_LIMIT_OPTION_PREFIX = 'ds_group_screen_limit_';
+	const CAPACITY_REQUESTS_OPTION = 'ds_capacity_requests';
+	const DEFAULT_SCREEN_LIMIT = 2;
 	private static $instance = null;
 
 	public static function instance() { if ( null === self::$instance ) { self::$instance = new self(); } return self::$instance; }
@@ -45,7 +48,43 @@ class DS_Groups {
 	}
 	public static function add_user( $group_id, $user_id ) { $ids = self::user_group_ids( $user_id ); $ids[] = absint( $group_id ); update_user_meta( $user_id, self::USER_META, array_values( array_unique( $ids ) ) ); }
 	public static function remove_user( $group_id, $user_id ) { update_user_meta( $user_id, self::USER_META, array_values( array_diff( self::user_group_ids( $user_id ), array( absint( $group_id ) ) ) ) ); }
-	public static function users( $group_id ) { return get_users( array( 'meta_key' => self::USER_META, 'meta_compare' => 'EXISTS' ) ); }
+	public static function users( $group_id ) {
+		$group_id = absint( $group_id );
+		return array_values( array_filter( get_users( array( 'meta_key' => self::USER_META, 'meta_compare' => 'EXISTS' ) ), function ( $user ) use ( $group_id ) { return in_array( $group_id, self::user_group_ids( $user->ID ), true ); } ) );
+	}
+	public static function screen_limit( $group_id ) { return max( 0, (int) get_option( self::SCREEN_LIMIT_OPTION_PREFIX . absint( $group_id ), self::DEFAULT_SCREEN_LIMIT ) ); }
+	public static function set_screen_limit( $group_id, $limit ) { if ( current_user_can( 'manage_options' ) ) { update_option( self::SCREEN_LIMIT_OPTION_PREFIX . absint( $group_id ), max( 0, absint( $limit ) ), false ); } }
+	public static function screen_count( $group_id ) {
+		return count( get_posts( array( 'post_type' => 'ds_screen', 'post_status' => 'any', 'posts_per_page' => -1, 'fields' => 'ids', 'meta_key' => self::POST_META, 'meta_value' => absint( $group_id ) ) ) );
+	}
+	public static function can_create_screen( $group_id ) { return self::screen_count( $group_id ) < self::screen_limit( $group_id ); }
+	public static function capacity_requests() { return array_values( array_filter( (array) get_option( self::CAPACITY_REQUESTS_OPTION, array() ), 'is_array' ) ); }
+	public static function clear_capacity_requests( array $group_ids ) {
+		$group_ids = array_values( array_unique( array_map( 'absint', $group_ids ) ) );
+		update_option( self::CAPACITY_REQUESTS_OPTION, array_values( array_filter( self::capacity_requests(), function ( $request ) use ( $group_ids ) { return ! in_array( absint( $request['group_id'] ?? 0 ), $group_ids, true ); } ) ), false );
+	}
+	public static function request_capacity( $group_id, $type, $user_id = 0 ) {
+		$group_id = absint( $group_id );
+		$user_id  = absint( $user_id ?: get_current_user_id() );
+		$type     = in_array( $type, array( 'screens', 'storage' ), true ) ? $type : 'screens';
+		if ( ! $group_id || ! self::get( $group_id ) || ! $user_id ) { return false; }
+		$rate_key = 'ds_capacity_' . $group_id . '_' . $type . '_' . $user_id;
+		if ( get_transient( $rate_key ) ) { return true; }
+		$group = self::get( $group_id );
+		$user  = get_userdata( $user_id );
+		$user_name  = $user ? $user->display_name : __( 'User', 'digital-signage' );
+		$user_email = $user ? $user->user_email : '';
+		$requests = self::capacity_requests();
+		array_unshift( $requests, array( 'group_id' => $group_id, 'type' => $type, 'user_id' => $user_id, 'requested_at' => current_time( 'mysql', true ) ) );
+		update_option( self::CAPACITY_REQUESTS_OPTION, array_slice( $requests, 0, 100 ), false );
+		set_transient( $rate_key, 1, 12 * HOUR_IN_SECONDS );
+		wp_mail(
+			sanitize_email( get_option( 'admin_email' ) ),
+			sprintf( __( 'Screens byKUTT capacity request: %s', 'digital-signage' ), sanitize_text_field( $group['name'] ?? '' ) ),
+			sprintf( __( '%1$s (%2$s) requested more %3$s capacity for group “%4$s”. Review the group limits in Screens byKUTT > Overview.', 'digital-signage' ), sanitize_text_field( $user_name ), sanitize_email( $user_email ), $type, sanitize_text_field( $group['name'] ?? '' ) )
+		);
+		return true;
+	}
 	public static function post_group_id( $post ) { $post = $post instanceof WP_Post ? $post : get_post( absint( $post ) ); return $post ? absint( get_post_meta( $post->ID, self::POST_META, true ) ) : 0; }
 	public static function set_post_group( $post_id, $group_id ) { update_post_meta( absint( $post_id ), self::POST_META, absint( $group_id ) ); }
 	public static function can_access_post( $post ) {

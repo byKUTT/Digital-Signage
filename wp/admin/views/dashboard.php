@@ -1,149 +1,53 @@
 <?php
-/**
- * Overview: at-a-glance screen status plus quick actions into the rest of the app.
- *
- * @var WP_Post[] $screens
- * @var object[]  $heartbeats keyed by screen_id
- * @var int       $offline_after
- * @var int       $channel_count
- */
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-
-$online = 0;
-foreach ( $screens as $s ) {
-	$hb = $heartbeats[ $s->ID ] ?? null;
-	if ( $hb && ( time() - strtotime( $hb->last_seen . ' UTC' ) ) <= $offline_after ) {
-		++$online;
-	}
-}
+/** Site-administrator operations overview. */
+if ( ! defined( 'ABSPATH' ) ) { exit; }
+$release_version = is_wp_error( $release ) ? '' : sanitize_text_field( $release['version'] ?? '' );
+$spotify_ready = ! empty( $spotify_settings['client_id'] ) && ! empty( $spotify_settings['client_secret'] );
+$recaptcha_ready = ! empty( $recaptcha_settings['site_key'] ) && ! empty( $recaptcha_settings['secret_key'] );
+$total_storage = array_reduce( $group_rows, function ( $sum, $row ) { return $sum + absint( $row['storage']['used'] ); }, 0 );
 ?>
-<div class="ds-app-wrap">
-	<div class="ds-app-header">
-		<div>
-			<h1><?php esc_html_e( 'Digital Signage', 'digital-signage' ); ?></h1>
-			<p class="ds-app-subtitle"><?php esc_html_e( 'Overview of your channels and screens.', 'digital-signage' ); ?></p>
-		</div>
-		<div class="ds-app-header-actions">
-			<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-channel-edit' ) ); ?>" class="ds-btn"><?php esc_html_e( 'New Channel', 'digital-signage' ); ?></a>
-			<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-pairing' ) ); ?>" class="ds-btn ds-btn-primary">+ <?php esc_html_e( 'Pair a New Screen', 'digital-signage' ); ?></a>
-		</div>
-	</div>
+<div class="ds-app-wrap ds-ops">
+	<nav class="ds-ops-nav" aria-label="<?php esc_attr_e( 'Screens byKUTT administration', 'digital-signage' ); ?>">
+		<a class="ds-ops-brand" href="<?php echo esc_url( admin_url( 'admin.php?page=digital-signage' ) ); ?>"><span class="ds-ops-mark"></span><strong>Screens <small>byKUTT</small></strong></a>
+		<div><a class="active" href="<?php echo esc_url( admin_url( 'admin.php?page=digital-signage' ) ); ?>"><?php esc_html_e( 'Overview', 'digital-signage' ); ?></a><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-guides' ) ); ?>"><?php esc_html_e( 'Guides', 'digital-signage' ); ?></a><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-settings' ) ); ?>"><?php esc_html_e( 'Global settings', 'digital-signage' ); ?></a></div>
+		<a class="ds-ops-button" href="<?php echo esc_url( DS_Portal::url() ); ?>"><?php esc_html_e( 'Open Screen Manager', 'digital-signage' ); ?></a>
+	</nav>
 
-	<?php if ( ! $screens && ! $channel_count ) : ?>
-		<div class="ds-quickstart">
-			<h2><?php esc_html_e( 'How it works', 'digital-signage' ); ?></h2>
-			<div class="ds-flow-diagram">
-				<div class="ds-flow-step">
-					<span class="ds-flow-icon"><?php echo DS_Icons::icon( 'channel' ); // phpcs:ignore ?></span>
-					<strong><?php esc_html_e( '1. Build a Channel', 'digital-signage' ); ?></strong>
-					<span><?php esc_html_e( 'A named playlist of slides — images, videos, webpages, widgets.', 'digital-signage' ); ?></span>
-				</div>
-				<span class="ds-flow-arrow"><?php echo DS_Icons::icon( 'arrow' ); // phpcs:ignore ?></span>
-				<div class="ds-flow-step">
-					<span class="ds-flow-icon"><?php echo DS_Icons::icon( 'screen' ); // phpcs:ignore ?></span>
-					<strong><?php esc_html_e( '2. Pair a Screen', 'digital-signage' ); ?></strong>
-					<span><?php esc_html_e( 'Any TV/tablet browser — scan a QR code or enter a short code.', 'digital-signage' ); ?></span>
-				</div>
-				<span class="ds-flow-arrow"><?php echo DS_Icons::icon( 'arrow' ); // phpcs:ignore ?></span>
-				<div class="ds-flow-step">
-					<span class="ds-flow-icon"><?php echo DS_Icons::icon( 'schedule' ); // phpcs:ignore ?></span>
-					<strong><?php esc_html_e( '3. Schedule (optional)', 'digital-signage' ); ?></strong>
-					<span><?php esc_html_e( 'Assign a channel directly, or set day/time rules and holiday overrides.', 'digital-signage' ); ?></span>
-				</div>
-			</div>
-			<ol>
-				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-channel-edit' ) ); ?>"><?php esc_html_e( 'Add a Channel →', 'digital-signage' ); ?></a></li>
-				<li><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-pairing' ) ); ?>"><?php esc_html_e( 'Pair a Screen →', 'digital-signage' ); ?></a></li>
-			</ol>
-		</div>
-	<?php endif; ?>
+	<header class="ds-ops-hero">
+		<div><p><?php esc_html_e( 'System overview', 'digital-signage' ); ?></p><h1><?php esc_html_e( 'Your signage network, at a glance.', 'digital-signage' ); ?></h1><span><?php echo esc_html( sprintf( __( 'Server time %1$s · %2$s', 'digital-signage' ), wp_date( 'H:i', time(), wp_timezone() ), wp_timezone_string() ?: 'UTC' ) ); ?></span></div>
+		<div class="ds-ops-health"><i class="<?php echo $online_controllers === count( $controllers ) && $controllers ? 'online' : 'attention'; ?>"></i><strong><?php echo esc_html( sprintf( __( '%1$d of %2$d controllers online', 'digital-signage' ), $online_controllers, count( $controllers ) ) ); ?></strong><small><?php echo $outdated_controllers ? esc_html( sprintf( _n( '%d device needs an update', '%d devices need updates', count( $outdated_controllers ), 'digital-signage' ), count( $outdated_controllers ) ) ) : esc_html__( 'Controller software is current', 'digital-signage' ); ?></small></div>
+	</header>
 
-	<p class="ds-overview-line"><?php echo esc_html( sprintf( __( '%1$d screens online · %2$d screens total · %3$d channels', 'digital-signage' ), $online, count( $screens ), $channel_count ) ); ?></p>
+	<section class="ds-ops-stats" aria-label="<?php esc_attr_e( 'Network totals', 'digital-signage' ); ?>">
+		<article><strong><?php echo count( $groups ); ?></strong><span><?php esc_html_e( 'Groups', 'digital-signage' ); ?></span></article>
+		<article><strong><?php echo count( $screens ); ?></strong><span><?php esc_html_e( 'Screens', 'digital-signage' ); ?></span></article>
+		<article><strong><?php echo count( $controllers ); ?></strong><span><?php esc_html_e( 'Controllers', 'digital-signage' ); ?></span></article>
+		<article><strong><?php echo esc_html( size_format( $total_storage, 1 ) ); ?></strong><span><?php esc_html_e( 'Storage used', 'digital-signage' ); ?></span></article>
+	</section>
 
-	<?php if ( $controllers ) : ?>
-		<div class="ds-panel">
-			<div class="ds-panel-header">
-				<h2><?php esc_html_e( 'Controller computers', 'digital-signage' ); ?></h2>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-controllers' ) ); ?>" class="ds-btn ds-btn-small"><?php esc_html_e( 'Manage Fleet', 'digital-signage' ); ?></a>
-			</div>
-			<div class="ds-controller-grid">
-				<?php foreach ( array_slice( $controllers, 0, 6 ) as $controller ) : ?>
-					<?php
-					$displays          = $controller_displays[ $controller->id ] ?? array();
-					$controller_online = $controller->last_seen && ( time() - strtotime( $controller->last_seen . ' UTC' ) ) <= $offline_after;
-					$telemetry         = json_decode( (string) $controller->telemetry, true );
-					$telemetry         = is_array( $telemetry ) ? $telemetry : array();
-					$connected_displays = array_filter( $displays, function ( $display ) { return ! empty( $display->is_connected ); } );
-					?>
-					<a class="ds-controller-card" data-controller-id="<?php echo esc_attr( $controller->id ); ?>" href="<?php echo esc_url( admin_url( 'admin.php?page=ds-controller-edit&id=' . absint( $controller->id ) ) ); ?>">
-						<div class="ds-controller-card-head">
-							<strong><?php echo esc_html( $controller->name ?: $controller->hostname ?: __( 'Unpaired controller', 'digital-signage' ) ); ?></strong>
-							<span class="ds-badge ds-badge-<?php echo $controller_online ? 'online' : 'offline'; ?>"><?php echo esc_html( $controller_online ? __( 'Online', 'digital-signage' ) : __( 'Offline', 'digital-signage' ) ); ?></span>
-						</div>
-						<p><?php echo esc_html( sprintf( _n( '%d display connected right now', '%d displays connected right now', count( $connected_displays ), 'digital-signage' ), count( $connected_displays ) ) ); ?></p>
-						<ul>
-							<?php foreach ( $displays as $display ) : ?>
-								<?php $display_hb = $display->screen_id ? ( $heartbeats[ $display->screen_id ] ?? null ) : null; $display_online = $display_hb && ( time() - strtotime( $display_hb->last_seen . ' UTC' ) ) <= $offline_after; ?>
-								<li><span><?php echo esc_html( $display->label ?: $display->connector ?: $display->output_key ); ?></span><strong><?php echo esc_html( $display->screen_id ? get_the_title( $display->screen_id ) . ' · ' . ( $display_online ? __( 'running', 'digital-signage' ) : __( 'not reporting', 'digital-signage' ) ) : __( 'Unassigned', 'digital-signage' ) ); ?></strong></li>
-							<?php endforeach; ?>
-						</ul>
-						<div class="ds-controller-metrics">
-							<span><?php echo esc_html( ucfirst( $controller->platform ) ); ?></span>
-							<span><?php echo esc_html( $controller->software_version ?: '—' ); ?></span>
-							<span><?php echo isset( $telemetry['cpu_load_percent'] ) ? esc_html( round( (float) $telemetry['cpu_load_percent'] ) . '% CPU' ) : '—'; ?></span>
-						</div>
-					</a>
-				<?php endforeach; ?>
-			</div>
-		</div>
-	<?php endif; ?>
+	<?php if ( isset( $_GET['limits_saved'] ) ) : ?><div class="ds-notice ds-notice-success"><?php esc_html_e( 'Group limits saved.', 'digital-signage' ); ?></div><?php endif; ?>
 
-	<div class="ds-panel">
-		<div class="ds-panel-header">
-			<h2><?php esc_html_e( 'Screens', 'digital-signage' ); ?></h2>
-			<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-screens' ) ); ?>" class="ds-btn ds-btn-small"><?php esc_html_e( 'Manage All', 'digital-signage' ); ?></a>
-		</div>
+	<section class="ds-ops-grid" id="groups">
+		<article class="ds-ops-card ds-span-8">
+			<header><div><h2><?php esc_html_e( 'Group capacity', 'digital-signage' ); ?></h2><p><?php esc_html_e( 'Storage, Screen allowance, members, and live status in one place.', 'digital-signage' ); ?></p></div></header>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="ds_save_storage_limits"><?php wp_nonce_field( 'ds_save_storage_limits' ); ?>
+				<div class="ds-ops-table"><table><thead><tr><th><?php esc_html_e( 'Group', 'digital-signage' ); ?></th><th><?php esc_html_e( 'Live', 'digital-signage' ); ?></th><th><?php esc_html_e( 'Screens', 'digital-signage' ); ?></th><th><?php esc_html_e( 'Storage', 'digital-signage' ); ?></th><th><?php esc_html_e( 'Members', 'digital-signage' ); ?></th></tr></thead><tbody>
+				<?php foreach ( $group_rows as $row ) : $group_id = absint( $row['group']['id'] ); ?><tr><td><strong><?php echo esc_html( $row['group']['name'] ); ?></strong></td><td><span class="ds-ops-live"><?php echo esc_html( $row['online_screens'] . '/' . $row['screens'] . ' ' . __( 'screens', 'digital-signage' ) ); ?></span><small><?php echo esc_html( $row['online_controllers'] . '/' . $row['controllers'] . ' ' . __( 'controllers', 'digital-signage' ) ); ?></small></td><td><label class="screen-reader-text" for="ds-screen-limit-<?php echo $group_id; ?>"><?php esc_html_e( 'Screen limit', 'digital-signage' ); ?></label><input id="ds-screen-limit-<?php echo $group_id; ?>" type="number" min="0" name="screen_limit[<?php echo $group_id; ?>]" value="<?php echo absint( $row['screen_limit'] ); ?>"><small><?php echo esc_html( sprintf( __( '%d used', 'digital-signage' ), $row['screens'] ) ); ?></small></td><td><label class="screen-reader-text" for="ds-storage-limit-<?php echo $group_id; ?>"><?php esc_html_e( 'Storage limit in GB', 'digital-signage' ); ?></label><input id="ds-storage-limit-<?php echo $group_id; ?>" type="number" min="0" step="0.25" name="storage_limit_gb[<?php echo $group_id; ?>]" value="<?php echo esc_attr( round( $row['storage']['limit'] / 1073741824, 2 ) ); ?>"><small><?php echo esc_html( size_format( $row['storage']['used'], 1 ) . ' · ' . $row['storage']['percent'] . '%' ); ?></small></td><td><?php echo absint( $row['members'] ); ?></td></tr><?php endforeach; ?>
+				<?php if ( ! $group_rows ) : ?><tr><td colspan="5"><?php esc_html_e( 'No groups have been created yet.', 'digital-signage' ); ?></td></tr><?php endif; ?></tbody></table></div>
+				<button class="ds-ops-button" type="submit"><?php esc_html_e( 'Save group limits', 'digital-signage' ); ?></button>
+			</form>
+		</article>
 
-		<?php if ( $screens ) : ?>
-			<div class="ds-table-wrap">
-				<table class="ds-table ds-screens-table">
-					<thead>
-						<tr>
-							<th><?php esc_html_e( 'Screen', 'digital-signage' ); ?></th>
-							<th><?php esc_html_e( 'Status', 'digital-signage' ); ?></th>
-							<th><?php esc_html_e( 'Channel', 'digital-signage' ); ?></th>
-							<th><?php esc_html_e( 'Last heartbeat', 'digital-signage' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( array_slice( $screens, 0, 8 ) as $screen ) : ?>
-							<?php
-							$hb         = $heartbeats[ $screen->ID ] ?? null;
-							$status     = ( $hb && ( time() - strtotime( $hb->last_seen . ' UTC' ) ) <= $offline_after ) ? 'online' : ( $hb ? 'offline' : 'never' );
-							$channel_id = get_post_meta( $screen->ID, 'ds_channel_id', true );
-							?>
-							<tr>
-								<td><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-screen-edit&id=' . $screen->ID ) ); ?>"><?php echo esc_html( $screen->post_title ); ?></a></td>
-								<td><span class="ds-badge ds-badge-<?php echo esc_attr( $status ); ?>"><?php echo esc_html( ucfirst( $status ) ); ?></span></td>
-								<td><?php echo $channel_id ? esc_html( get_the_title( $channel_id ) ) : '—'; ?></td>
-								<td><?php echo $hb ? esc_html( human_time_diff( strtotime( $hb->last_seen . ' UTC' ) ) . ' ago' ) : esc_html__( 'never', 'digital-signage' ); ?></td>
-							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-			</div>
-		<?php else : ?>
-			<p class="ds-hint"><?php esc_html_e( 'No screens paired yet.', 'digital-signage' ); ?></p>
-		<?php endif; ?>
-	</div>
+		<article class="ds-ops-card ds-span-4 ds-ops-requests"><header><div><h2><?php esc_html_e( 'Capacity requests', 'digital-signage' ); ?></h2><p><?php esc_html_e( 'Users who reached a limit.', 'digital-signage' ); ?></p></div><strong><?php echo count( $capacity_requests ); ?></strong></header><div>
+		<?php foreach ( array_slice( $capacity_requests, 0, 6 ) as $request ) : $request_group = DS_Groups::get( $request['group_id'] ?? 0 ); $request_user = get_userdata( absint( $request['user_id'] ?? 0 ) ); ?><article><strong><?php echo esc_html( $request_group['name'] ?? __( 'Unknown group', 'digital-signage' ) ); ?></strong><span><?php echo esc_html( ucfirst( sanitize_key( $request['type'] ?? 'screens' ) ) ); ?></span><small><?php echo esc_html( ( $request_user ? $request_user->display_name : __( 'User', 'digital-signage' ) ) . ' · ' . wp_date( 'd.m.Y H:i', strtotime( ( $request['requested_at'] ?? '' ) . ' UTC' ), wp_timezone() ) ); ?></small></article><?php endforeach; ?>
+		<?php if ( ! $capacity_requests ) : ?><p class="ds-ops-empty"><?php esc_html_e( 'No capacity requests.', 'digital-signage' ); ?></p><?php endif; ?></div></article>
 
-	<details class="ds-disclosure"><summary><?php esc_html_e( 'More tools', 'digital-signage' ); ?></summary><div class="ds-disclosure-body ds-quick-links">
-		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-calendar' ) ); ?>" class="ds-btn"><?php esc_html_e( 'Calendar View', 'digital-signage' ); ?></a>
-		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-analytics' ) ); ?>" class="ds-btn"><?php esc_html_e( 'Proof of Play', 'digital-signage' ); ?></a>
-		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-import-export' ) ); ?>" class="ds-btn"><?php esc_html_e( 'Import / Export', 'digital-signage' ); ?></a>
-	</div></details>
+		<article class="ds-ops-card ds-span-8" id="updates"><header><div><h2><?php esc_html_e( 'Software updates', 'digital-signage' ); ?></h2><p><?php echo esc_html( sprintf( __( 'Required controller version: %s', 'digital-signage' ), DS_DEVICE_VERSION ) ); ?></p></div><span class="ds-ops-status <?php echo $outdated_controllers ? 'warning' : 'ready'; ?>"><?php echo $outdated_controllers ? esc_html__( 'Action needed', 'digital-signage' ) : esc_html__( 'Current', 'digital-signage' ); ?></span></header>
+			<div class="ds-device-list"><?php foreach ( $controllers as $controller ) : $online = $controller->last_seen && time() - strtotime( $controller->last_seen . ' UTC' ) <= DS_Controllers::ONLINE_SECONDS; $outdated = ! $controller->software_version || version_compare( $controller->software_version, DS_DEVICE_VERSION, '<' ); ?><div><i class="<?php echo $online ? 'online' : ''; ?>"></i><strong><?php echo esc_html( $controller->name ?: $controller->hostname ?: __( 'Unnamed controller', 'digital-signage' ) ); ?></strong><span><?php echo esc_html( $controller->software_version ?: __( 'Unknown version', 'digital-signage' ) ); ?></span><b class="<?php echo $outdated ? 'warning' : ''; ?>"><?php echo $outdated ? esc_html__( 'Update', 'digital-signage' ) : esc_html__( 'Current', 'digital-signage' ); ?></b></div><?php endforeach; ?><?php if ( ! $controllers ) : ?><p class="ds-ops-empty"><?php esc_html_e( 'No bound controllers.', 'digital-signage' ); ?></p><?php endif; ?></div>
+			<div class="ds-ops-actions"><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><?php wp_nonce_field( 'ds_update_controllers' ); ?><input type="hidden" name="action" value="ds_update_controllers"><input type="hidden" name="update_mode" value="all_outdated"><button class="ds-ops-button" <?php disabled( ! $outdated_controllers ); ?>><?php esc_html_e( 'Update outdated devices', 'digital-signage' ); ?></button></form><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-guides#updates' ) ); ?>"><?php esc_html_e( 'Manual update guide', 'digital-signage' ); ?></a></div>
+		</article>
 
-	<p class="ds-app-footer"><?php esc_html_e( 'Digital Signage', 'digital-signage' ); ?> v<?php echo esc_html( DS_VERSION ); ?></p>
+		<article class="ds-ops-card ds-span-4"><header><div><h2><?php esc_html_e( 'Global services', 'digital-signage' ); ?></h2><p><?php esc_html_e( 'Configuration shared by every group.', 'digital-signage' ); ?></p></div></header><div class="ds-service-list"><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-settings#spotify' ) ); ?>"><span>Spotify API</span><strong class="<?php echo $spotify_ready ? 'ready' : ''; ?>"><?php echo $spotify_ready ? esc_html__( 'Configured', 'digital-signage' ) : esc_html__( 'Setup needed', 'digital-signage' ); ?></strong></a><a href="<?php echo esc_url( admin_url( 'admin.php?page=ds-settings#recaptcha' ) ); ?>"><span>reCAPTCHA</span><strong class="<?php echo $recaptcha_ready ? 'ready' : ''; ?>"><?php echo $recaptcha_ready ? esc_html__( 'Active', 'digital-signage' ) : esc_html__( 'Optional', 'digital-signage' ); ?></strong></a><div><span><?php esc_html_e( 'Plugin', 'digital-signage' ); ?></span><strong><?php echo esc_html( DS_VERSION ); ?></strong></div><div><span><?php esc_html_e( 'Latest release', 'digital-signage' ); ?></span><strong><?php echo esc_html( $release_version ?: '—' ); ?></strong></div></div></article>
+	</section>
+	<footer class="ds-ops-footer"><span>Screens byKUTT <?php echo esc_html( DS_VERSION ); ?></span><a href="<?php echo esc_url( 'https://github.com/byKUTT/Digital-Signage' ); ?>" target="_blank" rel="noopener noreferrer">GitHub</a></footer>
 </div>

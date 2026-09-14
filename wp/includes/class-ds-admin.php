@@ -4,12 +4,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * The entire custom admin UI: a from-scratch app-style interface (not
- * WordPress's native post-editor screens) for Channels, Screens, Slides and
- * Schedules, plus the Dashboard, Calendar, Settings, Pairing, Analytics and
- * Import/Export pages. Every page and form action here is gated behind the
- * single 'manage_digital_signage' capability (see DS_Roles) and reads/writes
- * through DS_CRUD — nothing goes through post.php/post-new.php.
+ * Site-administrator operations UI. Routine signage content and controller
+ * management lives in the group-scoped frontend Screen Manager; wp-admin is
+ * limited to fleet health, limits, updates, guides, and global service keys.
  */
 class DS_Admin {
 
@@ -49,6 +46,7 @@ class DS_Admin {
 		add_action( 'admin_post_ds_device_command', array( $this, 'handle_device_command' ) );
 		add_action( 'admin_post_ds_save_settings', array( $this, 'handle_save_settings' ) );
 		add_action( 'admin_post_ds_save_spotify_settings', array( $this, 'handle_save_spotify_settings' ) );
+		add_action( 'admin_post_ds_save_recaptcha_settings', array( $this, 'handle_save_recaptcha_settings' ) );
 		add_action( 'admin_post_ds_save_storage_limits', array( $this, 'handle_save_storage_limits' ) );
 		add_action( 'admin_post_ds_save_team', array( $this, 'handle_save_team' ) );
 		add_action( 'admin_post_ds_save_controller', array( $this, 'handle_save_controller' ) );
@@ -66,33 +64,18 @@ class DS_Admin {
 
 	public function menu() {
 		add_menu_page(
-			__( 'Digital Signage', 'digital-signage' ),
-			__( 'Digital Signage', 'digital-signage' ),
-			DS_Roles::CAP,
+			__( 'Screens byKUTT', 'digital-signage' ),
+			__( 'Screens byKUTT', 'digital-signage' ),
+			'manage_options',
 			'digital-signage',
 			array( $this, 'render_dashboard' ),
 			'dashicons-desktop',
 			26
 		);
 
-		add_submenu_page( 'digital-signage', __( 'Dashboard', 'digital-signage' ), __( 'Dashboard', 'digital-signage' ), DS_Roles::CAP, 'digital-signage', array( $this, 'render_dashboard' ) );
-		add_submenu_page( 'digital-signage', __( 'Channels', 'digital-signage' ), __( 'Channels', 'digital-signage' ), DS_Roles::CAP, 'ds-channels', array( $this, 'render_channels_list' ) );
-		add_submenu_page( 'digital-signage', __( 'Screens', 'digital-signage' ), __( 'Screens', 'digital-signage' ), DS_Roles::CAP, 'ds-screens', array( $this, 'render_screens_list' ) );
-		add_submenu_page( 'digital-signage', __( 'Controllers', 'digital-signage' ), __( 'Controllers', 'digital-signage' ), DS_Roles::CAP, 'ds-controllers', array( $this, 'render_controllers_list' ) );
-		add_submenu_page( 'digital-signage', __( 'Schedules', 'digital-signage' ), __( 'Schedules', 'digital-signage' ), DS_Roles::CAP, 'ds-schedules', array( $this, 'render_schedules_list' ) );
-		add_submenu_page( 'digital-signage', __( 'Calendar', 'digital-signage' ), __( 'Calendar', 'digital-signage' ), DS_Roles::CAP, 'ds-calendar', array( $this, 'render_calendar' ) );
-		add_submenu_page( 'digital-signage', __( 'Settings', 'digital-signage' ), __( 'Settings', 'digital-signage' ), DS_Roles::CAP, 'ds-settings', array( $this, 'render_settings' ) );
-		add_submenu_page( 'digital-signage', __( 'Updates', 'digital-signage' ), __( 'Updates', 'digital-signage' ), 'update_plugins', 'ds-updates', array( $this, 'render_updates' ) );
-
-		// Hidden pages: reached via buttons/links from the pages above, not the sidebar.
-		add_submenu_page( null, __( 'Edit Channel', 'digital-signage' ), '', DS_Roles::CAP, 'ds-channel-edit', array( $this, 'render_channel_edit' ) );
-		add_submenu_page( null, __( 'Edit Slide', 'digital-signage' ), '', DS_Roles::CAP, 'ds-slide-edit', array( $this, 'render_slide_edit' ) );
-		add_submenu_page( null, __( 'Edit Screen', 'digital-signage' ), '', DS_Roles::CAP, 'ds-screen-edit', array( $this, 'render_screen_edit' ) );
-		add_submenu_page( null, __( 'Controller', 'digital-signage' ), '', DS_Roles::CAP, 'ds-controller-edit', array( $this, 'render_controller_edit' ) );
-		add_submenu_page( null, __( 'Edit Schedule', 'digital-signage' ), '', DS_Roles::CAP, 'ds-schedule-edit', array( $this, 'render_schedule_edit' ) );
-		add_submenu_page( null, __( 'Pair a Screen', 'digital-signage' ), '', DS_Roles::CAP, 'ds-pairing', array( $this, 'render_pairing' ) );
-		add_submenu_page( null, __( 'Proof of Play', 'digital-signage' ), '', DS_Roles::CAP, 'ds-analytics', array( 'DS_Analytics', 'render_page' ) );
-		add_submenu_page( null, __( 'Import / Export', 'digital-signage' ), '', DS_Roles::CAP, 'ds-import-export', array( 'DS_Import_Export', 'render_page' ) );
+		add_submenu_page( 'digital-signage', __( 'System overview', 'digital-signage' ), __( 'Overview', 'digital-signage' ), 'manage_options', 'digital-signage', array( $this, 'render_dashboard' ) );
+		add_submenu_page( 'digital-signage', __( 'Guides', 'digital-signage' ), __( 'Guides', 'digital-signage' ), 'manage_options', 'ds-guides', array( $this, 'render_guides' ) );
+		add_submenu_page( 'digital-signage', __( 'Global settings', 'digital-signage' ), __( 'Global settings', 'digital-signage' ), 'manage_options', 'ds-settings', array( $this, 'render_settings' ) );
 	}
 
 	public function body_class( $classes ) {
@@ -112,9 +95,7 @@ class DS_Admin {
 		}
 
 		wp_enqueue_style( 'ds-admin', DS_PLUGIN_URL . 'admin/css/admin.css', array(), DS_VERSION );
-		wp_enqueue_script( 'jquery-ui-sortable' );
-		wp_enqueue_script( 'ds-admin', DS_PLUGIN_URL . 'admin/js/admin.js', array( 'jquery', 'jquery-ui-sortable', 'wp-util' ), DS_VERSION, true );
-		wp_enqueue_media();
+		wp_enqueue_script( 'ds-admin', DS_PLUGIN_URL . 'admin/js/admin.js', array( 'jquery' ), DS_VERSION, true );
 
 		wp_localize_script(
 			'ds-admin',
@@ -132,18 +113,35 @@ class DS_Admin {
 	 * ================================================================= */
 
 	public function render_dashboard() {
-		$this->require_cap();
+		if ( ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'Only a site administrator can view this page.', 'digital-signage' ) ); }
 		global $wpdb;
 		$screens       = get_posts( array( 'post_type' => 'ds_screen', 'posts_per_page' => -1, 'post_status' => 'any' ) );
 		$heartbeats    = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}ds_heartbeats", OBJECT_K );
 		$offline_after = (int) DS_Settings::get( 'offline_status_sec', 120 );
-		$channel_count = count( get_posts( array( 'post_type' => 'ds_channel', 'posts_per_page' => -1, 'fields' => 'ids' ) ) );
 		$controllers   = DS_Controllers::get_all();
-		$controller_displays = array();
-		foreach ( $controllers as $controller ) {
-			$controller_displays[ $controller->id ] = DS_Controllers::get_displays( $controller->id );
+		$groups        = DS_Groups::all();
+		$group_rows    = array();
+		foreach ( $groups as $group ) {
+			$group_id = absint( $group['id'] ?? 0 );
+			$group_screens = array_values( array_filter( $screens, function ( $screen ) use ( $group_id ) { return $group_id === DS_Groups::post_group_id( $screen ); } ) );
+			$group_controllers = array_values( array_filter( $controllers, function ( $controller ) use ( $group_id ) { return $group_id === DS_Groups::controller_group_id( $controller->id ); } ) );
+			$online_screens = count( array_filter( $group_screens, function ( $screen ) use ( $heartbeats, $offline_after ) { $heartbeat = $heartbeats[ $screen->ID ] ?? null; return $heartbeat && time() - strtotime( $heartbeat->last_seen . ' UTC' ) <= $offline_after; } ) );
+			$online_controllers = count( array_filter( $group_controllers, function ( $controller ) { return $controller->last_seen && time() - strtotime( $controller->last_seen . ' UTC' ) <= DS_Controllers::ONLINE_SECONDS; } ) );
+			$group_rows[] = array( 'group' => $group, 'members' => count( DS_Groups::users( $group_id ) ), 'screens' => count( $group_screens ), 'screen_limit' => DS_Groups::screen_limit( $group_id ), 'online_screens' => $online_screens, 'controllers' => count( $group_controllers ), 'online_controllers' => $online_controllers, 'storage' => DS_Storage::usage( $group_id ) );
 		}
-		$this->view( 'dashboard', compact( 'screens', 'heartbeats', 'offline_after', 'channel_count', 'controllers', 'controller_displays' ) );
+		$outdated_controllers = array_values( array_filter( $controllers, function ( $controller ) { return ! $controller->software_version || version_compare( $controller->software_version, DS_DEVICE_VERSION, '<' ); } ) );
+		$online_controllers = count( array_filter( $controllers, function ( $controller ) { return $controller->last_seen && time() - strtotime( $controller->last_seen . ' UTC' ) <= DS_Controllers::ONLINE_SECONDS; } ) );
+		$capacity_requests = DS_Groups::capacity_requests();
+		$spotify_settings = DS_Spotify::settings();
+		$recaptcha_settings = DS_Recaptcha::settings();
+		$release = DS_Updater::instance()->get_release( false );
+		$update_commands = DS_Controllers::get_latest_update_commands();
+		$this->view( 'dashboard', compact( 'screens', 'controllers', 'groups', 'group_rows', 'online_controllers', 'outdated_controllers', 'capacity_requests', 'spotify_settings', 'recaptcha_settings', 'release', 'update_commands' ) );
+	}
+
+	public function render_guides() {
+		if ( ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'Only a site administrator can view this page.', 'digital-signage' ) ); }
+		$this->view( 'guides', array() );
 	}
 
 	public function render_channels_list() {
@@ -313,13 +311,10 @@ class DS_Admin {
 	}
 
 	public function render_settings() {
-		$this->require_cap();
-		$can_manage_team = current_user_can( 'manage_options' );
-		$team_member_ids = DS_Roles::get_team_member_ids();
-		$team_users      = $can_manage_team ? get_users( array( 'orderby' => 'display_name', 'order' => 'ASC' ) ) : array();
-		$spotify_settings = $can_manage_team ? DS_Spotify::settings() : array();
-		$storage_groups = $can_manage_team ? DS_Groups::all() : array();
-		$this->view( 'settings', compact( 'can_manage_team', 'team_member_ids', 'team_users', 'spotify_settings', 'storage_groups' ) );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'Only a site administrator can manage global settings.', 'digital-signage' ) ); }
+		$spotify_settings = DS_Spotify::settings();
+		$recaptcha_settings = DS_Recaptcha::settings();
+		$this->view( 'settings', compact( 'spotify_settings', 'recaptcha_settings' ) );
 	}
 
 	private function view( $name, array $vars ) {
@@ -432,13 +427,23 @@ class DS_Admin {
 		exit;
 	}
 
+	public function handle_save_recaptcha_settings() {
+		if ( ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'Only a site administrator can manage reCAPTCHA credentials.', 'digital-signage' ) ); }
+		check_admin_referer( 'ds_save_recaptcha_settings' );
+		DS_Recaptcha::save( wp_unslash( $_POST['site_key'] ?? '' ), wp_unslash( $_POST['secret_key'] ?? '' ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=ds-settings&recaptcha_saved=1#recaptcha' ) );
+		exit;
+	}
+
 	public function handle_save_storage_limits() {
 		if ( ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'Only a site administrator can change group storage limits.', 'digital-signage' ) ); }
 		check_admin_referer( 'ds_save_storage_limits' );
 		foreach ( (array) ( $_POST['storage_limit_gb'] ?? array() ) as $group_id => $limit_gb ) {
 			DS_Storage::set_limit( absint( $group_id ), round( max( 0, (float) $limit_gb ) * 1024 * 1024 * 1024 ) );
 		}
-		wp_safe_redirect( admin_url( 'admin.php?page=ds-settings&storage_saved=1' ) );
+		foreach ( (array) ( $_POST['screen_limit'] ?? array() ) as $group_id => $screen_limit ) { DS_Groups::set_screen_limit( absint( $group_id ), absint( $screen_limit ) ); }
+		DS_Groups::clear_capacity_requests( array_merge( array_keys( (array) ( $_POST['storage_limit_gb'] ?? array() ) ), array_keys( (array) ( $_POST['screen_limit'] ?? array() ) ) ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=digital-signage&limits_saved=1#groups' ) );
 		exit;
 	}
 
@@ -723,7 +728,7 @@ class DS_Admin {
 		check_admin_referer( 'ds_update_settings' );
 		update_option( 'ds_github_auto_update', ! empty( $_POST['auto_update'] ) );
 		delete_transient( DS_Updater::CACHE_KEY );
-		wp_safe_redirect( admin_url( 'admin.php?page=ds-updates&ds_saved=1' ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=digital-signage&update_settings_saved=1#updates' ) );
 		exit;
 	}
 
@@ -734,7 +739,7 @@ class DS_Admin {
 		check_admin_referer( 'ds_install_plugin_update' );
 		$result = DS_Updater::instance()->install_plugin_update();
 		$query  = is_wp_error( $result ) || false === $result ? '&ds_error=install' : '&ds_updated=1';
-		wp_safe_redirect( admin_url( 'admin.php?page=ds-updates' . $query ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=digital-signage' . $query . '#updates' ) );
 		exit;
 	}
 
@@ -798,7 +803,7 @@ class DS_Admin {
 		}
 
 		set_transient( 'ds_controller_update_notice_' . get_current_user_id(), $result, 2 * MINUTE_IN_SECONDS );
-		wp_safe_redirect( admin_url( 'admin.php?page=ds-updates' ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=digital-signage#updates' ) );
 		exit;
 	}
 }

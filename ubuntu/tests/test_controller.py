@@ -412,6 +412,46 @@ class ValidationTests(unittest.TestCase):
         self.assertIn("write_managed_file", installer)
         self.assertNotIn("install -o", installer)
 
+    def test_browser_screens_have_stable_urls_and_group_preview_access(self):
+        repo = pathlib.Path(__file__).parents[2]
+        crud = (repo / "wp/includes/class-ds-crud.php").read_text(encoding="utf-8")
+        player = (repo / "wp/includes/class-ds-player.php").read_text(encoding="utf-8")
+        portal = (repo / "wp/public/templates/portal.php").read_text(encoding="utf-8")
+        self.assertIn("generate_screen_token", crud)
+        self.assertIn("DS_Groups::can_access_post( $channel_id )", player)
+        self.assertIn("Copy browser URL", portal)
+        self.assertIn("No controller is required", portal)
+
+    def test_group_screen_limits_and_capacity_requests_are_enforced(self):
+        repo = pathlib.Path(__file__).parents[2]
+        groups = (repo / "wp/includes/class-ds-groups.php").read_text(encoding="utf-8")
+        portal = (repo / "wp/includes/class-ds-portal.php").read_text(encoding="utf-8")
+        controllers = (repo / "wp/includes/class-ds-controllers.php").read_text(encoding="utf-8")
+        self.assertIn("DEFAULT_SCREEN_LIMIT = 2", groups)
+        self.assertIn("request_capacity", groups)
+        self.assertIn("! DS_Groups::can_create_screen", portal)
+        self.assertIn("! DS_Groups::can_create_screen", controllers)
+
+    def test_wp_admin_is_operations_only_and_has_copy_ready_guides(self):
+        repo = pathlib.Path(__file__).parents[2]
+        admin = (repo / "wp/includes/class-ds-admin.php").read_text(encoding="utf-8")
+        guide = (repo / "wp/admin/views/guides.php").read_text(encoding="utf-8")
+        menu_block = admin[admin.index("public function menu()") : admin.index("public function body_class")]
+        self.assertNotIn("ds-channels", menu_block)
+        self.assertNotIn("ds-screens", menu_block)
+        self.assertIn("ds-guides", menu_block)
+        self.assertIn("sudo digital-signage-update && sudo reboot", guide)
+
+    def test_recaptcha_is_optional_and_verified_server_side(self):
+        repo = pathlib.Path(__file__).parents[2]
+        captcha = (repo / "wp/includes/class-ds-recaptcha.php").read_text(encoding="utf-8")
+        auth = (repo / "wp/includes/class-ds-auth.php").read_text(encoding="utf-8")
+        template = (repo / "wp/public/templates/auth.php").read_text(encoding="utf-8")
+        self.assertIn("recaptcha/api/siteverify", captcha)
+        self.assertIn("DS_Recaptcha::verify", auth)
+        self.assertIn("g-recaptcha-response", auth)
+        self.assertIn("g-recaptcha", template)
+
 
 class GdmConfigurationTests(unittest.TestCase):
     def test_existing_daemon_settings_are_replaced_once(self):

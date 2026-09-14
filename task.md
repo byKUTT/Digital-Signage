@@ -1,62 +1,10 @@
-# VIDAA 9 private TV player
+# Screens byKUTT 4.8 delivery
 
-- [x] Add a rewrite-independent `/tv/` fallback after live-site 404 verification.
-
-- [x] Add the `/tv/` launcher route and persistent device pairing.
-- [x] Add VIDAA remote, fullscreen, resume and heartbeat compatibility.
-- [x] Update plugin version, architecture notes and setup documentation.
-- [x] Run available JavaScript/static checks and browser-flow tests (PHP CLI unavailable in this runtime).
-- [x] Rebuild and inspect `digital-signage.zip`.
-- [x] Commit and publish the VIDAA update to GitHub.
-# Ubuntu multi-display controller 3.2.0
-
-- [x] Confirm separate WordPress screen/channel per physical monitor.
-- [x] Remove daily and watchdog computer reboot requirements.
-- [x] Add Ubuntu-native installer and black-screen migration recovery.
-- [x] Add multi-output Firefox controller using the existing controller REST API.
-- [x] Add settings-preserving `digital-signage-update` command.
-- [x] Add safe Ubuntu uninstaller and systemd units with no auto-reboot behavior.
-- [x] Document install, pairing, update, recovery, and troubleshooting.
-- [x] Update WordPress controller telemetry UI and bump all plugin versions to 3.2.0.
-- [x] Add controller tests and run shell/Python/static verification (PHP CLI and ShellCheck unavailable locally).
-- [x] Rebuild and byte-verify Ubuntu and WordPress ZIP packages.
-- [x] Update architecture notes, commit, and publish fast-forward-only to GitHub.
-
----
-
-# Ubuntu Chrome boot autostart 3.2.1
-
-- [x] Replace early system-service startup with GDM graphical-session autostart.
-- [x] Install/detect Chrome and migrate preserved Ubuntu controller settings.
-- [x] Launch one isolated Chrome kiosk process at each XRandR output geometry.
-- [x] Add controller single-instance locking and graphical-session crash recovery.
-- [x] Update the settings-preserving updater and uninstaller.
-- [x] Update Ubuntu and WordPress version/documentation metadata to 3.2.1.
-- [x] Run shell, Python, static, multi-monitor, and no-auto-reboot verification.
-- [x] Rebuild and byte-verify both ZIP archives.
-- [x] Commit and publish the fast-forward update to GitHub.
-
-# Ubuntu Chrome stability and unattended-session fix 3.2.2
-
-- [x] Track Chrome player health by X11 window instead of launcher PID.
-- [x] Hide the cursor and disable sign-in, sync, autofill, passwords, and keyring access.
-- [x] Add regression tests for live-window handoff and unattended Chrome flags.
-- [x] Rebuild, verify, commit, and publish 3.2.2.
-
-# Ubuntu controller desktop mode and hard-coded awake state 3.3.0
-
-- [x] Remove all window detection and health-triggered Chrome relaunches.
-- [x] Add persistent Stop Screens / Start Kiosk Screens controller commands and cursor switching.
-- [x] Hard-code controller-wide automatic sleep and hibernation prevention.
-- [x] Repair WordPress-triggered updates with an independent root update job and result reporting.
-- [x] Update WordPress UI, command allowlists, telemetry, versions, documentation, and tests.
-- [x] Rebuild and byte-verify both ZIPs, commit, and publish 3.3.0.
-# WordPress workflow simplification and Ubuntu reliability 3.4.0
-
-- [x] Fix Ubuntu Git update queuing so it does not depend on GitHub Release assets.
-- [x] Return specific controller-command errors instead of the generic queue failure.
-- [x] Add verified, narrow, passwordless device-helper access during install and upgrade.
-- [x] Make cursor hiding immediate and compatible while restoring it in desktop mode.
-- [x] Distill dashboard, controller, screen, channel, and schedule interfaces with progressive disclosure.
-- [x] Synchronize version 3.4.0, documentation, architecture notes, and regression tests.
-- [x] Rebuild and verify both ZIPs, commit, publish, and verify the public branch.
+- [x] Implement standalone browser Screens and previews.
+- [x] Implement Screen limits and capacity requests.
+- [x] Consolidate wp-admin navigation and operations data.
+- [x] Build Overview, Guides, and Global settings interfaces.
+- [x] Add optional reCAPTCHA protection to custom authentication.
+- [x] Add regression coverage and run available verification.
+- [x] Rebuild distributable archives.
+- [x] Commit and publish the source update.

@@ -1,6 +1,6 @@
 # Screens byKUTT — Digital Signage for WordPress
 
-A WordPress plugin that turns a WordPress install into a full digital signage (CMS) platform: manage channels, screens, playlists/slides and schedules from a fully custom wp-admin interface (not WordPress's native post editor), and drive TVs/kiosks/tablets from a chrome-less, auto-fullscreen frontend player.
+A WordPress plugin that turns a WordPress install into a group-based digital signage platform: users manage channels, Screens, media, schedules, design, and audio in a custom frontend workspace, while site administrators monitor capacity, services, and controller updates in wp-admin.
 
 The plugin source lives in [`wp/`](wp/). Installable ZIP and Linux controller packages are published as GitHub Release assets instead of being committed to the source tree.
 
@@ -64,7 +64,11 @@ hibernation are disabled. Successful remote software updates and verified URL
 migrations reboot automatically; there is no daily reboot or watchdog. See `ubuntu/README.md` for recovery, assignment,
 diagnostics, and uninstall instructions.
 
-Version 4.7.0 cleans the source tree into `wp/`, `ubuntu/`, and `pi/`, removes the
+Version 4.8.0 adds controller-free browser Screens with stable player URLs,
+Screen and Channel previews, a two-Screen default group allowance, Buy more
+capacity requests, optional reCAPTCHA for custom authentication, and a focused
+site-administrator console for group usage, live state, updates, service keys,
+and manual command guides. Version 4.7.0 cleaned the source tree into `wp/`, `ubuntu/`, and `pi/`, removed the
 retired Windows packages and committed release archives, introduces short public
 routes, improves video recovery, restores site-admin Spotify setup, and makes the
 primary Ubuntu output available through Spotify's Web Playback SDK. Its 32 starter

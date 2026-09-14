@@ -74,6 +74,37 @@
 - Checks are non-overlapping and back off to 15 seconds during network failure. The existing configurable full-playlist poll remains active for schedule-time transitions and recovery.
 - This short revision request is intentional instead of SSE: it avoids reserving a PHP-FPM worker per display and works through hosts/proxies that buffer streaming responses.
 
+## Browser Screens and group capacity
+
+- Every newly created Screen receives an opaque stable `ds_pairing_token`, even
+  when it is not assigned to a controller output. The resulting `/play/{token}/`
+  URL is a first-class browser player for smart TVs, tablets, embedded browsers,
+  and ordinary computers. It uses the same REST playlist and heartbeat path as a
+  controller Screen.
+- Channel previews remain authenticated and now enforce group access as well as
+  the signage capability. Screen previews use the real stable browser URL so the
+  preview exercises the exact production renderer.
+- A group includes two Screens by default. A site administrator can change both
+  Screen and storage limits per group. Controller output discovery leaves excess
+  displays unassigned instead of creating Screens beyond that allowance.
+- Capacity requests are nonce-protected, group-scoped, rate-limited per user and
+  request type, emailed to the WordPress administrator, and retained in the
+  administrator overview until that group's limits are saved.
+
+## Administration boundary
+
+- Routine Channels, Screens, controllers, media, schedules, people, design,
+  music, and group settings live only in the authenticated frontend manager.
+  Legacy wp-admin content URLs redirect to their closest frontend destination.
+- wp-admin is site-administrator-only and exposes only Overview, Guides, and
+  Global settings. Overview aggregates group storage/Screen allowances, live
+  Screen and controller counts, capacity requests, controller versions, and
+  software-update actions. Guides contains fixed copy-ready controller commands;
+  it never exposes an arbitrary remote shell.
+- Google reCAPTCHA v2 is optional. When both global keys are configured, the
+  custom login and registration handlers fail closed unless Google's server-side
+  verification succeeds. The secret is never rendered back into the browser.
+
 ## Pairing and no-channel recovery
 
 - Unpaired controller outputs and token players show QR codes that point to the

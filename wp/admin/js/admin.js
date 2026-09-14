@@ -3,6 +3,15 @@
 	'use strict';
 
 	$( function () {
+		$( document ).on( 'click', '[data-copy]', function () {
+			var button = this;
+			if ( ! navigator.clipboard ) { return; }
+			navigator.clipboard.writeText( button.getAttribute( 'data-copy' ) || '' ).then( function () {
+				var original = button.textContent;
+				button.textContent = 'Copied';
+				window.setTimeout( function () { button.textContent = original; }, 1400 );
+			} );
+		} );
 
 		/* ---- Slide type field toggling ---- */
 		function toggleTypeFields() {
