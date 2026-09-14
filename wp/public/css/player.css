@@ -40,6 +40,7 @@ html, body {
 	outline-offset: 6px;
 }
 .ds-start-hint { color: #556; margin-top: 1em; font-size: min(13px, 2.4vh, 2.8vw); }
+.ds-audio-prompt{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));z-index:10002;transform:translateX(-50%)}.ds-audio-prompt[hidden]{display:none}.ds-audio-prompt button{min-height:48px;padding:11px 18px;border:0;border-radius:10px;background:#f8f6ed;color:#102018;font:700 15px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 12px 34px rgba(0,0,0,.34);cursor:pointer}.ds-audio-prompt button:focus-visible{outline:3px solid #e6ff3b;outline-offset:4px}
 
 /* TV-safe focus and scale for VIDAA's D-pad driven browser. */
 .ds-vidaa .ds-start-overlay { background: #050505; }

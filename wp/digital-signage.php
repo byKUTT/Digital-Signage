@@ -3,7 +3,7 @@
  * Plugin Name:       Screens byKUTT
  * Plugin URI:        https://github.com/bykutt/digital-signage
  * Description:       Turns WordPress into a group-based digital signage platform with a frontend manager, browser players, Linux controllers, scheduling, design, and audio.
- * Version:           4.8.0
+ * Version:           4.8.1
  * Requires at least: 5.9
  * Requires PHP:      7.4
  * Author:            byKUTT
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'DS_VERSION', '4.8.0' );
+define( 'DS_VERSION', '4.8.1' );
 define( 'DS_PLUGIN_FILE', __FILE__ );
 define( 'DS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

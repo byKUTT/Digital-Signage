@@ -3,14 +3,33 @@ document.addEventListener('DOMContentLoaded', () => {
 	const slideForm = slideDialog?.querySelector('form');
 	const scheduleDialog = document.getElementById('schedule-dialog');
 	const scheduleForm = scheduleDialog?.querySelector('form');
+	const slideType = () => slideForm?.querySelector('[name="slide_type"]:checked')?.value || 'image';
+	const filterMediaChoices = () => {
+		const type = slideType();
+		const accepted = type === 'video' ? 'video' : 'image';
+		document.querySelectorAll('[data-media-choice]').forEach((choice) => {
+			choice.hidden = choice.dataset.mediaType !== accepted;
+		});
+		const empty = document.querySelector('[data-media-filter-empty]');
+		if (empty) empty.hidden = Boolean(document.querySelector(`[data-media-choice][data-media-type="${accepted}"]`));
+		const input = document.querySelector('[data-media-dialog-upload] input[type="file"]');
+		if (input) input.accept = `${accepted}/*`;
+		const heading = document.querySelector('#media-library-dialog h2');
+		if (heading) heading.textContent = accepted === 'video' ? 'Choose video' : 'Choose image';
+	};
 	const updateSlideFields = () => {
 		if (!slideForm) return;
-		const type = slideForm.elements.slide_type.value;
-		slideForm.querySelector('.ds-slide-media').hidden = !['image', 'video'].includes(type);
-		slideForm.querySelector('.ds-slide-webpage').hidden = type !== 'webpage';
+		const type = slideType();
+		slideForm.querySelectorAll('[data-slide-types]').forEach((field) => {
+			field.hidden = !field.dataset.slideTypes.split(' ').includes(type);
+		});
+		const duration = slideForm.querySelector('.ds-slide-duration');
+		if (duration && type === 'video') duration.hidden = slideForm.elements.video_play_mode.value !== 'fixed_duration';
 		slideForm.elements.content_url.required = type === 'webpage';
-		slideForm.querySelector('.ds-slide-html').hidden = type !== 'html';
-		slideForm.querySelector('.ds-slide-video').hidden = type !== 'video';
+		slideForm.elements.content_html.required = type === 'html';
+		const selection = slideForm.querySelector('.ds-media-selection small');
+		if (selection && !slideForm.elements.media_id.value) selection.textContent = type === 'video' ? 'Choose a video from this group’s library.' : 'Choose an image from this group’s library.';
+		filterMediaChoices();
 	};
 	const resetSlide = () => {
 		if (!slideForm) return;
@@ -21,7 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
 		slideForm.elements.video_play_mode.value = 'until_end';
 		slideForm.elements.play_sound.checked = true;
 		slideForm.querySelector('[data-slide-dialog-title]').textContent = 'Add slide';
-		slideForm.querySelector('.ds-media-selection').textContent = 'No media selected';
+		slideForm.querySelector('.ds-media-selection').innerHTML = '<strong>No file selected</strong><small></small>';
+		slideForm.querySelector('[name="slide_type"][value="image"]').checked = true;
+		slideForm.querySelector('[data-slide-submit]').textContent = 'Add to channel';
 		updateSlideFields();
 	};
 	const resetSchedule = () => {
@@ -50,7 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
 		resetSlide();
 		slideForm.elements.id.value = button.dataset.slideId || '';
 		slideForm.elements.title.value = button.dataset.title || '';
-		slideForm.elements.slide_type.value = button.dataset.type || 'image';
+		const typeInput = slideForm.querySelector(`[name="slide_type"][value="${button.dataset.type || 'image'}"]`);
+		if (typeInput) typeInput.checked = true;
 		slideForm.elements.media_id.value = button.dataset.mediaId || '';
 		slideForm.elements.content_url.value = button.dataset.contentUrl || '';
 		slideForm.elements.content_html.value = button.dataset.contentHtml || '';
@@ -58,7 +80,10 @@ document.addEventListener('DOMContentLoaded', () => {
 		slideForm.elements.video_play_mode.value = button.dataset.playMode || 'until_end';
 		slideForm.elements.play_sound.checked = button.dataset.playSound !== '0';
 		slideForm.querySelector('[data-slide-dialog-title]').textContent = 'Edit slide';
-		slideForm.querySelector('.ds-media-selection').textContent = button.dataset.mediaUrl ? button.dataset.mediaUrl.split('/').pop() : 'No media selected';
+		const selectedName = button.dataset.mediaUrl ? button.dataset.mediaUrl.split('/').pop() : 'No file selected';
+		slideForm.querySelector('.ds-media-selection').innerHTML = `<strong></strong><small>Selected from this group’s library.</small>`;
+		slideForm.querySelector('.ds-media-selection strong').textContent = selectedName;
+		slideForm.querySelector('[data-slide-submit]').textContent = 'Save changes';
 		updateSlideFields();
 		slideDialog.showModal();
 	}));
@@ -76,26 +101,28 @@ document.addEventListener('DOMContentLoaded', () => {
 		scheduleForm.querySelector('[data-schedule-dialog-title]').textContent = 'Edit content schedule';
 		scheduleDialog.showModal();
 	}));
-	slideForm?.elements.slide_type.addEventListener('change', updateSlideFields);
+	slideForm?.querySelectorAll('[name="slide_type"]').forEach((input) => input.addEventListener('change', updateSlideFields));
+	slideForm?.elements.video_play_mode.addEventListener('change', updateSlideFields);
 	slideForm?.querySelector('[data-select-media]')?.addEventListener('click', () => {
 		const mediaDialog = document.getElementById('media-library-dialog');
 		if (!mediaDialog) return;
+		filterMediaChoices();
 		slideDialog?.close();
-		mediaDialog.showModal();
+		window.requestAnimationFrame(() => mediaDialog.showModal());
 	});
 	const mediaDialog = document.getElementById('media-library-dialog');
 	const restoreSlideDialog = () => {
 		mediaDialog?.close();
-		if (slideDialog && !slideDialog.open) slideDialog.showModal();
+		if (slideDialog && !slideDialog.open) window.requestAnimationFrame(() => slideDialog.showModal());
 	};
 	mediaDialog?.querySelector('[data-media-cancel]')?.addEventListener('click', restoreSlideDialog);
 	mediaDialog?.addEventListener('cancel', (event) => { event.preventDefault(); restoreSlideDialog(); });
+	mediaDialog?.addEventListener('click', (event) => { if (event.target === mediaDialog) restoreSlideDialog(); });
 	const chooseMedia = (button) => {
 		if (!slideForm) return;
 		slideForm.elements.media_id.value = button.dataset.mediaId || '';
-		slideForm.querySelector('.ds-media-selection').textContent = button.dataset.mediaTitle || 'Selected media';
-		if (button.dataset.mediaType === 'video') slideForm.elements.slide_type.value = 'video';
-		if (button.dataset.mediaType === 'image') slideForm.elements.slide_type.value = 'image';
+		slideForm.querySelector('.ds-media-selection').innerHTML = '<strong></strong><small>Selected from this group’s library.</small>';
+		slideForm.querySelector('.ds-media-selection strong').textContent = button.dataset.mediaTitle || 'Selected media';
 		if (!slideForm.elements.title.value) slideForm.elements.title.value = button.dataset.mediaTitle || '';
 		updateSlideFields();
 		restoreSlideDialog();
@@ -103,6 +130,14 @@ document.addEventListener('DOMContentLoaded', () => {
 	mediaDialog?.addEventListener('click', (event) => {
 		const button = event.target.closest('[data-media-choice]');
 		if (button) chooseMedia(button);
+	});
+	slideForm?.addEventListener('submit', (event) => {
+		const type = slideType();
+		if (['image', 'video'].includes(type) && !slideForm.elements.media_id.value) {
+			event.preventDefault();
+			slideForm.querySelector('.ds-media-selection').classList.add('error');
+			slideForm.querySelector('[data-select-media]').focus();
+		}
 	});
 	mediaDialog?.querySelector('[data-media-dialog-upload]')?.addEventListener('submit', async (event) => {
 		event.preventDefault();
@@ -138,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			form.reset();
 			const usage = item.usage;
 			message.textContent = usage ? `Upload complete · ${Math.round(usage.percent)}% used` : 'Upload complete. Select the new item below.';
+			if (item.type === (slideType() === 'video' ? 'video' : 'image')) chooseMedia(button);
 		} catch (error) { message.textContent = error.message; }
 	});
 	updateSlideFields();

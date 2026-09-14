@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 4.8.0
+Stable tag: 4.8.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -54,6 +54,13 @@ For a private VIDAA 9 TV player, open `https://your-site.example/tv/` in the TV 
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 4.8.1 =
+* Fixed Screen and Channel preview/player URLs being redirected to the Screen Manager when rewrite rules were stale.
+* Preserved the requested player or preview destination after frontend login.
+* Made Settings and Designer load only their own group-scoped data and removed Designer's per-Screen heartbeat query loop.
+* Rebuilt Add slide with type-specific fields, a filtered group media picker, reliable dialog return behavior, and server-side source validation.
+* Improved audible video autoplay recovery and restored local/Spotify background music correctly across play, pause, end, error, and slide cleanup.
 
 = 4.8.0 =
 * Added stable browser-player URLs for Screens created without a controller and Preview actions for both Screens and Channels.

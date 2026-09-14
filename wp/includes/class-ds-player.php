@@ -21,7 +21,9 @@ class DS_Player {
 	}
 
 	private function __construct() {
-		add_action( 'template_redirect', array( $this, 'maybe_render_player' ) );
+		// Resolve direct player paths before WordPress' canonical redirect can fold
+		// an unflushed custom route back into the /screens/ portal page.
+		add_action( 'template_redirect', array( $this, 'maybe_render_player' ), -20 );
 		add_filter( 'show_admin_bar', array( $this, 'hide_admin_bar' ) );
 	}
 

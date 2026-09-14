@@ -191,3 +191,20 @@
 - Every continuous track owns one animation frame loop and one resize observer/listener. `stopTimers()` must clean both before a slide or zone is removed to prevent hidden duplicate animation work.
 - Remeasurement converts the current offset to normalized loop progress and reapplies that progress to the new sequence length in either movement direction, avoiding a visible restart after resize or orientation change.
 - Animation frames clamp elapsed time to 50 ms so a stalled kiosk browser cannot jump far ahead on recovery. When `prefers-reduced-motion: reduce` is active, the sequence is laid out but its repetitive animation loop is not started.
+
+## Direct player routing
+
+- `DS_Player` resolves player, short player, controller, TV, and authenticated preview paths at an early `template_redirect` priority. Its path-based fallback therefore runs before WordPress canonical redirects even when rewrite rules have not yet been flushed after an update.
+- Successful authentication preserves a same-site requested destination. The frontend manager remains the fallback only when login did not carry a valid target.
+
+## Portal loading boundaries
+
+- `DS_Portal::render()` initializes every template dataset safely but fetches only the records required by the active section. Settings does not enumerate attachments, scan media files, query heartbeats, or load fleet records.
+- Heartbeats are fetched in one query limited to accessible Screen IDs. Designer format discovery reuses that bulk result instead of querying once per Screen, and Designer-only assets are not enqueued elsewhere.
+- Request-local post caching prevents the enqueue and render phases from repeating the same group-scoped post query.
+
+## Slide creation and audible video
+
+- Add slide presents one selected content type and progressively reveals only its relevant source and playback controls. The custom picker filters the existing group library and upload chooser to the selected image/video type, while the server independently verifies ownership, MIME family, and required source data.
+- Audible videos claim background-music ducking only after a real `playing` event and release it on pause, end, error, abort, or DOM cleanup. Ubuntu kiosk playback uses the browser's configured autoplay policy; ordinary browsers fall back to muted visual playback plus a focused user-gesture control that enables sound.
+- A one-item zone keeps its existing element and never schedules slide advancement. A single video loops in place.

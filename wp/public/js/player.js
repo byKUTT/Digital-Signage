@@ -35,6 +35,7 @@
 		music: null,
 		spotify: null,
 		ducked: 0,
+		blockedVideo: null,
 	};
 	var playlistRequest = null;
 	var changesRequestActive = false;
@@ -141,8 +142,24 @@
 		var result;
 		if ( ! activeVideo ) { return; }
 		activeVideo.muted = '1' !== activeVideo.dataset.playSound;
+		activeVideo.defaultMuted = activeVideo.muted;
+		activeVideo.volume = 1;
 		result = activeVideo.play();
-		if ( result && result.catch ) { result.catch( function () {} ); }
+		if ( result && result.then ) { result.then( function () { hideAudioPrompt( activeVideo ); if ( ! activeVideo.muted ) { duckMusicFor( activeVideo ); } } ).catch( function () { showAudioPrompt( activeVideo ); } ); }
+	}
+
+	function showAudioPrompt( video ) {
+		if ( ! video || '1' !== video.dataset.playSound ) { return; }
+		state.blockedVideo = video;
+		var prompt = document.getElementById( 'ds-audio-prompt' );
+		if ( prompt ) { prompt.hidden = false; }
+	}
+
+	function hideAudioPrompt( video ) {
+		if ( video && state.blockedVideo && state.blockedVideo !== video ) { return; }
+		state.blockedVideo = null;
+		var prompt = document.getElementById( 'ds-audio-prompt' );
+		if ( prompt ) { prompt.hidden = true; }
 	}
 
 	function resumePlayer() {
@@ -353,7 +370,7 @@
 		state.music = { audio: audio, tracks: config.tracks, index: 0, volume: Math.max( 0, Math.min( 1, Number( config.volume ) || 0 ) ), shuffle: !! config.shuffle, duckMs: Number( config.duck_ms ) || 1500, fadeTimer: null, revision: revision };
 		audio.addEventListener( 'ended', function () { if ( ! state.music ) { return; } state.music.index = ( state.music.index + 1 ) % state.music.tracks.length; playMusicTrack(); } );
 		playMusicTrack();
-		document.querySelectorAll( '.ds-slide.ds-active video' ).forEach( function ( video ) { if ( ! video.muted ) { duckMusicFor( video ); } } );
+		document.querySelectorAll( '.ds-slide.ds-active video' ).forEach( function ( video ) { if ( ! video.muted && ! video.paused ) { duckMusicFor( video ); } } );
 	}
 
 	function duckMusicFor( video ) {
@@ -596,6 +613,8 @@
 				video.src = item.src || '';
 				video.preload = 'auto';
 				video.muted = ! item.play_sound;
+				video.defaultMuted = video.muted;
+				video.volume = 1;
 				video.dataset.playSound = item.play_sound ? '1' : '0';
 				video.playsInline = true;
 				video.setAttribute( 'playsinline', '' );
@@ -694,6 +713,7 @@
 	 */
 	function stopTimers( container ) {
 		container.querySelectorAll( 'video' ).forEach( function ( video ) {
+			hideAudioPrompt( video );
 			restoreMusicFor( video );
 			video.pause();
 			video.removeAttribute( 'src' );
@@ -1122,10 +1142,21 @@
 			} );
 
 			if ( video ) {
-				if ( ! video.muted ) { duckMusicFor( video ); }
+				video.addEventListener( 'playing', function () { if ( ! video.muted ) { hideAudioPrompt( video ); duckMusicFor( video ); } } );
+				[ 'pause', 'ended', 'error', 'abort' ].forEach( function ( eventName ) { video.addEventListener( eventName, function () { hideAudioPrompt( video ); restoreMusicFor( video ); } ); } );
 				var playPromise = video.play();
-				if ( playPromise && playPromise.catch ) { playPromise.catch( function () { restoreMusicFor( video ); if ( ! singleItem ) { zone.timer = setTimeout( function () { advanceZone( zoneName ); }, Math.max( 3, item.duration || 10 ) * 1000 ); } } ); }
-				video.addEventListener( 'ended', function () { restoreMusicFor( video ); }, { once: true } );
+				if ( playPromise && playPromise.catch ) { playPromise.catch( function ( error ) {
+					restoreMusicFor( video );
+					if ( '1' === video.dataset.playSound && error && 'NotAllowedError' === error.name ) {
+						showAudioPrompt( video );
+						video.muted = true;
+						video.defaultMuted = true;
+						var mutedPromise = video.play();
+						if ( mutedPromise && mutedPromise.catch ) { mutedPromise.catch( function () {} ); }
+					} else if ( ! singleItem ) {
+						zone.timer = setTimeout( function () { advanceZone( zoneName ); }, Math.max( 3, item.duration || 10 ) * 1000 );
+					}
+				} ); }
 			}
 			logProofOfPlay( zoneName, item );
 			if ( singleItem ) { return; }
@@ -1190,6 +1221,14 @@
 	/* ---------------------------------------------------------------- */
 
 	function boot() {
+		var audioButton = document.getElementById( 'ds-audio-button' );
+		if ( audioButton ) { audioButton.addEventListener( 'click', function () {
+			var video = state.blockedVideo;
+			if ( ! video || ! document.documentElement.contains( video ) ) { hideAudioPrompt(); return; }
+			video.muted = false; video.defaultMuted = false; video.volume = 1;
+			var promise = video.play();
+			if ( promise && promise.then ) { promise.then( function () { hideAudioPrompt( video ); duckMusicFor( video ); } ).catch( function () { showAudioPrompt( video ); } ); }
+		} ); }
 		if ( ! CONFIG.isPreview ) {
 			initFullscreen();
 		}

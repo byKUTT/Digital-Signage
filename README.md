@@ -64,7 +64,9 @@ hibernation are disabled. Successful remote software updates and verified URL
 migrations reboot automatically; there is no daily reboot or watchdog. See `ubuntu/README.md` for recovery, assignment,
 diagnostics, and uninstall instructions.
 
-Version 4.8.0 adds controller-free browser Screens with stable player URLs,
+Version 4.8.1 repairs player and preview routing, reduces Settings and Designer
+loading work, simplifies type-specific slide creation, and improves audible-video
+playback recovery. Version 4.8.0 adds controller-free browser Screens with stable player URLs,
 Screen and Channel previews, a two-Screen default group allowance, Buy more
 capacity requests, optional reCAPTCHA for custom authentication, and a focused
 site-administrator console for group usage, live state, updates, service keys,

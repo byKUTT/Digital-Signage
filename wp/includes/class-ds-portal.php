@@ -4,6 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class DS_Portal {
 	private static $instance = null;
+	private static $post_cache = array();
 	const PATH = '/screens/';
 	const LEGACY_PATH = '/signage-manager/';
 	public static function instance() { if ( null === self::$instance ) { self::$instance = new self(); } return self::$instance; }
@@ -24,7 +25,12 @@ class DS_Portal {
 	private function is_legacy_portal() { return untrailingslashit( self::LEGACY_PATH ) === $this->portal_path(); }
 	public function admin_bar( $show ) { return $this->is_portal() ? false : $show; }
 	public function admin_bar_link( $bar ) { if ( is_user_logged_in() && ( current_user_can( DS_Roles::CAP ) || current_user_can( DS_Roles::SPOTIFY_CAP ) ) ) { $bar->add_node( array( 'id' => 'ds-screen-manager', 'title' => __( 'Screen Manager', 'digital-signage' ), 'href' => current_user_can( DS_Roles::CAP ) ? self::url() : self::url( 'spotify' ) ) ); if ( current_user_can( 'manage_options' ) ) { $bar->add_node( array( 'id' => 'ds-spotify-setup', 'parent' => 'ds-screen-manager', 'title' => __( 'Spotify application setup', 'digital-signage' ), 'href' => admin_url( 'admin.php?page=ds-settings#spotify' ) ) ); } } }
-	public function login_redirect( $redirect_to, $requested, $user ) { return ( $user instanceof WP_User && ( $user->has_cap( DS_Roles::CAP ) || $user->has_cap( DS_Roles::SPOTIFY_CAP ) ) ) ? self::url( $user->has_cap( DS_Roles::CAP ) ? 'overview' : 'spotify' ) : $redirect_to; }
+	public function login_redirect( $redirect_to, $requested, $user ) {
+		if ( ! $user instanceof WP_User || ( ! $user->has_cap( DS_Roles::CAP ) && ! $user->has_cap( DS_Roles::SPOTIFY_CAP ) ) ) { return $redirect_to; }
+		$fallback = self::url( $user->has_cap( DS_Roles::CAP ) ? 'overview' : 'spotify' );
+		$target = $requested ?: $redirect_to;
+		return $target ? wp_validate_redirect( $target, $fallback ) : $fallback;
+	}
 	public function redirect_legacy_admin() {
 		if ( ! current_user_can( DS_Roles::CAP ) || wp_doing_ajax() ) { return; }
 		$page = sanitize_key( wp_unslash( $_GET['page'] ?? '' ) );
@@ -36,23 +42,23 @@ class DS_Portal {
 	public function plugin_links( $links ) { array_unshift( $links, '<a href="' . esc_url( self::url() ) . '">' . esc_html__( 'Open Screens byKUTT', 'digital-signage' ) . '</a>' ); return $links; }
 	public function assets() {
 		if ( ! $this->is_portal() ) { return; }
+		$section = sanitize_key( wp_unslash( $_GET['section'] ?? 'overview' ) );
 		wp_enqueue_style( 'ds-portal', DS_PLUGIN_URL . 'public/css/portal.css', array(), DS_VERSION );
 		wp_enqueue_style( 'ds-portal-time', DS_PLUGIN_URL . 'public/css/portal-time.css', array( 'ds-portal' ), DS_VERSION );
-		wp_enqueue_style( 'ds-designer-ui', DS_PLUGIN_URL . 'public/css/designer.css', array( 'ds-portal' ), DS_VERSION );
 		wp_enqueue_style( 'ds-portal-extras', DS_PLUGIN_URL . 'public/css/portal-extras.css', array( 'ds-portal' ), DS_VERSION );
-		wp_enqueue_style( 'ds-ui-refresh', DS_PLUGIN_URL . 'public/css/ui-refresh.css', array( 'ds-portal-extras', 'ds-designer-ui' ), DS_VERSION );
+		$refresh_dependencies = array( 'ds-portal-extras' );
+		if ( 'designer' === $section ) {
+			wp_enqueue_style( 'ds-designer-ui', DS_PLUGIN_URL . 'public/css/designer.css', array( 'ds-portal' ), DS_VERSION );
+			$refresh_dependencies[] = 'ds-designer-ui';
+		}
+		wp_enqueue_style( 'ds-ui-refresh', DS_PLUGIN_URL . 'public/css/ui-refresh.css', $refresh_dependencies, DS_VERSION );
 		wp_enqueue_script( 'ds-portal', DS_PLUGIN_URL . 'public/js/portal.js', array(), DS_VERSION, true );
 		wp_localize_script( 'ds-portal', 'DSPortal', array( 'groupId' => DS_Groups::current_group_id(), 'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'mediaNonce' => wp_create_nonce( 'ds_media_library' ) ) );
-		if ( 'designer' === sanitize_key( wp_unslash( $_GET['section'] ?? '' ) ) ) {
+		if ( 'designer' === $section ) {
 			$design_id = absint( $_GET['id'] ?? 0 );
+			if ( $design_id && ( 'ds_design' !== get_post_type( $design_id ) || ! self::can_access_post( $design_id ) || DS_Groups::current_group_id() !== DS_Groups::post_group_id( $design_id ) ) ) { $design_id = 0; }
 			$template_key = sanitize_key( wp_unslash( $_GET['template'] ?? 'daily-offers' ) );
-			$channel_formats = array();
-			global $wpdb;
-			foreach ( self::posts( 'ds_screen' ) as $format_screen ) {
-				$format_channel_id = absint( get_post_meta( $format_screen->ID, 'ds_channel_id', true ) );
-				$format_resolution = $wpdb->get_var( $wpdb->prepare( "SELECT resolution FROM {$wpdb->prefix}ds_heartbeats WHERE screen_id = %d", $format_screen->ID ) );
-				if ( $format_channel_id && empty( $channel_formats[ $format_channel_id ] ) && preg_match( '/^\d{2,5}x\d{2,5}$/', (string) $format_resolution ) ) { $channel_formats[ $format_channel_id ] = $format_resolution; }
-			}
+			$channel_formats = self::channel_formats( self::posts( 'ds_screen' ) );
 			wp_enqueue_script( 'ds-designer', DS_PLUGIN_URL . 'public/js/designer.js', array(), DS_VERSION, true );
 			wp_localize_script( 'ds-designer', 'DSDesigner', array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ), 'nonce' => wp_create_nonce( 'ds_vellum_save' ),
@@ -66,7 +72,7 @@ class DS_Portal {
 				'channelFormats' => $channel_formats,
 			) );
 		}
-		if ( 'spotify' === sanitize_key( wp_unslash( $_GET['section'] ?? '' ) ) ) {
+		if ( 'spotify' === $section ) {
 			$controller_id = absint( $_GET['id'] ?? 0 );
 			if ( ! $controller_id || ! DS_Spotify::can_access_controller( $controller_id ) ) { return; }
 			$connection = DS_Spotify::connection( $controller_id );
@@ -79,9 +85,30 @@ class DS_Portal {
 	public static function can_access_post( $post ) { return DS_Groups::can_access_post( $post ); }
 	public static function posts( $type ) {
 		$group_id = DS_Groups::current_group_id();
-		return array_values( array_filter( get_posts( array( 'post_type' => $type, 'post_status' => 'any', 'posts_per_page' => -1, 'orderby' => 'title', 'order' => 'ASC' ) ), function ( $post ) use ( $group_id ) { return DS_Groups::can_access_post( $post ) && ( ! $group_id || $group_id === DS_Groups::post_group_id( $post ) ); } ) );
+		$cache_key = sanitize_key( $type ) . ':' . absint( $group_id );
+		if ( isset( self::$post_cache[ $cache_key ] ) ) { return self::$post_cache[ $cache_key ]; }
+		self::$post_cache[ $cache_key ] = array_values( array_filter( get_posts( array( 'post_type' => $type, 'post_status' => 'any', 'posts_per_page' => -1, 'orderby' => 'title', 'order' => 'ASC' ) ), function ( $post ) use ( $group_id ) { return DS_Groups::can_access_post( $post ) && ( ! $group_id || $group_id === DS_Groups::post_group_id( $post ) ); } ) );
+		return self::$post_cache[ $cache_key ];
 	}
 	public static function can_access_controller( $id ) { return DS_Groups::can_access_controller( $id ); }
+	private static function heartbeats_for( array $screens ) {
+		$ids = array_values( array_filter( array_map( function ( $screen ) { return absint( $screen->ID ?? 0 ); }, $screens ) ) );
+		if ( ! $ids ) { return array(); }
+		global $wpdb;
+		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+		$sql = $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}ds_heartbeats WHERE screen_id IN ($placeholders)", $ids ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return $wpdb->get_results( $sql, OBJECT_K ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+	private static function channel_formats( array $screens ) {
+		$formats = array();
+		$heartbeats = self::heartbeats_for( $screens );
+		foreach ( $screens as $screen ) {
+			$channel_id = absint( get_post_meta( $screen->ID, 'ds_channel_id', true ) );
+			$resolution = sanitize_text_field( $heartbeats[ $screen->ID ]->resolution ?? '' );
+			if ( $channel_id && empty( $formats[ $channel_id ] ) && preg_match( '/^\d{2,5}x\d{2,5}$/', $resolution ) ) { $formats[ $channel_id ] = $resolution; }
+		}
+		return $formats;
+	}
 	private static function require_group( $group_id ) { $group_id = absint( $group_id ?: DS_Groups::ensure_user_group() ); if ( ! $group_id || ( ! current_user_can( 'manage_options' ) && ! in_array( $group_id, DS_Groups::user_group_ids(), true ) ) ) { wp_die( esc_html__( 'This workspace is not assigned to your account.', 'digital-signage' ), '', array( 'response' => 403 ) ); } return $group_id; }
 	private function redirect( $section, array $args = array() ) { wp_safe_redirect( self::url( $section, array_merge( array( 'group' => DS_Groups::current_group_id() ), $args ) ) ); exit; }
 
@@ -96,20 +123,20 @@ class DS_Portal {
 		$section = sanitize_key( wp_unslash( $_GET['section'] ?? 'overview' ) ); if ( ! in_array( $section, $allowed, true ) ) { $section = 'overview'; }
 		if ( $spotify_only ) { $section = 'spotify'; } else { DS_Groups::ensure_user_group(); }
 		$id = absint( $_GET['id'] ?? 0 ); $group_id = DS_Groups::current_group_id(); $groups = DS_Groups::all();
-		$channels = self::posts( 'ds_channel' ); $screens = self::posts( 'ds_screen' ); $schedules = self::posts( 'ds_schedule' ); $designs = array_values( array_filter( self::posts( 'ds_design' ), function ( $design ) { return current_user_can( 'manage_options' ) || absint( $design->post_author ) === get_current_user_id(); } ) );
-		$media = $spotify_only ? array() : DS_Storage::items( $group_id ); $storage_usage = $spotify_only ? array( 'used' => 0, 'limit' => 0, 'percent' => 0 ) : DS_Storage::usage( $group_id );
-		$channel_formats = array();
-		if ( ! $spotify_only ) {
-			global $wpdb;
-			$reported = $wpdb->get_results( "SELECT screen_id, resolution FROM {$wpdb->prefix}ds_heartbeats", OBJECT_K ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			foreach ( $screens as $screen ) {
-				$channel_id = absint( get_post_meta( $screen->ID, 'ds_channel_id', true ) );
-				$resolution = sanitize_text_field( $reported[ $screen->ID ]->resolution ?? '' );
-				if ( $channel_id && empty( $channel_formats[ $channel_id ] ) && preg_match( '/^\d{2,5}x\d{2,5}$/', $resolution ) ) { $channel_formats[ $channel_id ] = $resolution; }
-			}
+		$channels = array(); $screens = array(); $schedules = array(); $designs = array(); $media = array(); $heartbeats = array(); $channel_formats = array(); $controllers = array(); $music_playlists = array(); $music_tracks = array();
+		$storage_usage = array( 'used' => 0, 'limit' => DS_Storage::limit( $group_id ), 'percent' => 0 );
+		if ( in_array( $section, array( 'overview', 'channels', 'screens', 'designer', 'calendar' ), true ) ) { $channels = self::posts( 'ds_channel' ); }
+		if ( in_array( $section, array( 'overview', 'screens', 'controllers', 'calendar' ), true ) ) { $screens = self::posts( 'ds_screen' ); }
+		if ( in_array( $section, array( 'overview', 'calendar' ), true ) ) { $schedules = self::posts( 'ds_schedule' ); }
+		if ( 'designer' === $section ) {
+			$designs = array_values( array_filter( self::posts( 'ds_design' ), function ( $design ) { return current_user_can( 'manage_options' ) || absint( $design->post_author ) === get_current_user_id(); } ) );
 		}
-		$controllers = $spotify_only ? DS_Spotify::accessible_controllers() : array_values( array_filter( DS_Controllers::get_all(), function ( $item ) use ( $group_id ) { return self::can_access_controller( $item->id ) && ( ! $group_id || $group_id === DS_Groups::controller_group_id( $item->id ) ); } ) );
-		$music_playlists = $spotify_only ? array() : DS_Music::playlists( $group_id ); $music_tracks = $spotify_only ? array() : DS_Music::tracks( $group_id );
+		if ( in_array( $section, array( 'channels', 'media' ), true ) ) { $media = DS_Storage::items( $group_id ); $storage_usage = DS_Storage::usage( $group_id ); }
+		if ( in_array( $section, array( 'overview', 'screens' ), true ) ) { $heartbeats = self::heartbeats_for( $screens ); }
+		if ( $spotify_only ) { $controllers = DS_Spotify::accessible_controllers(); }
+		elseif ( in_array( $section, array( 'overview', 'controllers', 'spotify', 'calendar' ), true ) ) { $controllers = array_values( array_filter( DS_Controllers::get_all(), function ( $item ) use ( $group_id ) { return self::can_access_controller( $item->id ) && ( ! $group_id || $group_id === DS_Groups::controller_group_id( $item->id ) ); } ) ); }
+		if ( in_array( $section, array( 'controllers', 'music' ), true ) ) { $music_playlists = DS_Music::playlists( $group_id ); }
+		if ( 'music' === $section ) { $music_tracks = DS_Music::tracks( $group_id ); }
 		include DS_PLUGIN_DIR . 'public/templates/portal.php'; exit;
 	}
 
@@ -121,7 +148,22 @@ class DS_Portal {
 		if ( 'create_group' === $operation ) { if ( ! current_user_can( 'manage_options' ) ) { wp_die( esc_html__( 'Only administrators can create groups.', 'digital-signage' ) ); } $group_id = DS_Groups::create( sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) ) ); DS_Groups::add_user( $group_id, get_current_user_id() ); $this->redirect( 'settings', array( 'group' => $group_id, 'saved' => 1 ) ); }
 		$group_id = self::require_group( $group_id );
 		if ( 'save_channel' === $operation ) { $id = absint( $_POST['id'] ?? 0 ); if ( $id && ( ! self::can_access_post( $id ) || $group_id !== DS_Groups::post_group_id( $id ) ) ) { wp_die( esc_html__( 'Channel access denied.', 'digital-signage' ) ); } $id = DS_CRUD::save_channel( $id, wp_unslash( $_POST ) ); DS_Groups::set_post_group( $id, $group_id ); $this->redirect( 'channels', array( 'id' => $id, 'saved' => 1 ) ); }
-		if ( 'save_slide' === $operation ) { $channel_id = absint( $_POST['channel_id'] ?? 0 ); if ( ! self::can_access_post( $channel_id ) || $group_id !== DS_Groups::post_group_id( $channel_id ) ) { wp_die( esc_html__( 'Channel access denied.', 'digital-signage' ) ); } $id = absint( $_POST['id'] ?? 0 ); if ( $id && ( ! self::can_access_post( $id ) || $group_id !== DS_Groups::post_group_id( $id ) ) ) { wp_die( esc_html__( 'Slide access denied.', 'digital-signage' ) ); } $media_id = absint( $_POST['media_id'] ?? 0 ); if ( $media_id && ( 'attachment' !== get_post_type( $media_id ) || ! self::can_access_post( $media_id ) || $group_id !== DS_Groups::post_group_id( $media_id ) ) ) { wp_die( esc_html__( 'Media access denied.', 'digital-signage' ) ); } $id = DS_CRUD::save_slide( $id, wp_unslash( $_POST ) ); DS_Groups::set_post_group( $id, $group_id ); $this->redirect( 'channels', array( 'id' => $channel_id, 'saved' => 1 ) ); }
+		if ( 'save_slide' === $operation ) {
+			$channel_id = absint( $_POST['channel_id'] ?? 0 );
+			if ( ! self::can_access_post( $channel_id ) || $group_id !== DS_Groups::post_group_id( $channel_id ) ) { wp_die( esc_html__( 'Channel access denied.', 'digital-signage' ) ); }
+			$id = absint( $_POST['id'] ?? 0 );
+			if ( $id && ( ! self::can_access_post( $id ) || $group_id !== DS_Groups::post_group_id( $id ) ) ) { wp_die( esc_html__( 'Slide access denied.', 'digital-signage' ) ); }
+			$type = sanitize_key( wp_unslash( $_POST['slide_type'] ?? 'image' ) );
+			if ( ! in_array( $type, array( 'image', 'video', 'webpage', 'html', 'clock' ), true ) ) { wp_die( esc_html__( 'Choose a supported slide type.', 'digital-signage' ), '', array( 'response' => 400 ) ); }
+			$media_id = absint( $_POST['media_id'] ?? 0 );
+			if ( in_array( $type, array( 'image', 'video' ), true ) ) {
+				$mime = $media_id ? (string) get_post_mime_type( $media_id ) : '';
+				if ( ! $media_id || 'attachment' !== get_post_type( $media_id ) || ! self::can_access_post( $media_id ) || $group_id !== DS_Groups::post_group_id( $media_id ) || 0 !== strpos( $mime, $type . '/' ) ) { wp_die( esc_html__( 'Choose media that matches the selected slide type.', 'digital-signage' ), '', array( 'response' => 400 ) ); }
+			}
+			if ( 'webpage' === $type && ! wp_http_validate_url( esc_url_raw( wp_unslash( $_POST['content_url'] ?? '' ) ) ) ) { wp_die( esc_html__( 'Enter a valid webpage URL.', 'digital-signage' ), '', array( 'response' => 400 ) ); }
+			if ( 'html' === $type && '' === trim( (string) wp_unslash( $_POST['content_html'] ?? '' ) ) ) { wp_die( esc_html__( 'Add text or HTML for this slide.', 'digital-signage' ), '', array( 'response' => 400 ) ); }
+			$id = DS_CRUD::save_slide( $id, wp_unslash( $_POST ) ); DS_Groups::set_post_group( $id, $group_id ); $this->redirect( 'channels', array( 'id' => $channel_id, 'saved' => 1 ) );
+		}
 		if ( 'request_capacity' === $operation ) { DS_Groups::request_capacity( $group_id, sanitize_key( wp_unslash( $_POST['capacity_type'] ?? 'screens' ) ) ); $this->redirect( sanitize_key( wp_unslash( $_POST['return_section'] ?? 'screens' ) ), array( 'requested' => 1 ) ); }
 		if ( 'save_screen' === $operation ) { $id = absint( $_POST['id'] ?? 0 ); if ( ! $id && ! DS_Groups::can_create_screen( $group_id ) ) { $this->redirect( 'screens', array( 'error' => 'screen_limit' ) ); } if ( $id && ( ! self::can_access_post( $id ) || $group_id !== DS_Groups::post_group_id( $id ) ) ) { wp_die( esc_html__( 'Screen access denied.', 'digital-signage' ) ); } $channel_id = absint( $_POST['channel_id'] ?? 0 ); if ( $channel_id && ( ! self::can_access_post( $channel_id ) || $group_id !== DS_Groups::post_group_id( $channel_id ) ) ) { wp_die( esc_html__( 'Channel access denied.', 'digital-signage' ) ); } $id = DS_CRUD::save_screen( $id, wp_unslash( $_POST ) ); DS_Groups::set_post_group( $id, $group_id ); $this->redirect( 'screens', array( 'id' => $id, 'saved' => 1 ) ); }
 		if ( 'save_schedule' === $operation ) { $id = absint( $_POST['id'] ?? 0 ); if ( $id && ( ! self::can_access_post( $id ) || $group_id !== DS_Groups::post_group_id( $id ) ) ) { wp_die( esc_html__( 'Schedule access denied.', 'digital-signage' ) ); } $channel_id = absint( $_POST['channel_id'] ?? 0 ); if ( ! $channel_id || ! self::can_access_post( $channel_id ) || $group_id !== DS_Groups::post_group_id( $channel_id ) ) { wp_die( esc_html__( 'Channel access denied.', 'digital-signage' ) ); } foreach ( array_map( 'absint', (array) ( $_POST['screen_ids'] ?? array() ) ) as $screen_id ) { if ( ! self::can_access_post( $screen_id ) || $group_id !== DS_Groups::post_group_id( $screen_id ) ) { wp_die( esc_html__( 'Screen access denied.', 'digital-signage' ) ); } } $id = DS_CRUD::save_schedule( $id, wp_unslash( $_POST ) ); DS_Groups::set_post_group( $id, $group_id ); $this->redirect( 'calendar', array( 'saved' => 1 ) ); }

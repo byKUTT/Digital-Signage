@@ -56,6 +56,9 @@ if ( in_array( $rotation, array( 90, 270 ), true ) && in_array( $orientation, ar
 			</div>
 		</div>
 	<?php endif; ?>
+	<div id="ds-audio-prompt" class="ds-audio-prompt" hidden>
+		<button id="ds-audio-button" type="button"><?php esc_html_e( 'Enable video sound', 'digital-signage' ); ?></button>
+	</div>
 
 	<div id="ds-stage" class="ds-stage ds-layout-fullscreen">
 		<div id="ds-zone-main" class="ds-zone ds-zone-main"></div>
