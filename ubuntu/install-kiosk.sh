@@ -226,7 +226,6 @@ rm -f /etc/systemd/system/digital-signage-ubuntu.service /usr/local/bin/ds-ubunt
 
 sudoers_file="/etc/sudoers.d/digital-signage-ubuntu"
 write_managed_file "$sudoers_file" 440 <<EOF
-Defaults:$kiosk_user listpw=never
 Cmnd_Alias DIGITAL_SIGNAGE_ROOT = /usr/local/sbin/digital-signage-root-command check, /usr/local/sbin/digital-signage-root-command software-update, /usr/local/sbin/digital-signage-root-command system-update, /usr/local/sbin/digital-signage-root-command reboot, /usr/local/sbin/digital-signage-root-command diagnostic-update, /usr/local/sbin/digital-signage-root-command diagnostic-controller, /usr/local/sbin/digital-signage-root-command diagnostic-network, /usr/local/sbin/digital-signage-root-command diagnostic-system
 $kiosk_user ALL=(root) NOPASSWD: DIGITAL_SIGNAGE_ROOT
 EOF
