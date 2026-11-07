@@ -48,6 +48,9 @@ class OutputParsingTests(unittest.TestCase):
 
 class AssignmentTests(unittest.TestCase):
     def setUp(self):
+        placement = mock.patch.object(CONTROLLER.Controller, "place_player")
+        placement.start()
+        self.addCleanup(placement.stop)
         self.outputs = CONTROLLER.parse_xrandr(
             "DP-1 connected primary 1920x1080+0+0\n"
             "HDMI-1 connected 1920x1080+1920+0\n"
@@ -157,6 +160,8 @@ class ChromeCommandTests(unittest.TestCase):
         self.assertIn("--window-position=1920,0", command)
         self.assertIn("--window-size=1080,1920", command)
         self.assertIn("--kiosk", command)
+        self.assertIn("--new-window", command)
+        self.assertIn("--ozone-platform=x11", command)
         self.assertIn("--disable-sync", command)
         self.assertIn("--password-store=basic", command)
         self.assertEqual("https://example.test/play/two/", command[-1])
@@ -167,6 +172,58 @@ class ChromeCommandTests(unittest.TestCase):
             "/usr/bin/chromium", pathlib.Path("/profiles/dp-2"), output, "https://example.test"
         )
         self.assertIn("--window-position=-1280,-100", command)
+
+
+class WindowPlacementTests(unittest.TestCase):
+    def setUp(self):
+        self.controller = CONTROLLER.Controller.__new__(CONTROLLER.Controller)
+        self.controller.log = mock.Mock()
+        self.output = CONTROLLER.Output("vga-1", "VGA-1", -1280, 0, 1280, 1024)
+        self.player = CONTROLLER.Player(object(), "https://example.test/vga", (-1280, 0, 1280, 1024))
+
+    def test_moves_only_the_vga_window_then_restores_fullscreen(self):
+        windows = (
+            "0x001 0 bykutt-signage-hdmi-1.Google-chrome host HDMI\n"
+            "0x002 0 bykutt-signage-vga-1.Google-chrome host VGA\n"
+            "0x003 0 bykutt-signage-vga-10.Google-chrome host Other\n"
+        )
+        with mock.patch.object(CONTROLLER.subprocess, "run", return_value=mock.Mock(stdout=windows)) as run:
+            self.controller.place_player(self.output, self.player)
+        self.assertTrue(self.player.placed)
+        self.assertEqual([
+            ["wmctrl", "-lx"],
+            ["wmctrl", "-ir", "0x002", "-b", "remove,fullscreen"],
+            ["wmctrl", "-ir", "0x002", "-b", "remove,maximized_vert,maximized_horz"],
+            ["wmctrl", "-ir", "0x002", "-e", "0,-1280,0,1280,1024"],
+            ["wmctrl", "-ir", "0x002", "-b", "add,fullscreen"],
+        ], [call.args[0] for call in run.call_args_list])
+
+    def test_late_window_is_retried_without_launching_another_browser(self):
+        with mock.patch.object(CONTROLLER.subprocess, "run", return_value=mock.Mock(stdout="")) as run:
+            self.controller.place_player(self.output, self.player)
+            self.assertFalse(self.player.placed)
+            run.return_value.stdout = "0x002 0 bykutt-signage-vga-1.Google-chrome host VGA"
+            self.controller.place_player(self.output, self.player)
+            self.assertTrue(self.player.placed)
+            count = run.call_count
+            self.controller.place_player(self.output, self.player)
+            self.assertEqual(count, run.call_count)
+
+    def test_missing_helper_is_bounded_and_reported(self):
+        with mock.patch.object(CONTROLLER.subprocess, "run", side_effect=FileNotFoundError("wmctrl")) as run:
+            for _ in range(10):
+                self.controller.place_player(self.output, self.player)
+        self.assertEqual(6, run.call_count)
+        self.assertFalse(self.player.placed)
+        self.controller.log.assert_called_once()
+
+    def test_failed_move_does_not_mark_window_placed(self):
+        with mock.patch.object(CONTROLLER.subprocess, "run", side_effect=[
+            mock.Mock(stdout="0x002 0 bykutt-signage-vga-1.Google-chrome host VGA"),
+            CONTROLLER.subprocess.CalledProcessError(1, "wmctrl"),
+        ]):
+            self.controller.place_player(self.output, self.player)
+        self.assertFalse(self.player.placed)
 
 
 class ValidationTests(unittest.TestCase):
@@ -230,11 +287,11 @@ class ValidationTests(unittest.TestCase):
         source = MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn("fcntl.LOCK_EX | fcntl.LOCK_NB", source)
 
-    def test_no_window_detection_or_automatic_browser_health_restart(self):
+    def test_placement_does_not_add_automatic_browser_health_restart(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
-        self.assertNotIn("wmctrl", source)
-        self.assertNotIn("window_ids", source)
-        self.assertNotIn("Chrome window did not appear", source)
+        sync = source[source.index("    def sync_players("):source.index("    @staticmethod\n    def profile_process_ids")]
+        self.assertNotIn(".poll()", sync)
+        self.assertIn("self.place_player(output, player)", sync)
 
     def test_installer_hard_disables_sleep_and_uses_nonblocking_update_service(self):
         root = pathlib.Path(__file__).parents[1]
@@ -470,3 +527,4 @@ class GdmConfigurationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

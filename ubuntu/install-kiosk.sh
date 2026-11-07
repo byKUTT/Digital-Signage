@@ -56,7 +56,7 @@ export DEBIAN_FRONTEND=noninteractive
 if [ "$mode" != "--upgrade" ]; then
 	apt-get update
 	apt-get install -y --no-install-recommends \
-		python3 git ca-certificates curl sudo x11-xserver-utils unclutter dbus-x11 gdm3
+		python3 git ca-certificates curl sudo x11-xserver-utils unclutter dbus-x11 gdm3 wmctrl
 else
 	for required_command in python3 git sudo xrandr unclutter dbus-launch cp chown chmod tee visudo; do
 		if ! command -v "$required_command" >/dev/null 2>&1; then
@@ -64,6 +64,12 @@ else
 			exit 1
 		fi
 	done
+fi
+
+# Existing controllers need the new placement helper on their first upgrade.
+if ! command -v wmctrl >/dev/null 2>&1; then
+	apt-get update
+	apt-get install -y --no-install-recommends wmctrl
 fi
 
 copy_managed_file() {
@@ -267,7 +273,8 @@ if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
 fi
 
 echo
-echo "Screens byKUTT Ubuntu controller 4.8.0 is installed."
+echo "Screens byKUTT Ubuntu controller 4.8.1 is installed."
 echo "No automatic reboot timer or reboot watchdog was installed."
 echo "Reboot once to activate Xorg autologin: sudo reboot"
 echo "Future updates: sudo digital-signage-update"
+

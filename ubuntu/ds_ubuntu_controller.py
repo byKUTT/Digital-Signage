@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "4.8.0"
+VERSION = "4.8.1"
 DEFAULT_SITE = "https://screens.kutt.ee"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
@@ -71,6 +71,8 @@ class Player:
     url: str
     geometry: tuple[int, int, int, int]
     profile: Path | None = None
+    placement_attempts: int = 0
+    placed: bool = False
 
 
 def stable_output_key(connector: str) -> str:
@@ -184,6 +186,9 @@ def chrome_command(browser: str, profile: Path, output: Output, url: str) -> lis
         f"--window-position={output.x},{output.y}",
         f"--window-size={output.width},{output.height}",
         f"--class=bykutt-signage-{output.output_key}",
+        "--new-window",
+        "--ozone-platform=x11",
+        "--force-device-scale-factor=1",
         "--kiosk",
         "--no-first-run",
         "--no-default-browser-check",
@@ -638,6 +643,43 @@ class Controller:
             profile=profile,
         )
 
+    def place_player(self, output: Output, player: Player) -> None:
+        """Place only this output's window after Chrome has mapped it in Xorg."""
+        if player.placed or player.placement_attempts >= 6:
+            return
+        player.placement_attempts += 1
+        try:
+            completed = subprocess.run(
+                ["wmctrl", "-lx"], check=True, capture_output=True, text=True, timeout=2
+            )
+            expected = f"bykutt-signage-{output.output_key}".lower()
+            window = None
+            for line in completed.stdout.splitlines():
+                fields = line.split(None, 4)
+                if len(fields) >= 4 and expected in fields[2].lower().split("."):
+                    if re.fullmatch(r"0x[0-9a-fA-F]+", fields[0]):
+                        window = fields[0]
+                        break
+            if window is None:
+                raise RuntimeError(f"Waiting for {output.connector} Chrome window")
+            # GNOME may initially fullscreen every Chrome window on the primary
+            # monitor. Remove that state before moving, then fullscreen in place.
+            for arguments in (
+                ["-b", "remove,fullscreen"],
+                ["-b", "remove,maximized_vert,maximized_horz"],
+                ["-e", f"0,{output.x},{output.y},{output.width},{output.height}"],
+                ["-b", "add,fullscreen"],
+            ):
+                subprocess.run(
+                    ["wmctrl", "-ir", window, *arguments],
+                    check=True, capture_output=True, text=True, timeout=2,
+                )
+            player.placed = True
+            self.log(f"Placed {output.connector} Chrome window on its assigned monitor")
+        except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+            if player.placement_attempts >= 6:
+                self.log(f"Could not place {output.connector} Chrome window: {error}")
+
     def sync_players(self, outputs: list[Output], targets: dict[str, str]) -> None:
         current = {output.output_key: output for output in outputs}
         for key in list(self.players):
@@ -659,6 +701,9 @@ class Controller:
                 self.players[output.output_key] = self.launch_player(
                     output, targets[output.output_key]
                 )
+            player = self.players.get(output.output_key)
+            if player is not None:
+                self.place_player(output, player)
 
     @staticmethod
     def profile_process_ids(profile: Path, proc_root: Path = Path("/proc")) -> set[int]:
@@ -795,3 +840,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

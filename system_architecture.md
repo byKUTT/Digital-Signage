@@ -18,8 +18,11 @@
   address; no service guesses `DISPLAY=:0` before login is ready.
 - The controller launches one isolated Chrome-family profile/process per
   connected output. Chrome receives each XRandR output's exact position and
-  dimensions on its command line. There is no window discovery or browser
-  health check: boot issues one launch per assigned output and trusts Chrome.
+  dimensions on its command line with explicit new-window and X11 flags.
+  A bounded startup pass identifies each window by its output-specific WM_CLASS,
+  removes fullscreen/maximized state, moves it with wmctrl, and restores fullscreen.
+  The installer supplies wmctrl on fresh installs and existing upgrades.
+  Placement does not add browser health checks or automatic browser relaunch.
   Relaunch occurs only for an explicit Start/Restart command, URL or geometry
   reconciliation, or output reconnection.
 - A controller-local state file persists kiosk versus desktop mode across
@@ -208,3 +211,4 @@
 - Add slide presents one selected content type and progressively reveals only its relevant source and playback controls. The custom picker filters the existing group library and upload chooser to the selected image/video type, while the server independently verifies ownership, MIME family, and required source data.
 - Audible videos claim background-music ducking only after a real `playing` event and release it on pause, end, error, abort, or DOM cleanup. Ubuntu kiosk playback uses the browser's configured autoplay policy; ordinary browsers fall back to muted visual playback plus a focused user-gesture control that enables sound.
 - A one-item zone keeps its existing element and never schedules slide advancement. A single video loops in place.
+
