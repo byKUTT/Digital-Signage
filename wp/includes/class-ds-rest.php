@@ -183,7 +183,9 @@ class DS_REST {
 		$response   = rest_ensure_response(
 			array(
 				'channel_id'  => $channel_id,
-				'revision'    => $this->get_channel_revision( $channel_id ),
+				'revision'    => $this->get_channel_revision( $channel_id ) . ':' . DS_VERSION . ':' . (string) get_post_meta( $screen->ID, 'ds_screen_revision', true ),
+				'screen_id'   => $screen->ID,
+				'screen_revision' => (string) get_post_meta( $screen->ID, 'ds_screen_revision', true ),
 				'music_revision' => DS_Music::revision( $screen->ID ),
 				'spotify_revision' => DS_Spotify::controller_output_revision( $screen->ID ),
 				'orientation' => get_post_meta( $screen->ID, 'ds_orientation', true ) ?: 'landscape',
@@ -220,7 +222,8 @@ class DS_REST {
 				'rotation'       => absint( get_post_meta( $screen->ID, 'ds_content_rotation', true ) ),
 				'channel_id'     => $channel_id,
 				'channel_name'   => $channel_id ? get_the_title( $channel_id ) : '',
-				'revision'       => $this->get_channel_revision( $channel_id ),
+				'revision'       => $this->get_channel_revision( $channel_id ) . ':' . DS_VERSION . ':' . (string) get_post_meta( $screen->ID, 'ds_screen_revision', true ),
+				'screen_revision' => (string) get_post_meta( $screen->ID, 'ds_screen_revision', true ),
 				'music_revision' => DS_Music::revision( $screen->ID ),
 				'spotify_revision' => DS_Spotify::controller_output_revision( $screen->ID ),
 				'music'          => DS_Music::player_config( $screen->ID ),
@@ -644,3 +647,4 @@ class DS_REST {
 		return $data;
 	}
 }
+

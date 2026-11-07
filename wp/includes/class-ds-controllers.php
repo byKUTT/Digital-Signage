@@ -319,11 +319,22 @@ class DS_Controllers {
 		$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE controller_id = %d ORDER BY id ASC", $controller_id ) );
 		$out   = array();
 		foreach ( $rows as $row ) {
+			$player_url = '';
+			if ( $row->screen_id ) {
+				DS_CRUD::ensure_screen_token( $row->screen_id );
+				$player_url = DS_Player::get_player_url( $row->screen_id );
+				if ( $player_url ) {
+					$player_url = add_query_arg( array(
+						'ds_output' => $row->output_key,
+						'ds_revision' => DS_VERSION . '-' . (string) get_post_meta( $row->screen_id, 'ds_screen_revision', true ),
+					), $player_url );
+				}
+			}
 			$out[] = array(
 				'output_key'   => $row->output_key,
 				'connector'    => $row->connector,
 				'screen_id'    => (int) $row->screen_id,
-				'player_url'   => $row->screen_id ? DS_Player::get_player_url( $row->screen_id ) : '',
+				'player_url'   => $player_url,
 				'pairing_url'  => home_url( '/c/' . self::get_public_id( $controller_id ) . '/' . rawurlencode( $row->output_key ) . '/' ),
 			);
 		}
@@ -513,6 +524,7 @@ class DS_Controllers {
 				$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET screen_id = 0 WHERE screen_id = %d AND id <> %d", $screen_id, $display_id ) );
 				update_post_meta( $screen_id, 'ds_controller_id', $controller_id );
 				update_post_meta( $screen_id, 'ds_controller_output', $display->output_key );
+				DS_CRUD::touch_screen( $screen_id );
 			}
 			if ( $display->screen_id && (int) $display->screen_id !== $screen_id ) {
 				delete_post_meta( $display->screen_id, 'ds_controller_id' );
@@ -571,3 +583,4 @@ class DS_Controllers {
 		delete_option( 'ds_spotify_output_' . $controller_id );
 	}
 }
+

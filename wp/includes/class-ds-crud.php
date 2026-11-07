@@ -252,9 +252,7 @@ class DS_CRUD {
 		update_post_meta( $post_id, 'ds_channel_id', absint( $data['channel_id'] ?? 0 ) );
 		update_post_meta( $post_id, 'ds_orientation', sanitize_key( $data['orientation'] ?? 'landscape' ) );
 		update_post_meta( $post_id, 'ds_content_rotation', $rotation );
-		if ( ! get_post_meta( $post_id, 'ds_pairing_token', true ) ) {
-			update_post_meta( $post_id, 'ds_pairing_token', self::generate_screen_token() );
-		}
+		self::ensure_screen_token( $post_id );
 
 		$short_enabled = ! empty( $data['short_url_enabled'] );
 		$short_code    = sanitize_text_field( get_post_meta( $post_id, 'ds_short_code', true ) );
@@ -272,9 +270,36 @@ class DS_CRUD {
 			wp_set_post_terms( $post_id, array(), 'ds_location' );
 		}
 
+		self::touch_screen( $post_id );
 		return $post_id;
 	}
 
+	/** Signal a fresh playlist and controller navigation on every screen save. */
+	public static function touch_screen( $screen_id ) {
+		$screen_id = absint( $screen_id );
+		if ( $screen_id && 'ds_screen' === get_post_type( $screen_id ) ) {
+			update_post_meta( $screen_id, 'ds_screen_revision', wp_generate_uuid4() );
+		}
+	}
+
+	/** Keep legacy or copied Screens from sharing the same player identity. */
+	public static function ensure_screen_token( $screen_id ) {
+		$screen_id = absint( $screen_id );
+		if ( ! $screen_id || 'ds_screen' !== get_post_type( $screen_id ) ) {
+			return '';
+		}
+		$token = (string) get_post_meta( $screen_id, 'ds_pairing_token', true );
+		$duplicates = $token ? get_posts( array(
+			'post_type' => 'ds_screen', 'post_status' => 'any', 'posts_per_page' => 1,
+			'fields' => 'ids', 'post__not_in' => array( $screen_id ),
+			'meta_key' => 'ds_pairing_token', 'meta_value' => $token,
+		) ) : array();
+		if ( ! $token || $duplicates ) {
+			$token = self::generate_screen_token();
+			update_post_meta( $screen_id, 'ds_pairing_token', $token );
+		}
+		return $token;
+	}
 	/** Generate an opaque stable player token for controller and browser Screens. */
 	private static function generate_screen_token() {
 		for ( $attempt = 0; $attempt < 10; $attempt++ ) {
@@ -446,3 +471,4 @@ class DS_CRUD {
 		);
 	}
 }
+

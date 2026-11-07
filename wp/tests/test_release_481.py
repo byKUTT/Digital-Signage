@@ -11,12 +11,12 @@ class Release481Tests(unittest.TestCase):
     def source(self, relative):
         return (ROOT / relative).read_text(encoding="utf-8")
 
-    def test_plugin_version_is_481(self):
+    def test_plugin_version_is_current(self):
         plugin = self.source("wp/digital-signage.php")
         readme = self.source("wp/readme.txt")
-        self.assertIn("Version:           4.8.1", plugin)
-        self.assertIn("define( 'DS_VERSION', '4.8.1' );", plugin)
-        self.assertIn("Stable tag: 4.8.1", readme)
+        self.assertIn("Version:           4.8.3", plugin)
+        self.assertIn("define( 'DS_VERSION', '4.8.3' );", plugin)
+        self.assertIn("Stable tag: 4.8.3", readme)
 
     def test_player_routes_run_before_canonical_redirects(self):
         player = self.source("wp/includes/class-ds-player.php")
@@ -55,3 +55,4 @@ class Release481Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

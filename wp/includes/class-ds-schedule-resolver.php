@@ -13,14 +13,14 @@ class DS_Schedule_Resolver {
 
 	/**
 	 * Returns the channel ID that should be active on a screen right now.
-	 * Priority order: emergency/priority channel override (site or screen-wide) >
+	 * Priority order: assigned priority channel >
 	 * active one-off schedule > active recurring schedule > screen's assigned default channel.
 	 */
 	public static function resolve_channel_id_for_screen( $screen_id ) {
 		$now = current_time( 'timestamp' );
 
-		// 1. Global/site-wide emergency channel takes over everything.
-		$emergency = self::find_emergency_channel();
+		// 1. An assigned priority channel takes precedence for this screen only.
+		$emergency = self::find_emergency_channel( $screen_id );
 		if ( $emergency ) {
 			return $emergency;
 		}
@@ -59,17 +59,13 @@ class DS_Schedule_Resolver {
 		return absint( get_post_meta( $screen_id, 'ds_channel_id', true ) );
 	}
 
-	public static function find_emergency_channel() {
-		$channels = get_posts(
-			array(
-				'post_type'      => 'ds_channel',
-				'posts_per_page' => 1,
-				'meta_key'       => 'ds_is_priority',
-				'meta_value'     => 1,
-				'post_status'    => 'publish',
-			)
-		);
-		return $channels ? $channels[0]->ID : 0;
+	public static function find_emergency_channel( $screen_id = 0 ) {
+		// Priority belongs to an assigned channel, not an implicit site broadcast.
+		$channel_id = absint( get_post_meta( absint( $screen_id ), 'ds_channel_id', true ) );
+		if ( ! $channel_id || 'ds_channel' !== get_post_type( $channel_id ) || 'publish' !== get_post_status( $channel_id ) ) {
+			return 0;
+		}
+		return get_post_meta( $channel_id, 'ds_is_priority', true ) ? $channel_id : 0;
 	}
 
 	private static function get_schedules_for_screen( $screen_id ) {

@@ -179,7 +179,9 @@
 		if ( CONFIG.nonce ) {
 			headers['X-WP-Nonce'] = CONFIG.nonce; // Only needed for the cookie-authenticated preview endpoint.
 		}
-		return fetch( CONFIG.restUrl + path, { cache: 'no-store', credentials: 'same-origin', headers: headers } ).then( function ( r ) {
+		var requestUrl = CONFIG.restUrl + path;
+		requestUrl += ( requestUrl.indexOf( '?' ) < 0 ? '?' : '&' ) + '_ds_screen=' + encodeURIComponent( CONFIG.screenId ) + '&_ds_time=' + Date.now();
+		return fetch( requestUrl, { cache: 'no-store', credentials: 'same-origin', headers: headers } ).then( function ( r ) {
 			if ( ! r.ok ) {
 				throw new Error( 'HTTP ' + r.status );
 			}
@@ -215,7 +217,8 @@
 	function loadCachedPlaylist() {
 		try {
 			var raw = localStorage.getItem( CACHE_KEY );
-			return raw ? JSON.parse( raw ) : null;
+			var cached = raw ? JSON.parse( raw ) : null;
+			return cached && String( cached.screen_id ) === String( CONFIG.screenId ) ? cached : null;
 		} catch ( e ) {
 			return null;
 		}
@@ -245,6 +248,9 @@
 		var path = CONFIG.isPreview ? ( '/preview/' + CONFIG.previewChannelId ) : '/playlist';
 		playlistRequest = apiGet( path )
 			.then( function ( data ) {
+				if ( ! CONFIG.isPreview && String( data.screen_id ) !== String( CONFIG.screenId ) ) {
+					throw new Error( 'Playlist belongs to another screen' );
+				}
 				setOffline( false );
 				if ( ! CONFIG.isPreview ) {
 					cachePlaylist( data );
@@ -430,6 +436,9 @@
 	}
 
 	function applyPlaylist( data ) {
+		if ( state.playlist && data.screen_revision !== state.playlist.screen_revision ) {
+			Object.keys( state.zones ).forEach( stopZone );
+		}
 		state.playlist = data;
 		state.revisionKey = playlistRevisionKey( data );
 		configureMusic( data.music, data.music_revision || 'none' );
@@ -1272,3 +1281,4 @@
 		boot();
 	}
 } )();
+

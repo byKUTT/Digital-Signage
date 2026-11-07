@@ -1,5 +1,19 @@
 # Digital Signage architecture notes
 
+## Screen identity and forced refresh (WordPress 4.8.3)
+
+- Screen saves and controller assignment saves rotate `ds_screen_revision`.
+  Both changes probes and playlists include it in the legacy-compatible revision
+  string. Controller player URLs include the output key, plugin version, and
+  screen revision, so existing agents navigate on the next heartbeat after saves.
+- Priority channels apply only to screens assigned to them. A priority flag on an
+  unrelated channel no longer silently overrides every Screen on the site.
+  Manual overrides and screen-targeted schedules retain their existing behavior.
+- Missing/duplicate player tokens are repaired during screen saves and controller
+  assignment responses. Player requests bypass caches and reject mismatched
+  screen IDs in live responses and offline playlists. A new screen revision
+  clears the rendered zones before rebuilding the playlist.
+
 ## Ubuntu multi-display controller
 
 - Ubuntu Desktop uses `ubuntu/`; the Raspberry Pi installer remains

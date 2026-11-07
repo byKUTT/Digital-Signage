@@ -5,7 +5,7 @@ Tags: digital signage, kiosk, cms, screens, display
 Requires at least: 5.9
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 4.8.1
+Stable tag: 4.8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -54,6 +54,11 @@ For a private VIDAA 9 TV player, open `https://your-site.example/tv/` in the TV 
 * The frontend player never touches PHP after first load — it talks entirely to the **REST API**, so it works equally well embedded in a WebView or a plain browser tab.
 
 == Changelog ==
+
+= 4.8.3 =
+* Keep priority playback scoped to each screen's assigned channel instead of broadcasting a priority channel to unrelated screens.
+* Refresh playlists and controller player URLs whenever a screen or output assignment is saved.
+* Repair duplicate player tokens and reject playlists belonging to another screen.
 
 = 4.8.1 =
 * Fixed Screen and Channel preview/player URLs being redirected to the Screen Manager when rewrite rules were stale.
