@@ -135,8 +135,13 @@ xrandr --query
 
 At boot the controller opens a separate Chrome window and isolated profile per
 assigned output. It uses X11 and `wmctrl` to move each window to its monitor
-before restoring fullscreen. Placement is retried for up to six display refresh
-cycles while Chrome starts. There is no browser-health relaunch.
+before restoring fullscreen. Chrome starts in app mode, without tabs or an address
+bar, so its startup fullscreen logic cannot override the assigned monitor.
+Unfullscreen, move, fullscreen, and geometry verification happen on separate
+one-second refreshes, with up to 20 attempts. Success requires observing the
+window on its assigned monitor after fullscreen. There is no browser-health relaunch.
+Startup is sequential: the next output opens only after the preceding window is
+verified, or its bounded placement attempt has failed and been reported.
 A player is relaunched only by an explicit Start/Restart command,
 an assignment URL or geometry change, or reconnecting an output. Controller
 errors stay in the logs and WordPress telemetry; they never trigger an

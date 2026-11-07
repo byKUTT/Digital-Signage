@@ -21,6 +21,11 @@
   dimensions on its command line with explicit new-window and X11 flags.
   A bounded startup pass identifies each window by its output-specific WM_CLASS,
   removes fullscreen/maximized state, moves it with wmctrl, and restores fullscreen.
+  Chrome starts in app mode instead of requesting kiosk fullscreen at startup.
+  Placement phases run on separate one-second refreshes and verify actual geometry
+  before fullscreen and after it; failed placement has a 20-attempt bound.
+  Startup serializes outputs: an unverified window holds back the next launch
+  until verified or the placement retry limit is reached.
   The installer supplies wmctrl on fresh installs and existing upgrades.
   Placement does not add browser health checks or automatic browser relaunch.
   Relaunch occurs only for an explicit Start/Restart command, URL or geometry

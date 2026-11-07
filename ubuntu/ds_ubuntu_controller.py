@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "4.8.1"
+VERSION = "4.8.2"
 DEFAULT_SITE = "https://screens.kutt.ee"
 DEFAULT_SETTINGS = Path("/etc/digital-signage-ubuntu/settings.json")
 DEFAULT_IDENTITY = Path("/etc/digital-signage-ubuntu/identity.json")
@@ -73,6 +73,7 @@ class Player:
     profile: Path | None = None
     placement_attempts: int = 0
     placed: bool = False
+    placement_phase: int = 0
 
 
 def stable_output_key(connector: str) -> str:
@@ -189,7 +190,6 @@ def chrome_command(browser: str, profile: Path, output: Output, url: str) -> lis
         "--new-window",
         "--ozone-platform=x11",
         "--force-device-scale-factor=1",
-        "--kiosk",
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-session-crashed-bubble",
@@ -203,7 +203,7 @@ def chrome_command(browser: str, profile: Path, output: Output, url: str) -> lis
         "--disable-pinch",
         "--overscroll-history-navigation=0",
         "--password-store=basic",
-        url,
+        f"--app={url}",
     ]
 
 
@@ -645,39 +645,62 @@ class Controller:
 
     def place_player(self, output: Output, player: Player) -> None:
         """Place only this output's window after Chrome has mapped it in Xorg."""
-        if player.placed or player.placement_attempts >= 6:
+        if player.placed or player.placement_attempts >= 20:
             return
         player.placement_attempts += 1
         try:
             completed = subprocess.run(
-                ["wmctrl", "-lx"], check=True, capture_output=True, text=True, timeout=2
+                ["wmctrl", "-lGx"], check=True, capture_output=True, text=True, timeout=2
             )
             expected = f"bykutt-signage-{output.output_key}".lower()
             window = None
+            geometry = None
             for line in completed.stdout.splitlines():
-                fields = line.split(None, 4)
-                if len(fields) >= 4 and expected in fields[2].lower().split("."):
+                fields = line.split(None, 8)
+                if len(fields) >= 8 and expected in fields[6].lower().split("."):
                     if re.fullmatch(r"0x[0-9a-fA-F]+", fields[0]):
                         window = fields[0]
+                        geometry = tuple(int(value) for value in fields[2:6])
                         break
             if window is None:
                 raise RuntimeError(f"Waiting for {output.connector} Chrome window")
-            # GNOME may initially fullscreen every Chrome window on the primary
-            # monitor. Remove that state before moving, then fullscreen in place.
-            for arguments in (
-                ["-b", "remove,fullscreen"],
-                ["-b", "remove,maximized_vert,maximized_horz"],
-                ["-e", f"0,{output.x},{output.y},{output.width},{output.height}"],
-                ["-b", "add,fullscreen"],
+            # X11 requests are asynchronous. Each phase runs on a later refresh,
+            # allowing GNOME to apply the previous state before the next request.
+            assert geometry is not None
+            x, y, width, height = geometry
+            on_monitor = (
+                output.x <= x + width / 2 < output.x + output.width
+                and output.y <= y + height / 2 < output.y + output.height
+            )
+            if player.placement_phase == 0:
+                commands = [
+                    ["-b", "remove,fullscreen"],
+                    ["-b", "remove,maximized_vert,maximized_horz"],
+                ]
+                next_phase = 1
+            elif player.placement_phase == 1:
+                commands = [["-e", f"0,{output.x},{output.y},{output.width},{output.height}"]]
+                next_phase = 2
+            elif player.placement_phase == 2 and on_monitor:
+                commands = [["-b", "add,fullscreen"]]
+                next_phase = 3
+            elif player.placement_phase == 3 and on_monitor and (
+                abs(width - output.width) <= 2 and abs(height - output.height) <= 2
             ):
+                player.placed = True
+                self.log(f"Verified {output.connector} Chrome window on its assigned monitor")
+                return
+            else:
+                player.placement_phase = 0
+                raise RuntimeError(f"{output.connector} window has not reached its assigned monitor")
+            for arguments in commands:
                 subprocess.run(
                     ["wmctrl", "-ir", window, *arguments],
                     check=True, capture_output=True, text=True, timeout=2,
                 )
-            player.placed = True
-            self.log(f"Placed {output.connector} Chrome window on its assigned monitor")
-        except (OSError, RuntimeError, subprocess.SubprocessError) as error:
-            if player.placement_attempts >= 6:
+            player.placement_phase = next_phase
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            if player.placement_attempts >= 20:
                 self.log(f"Could not place {output.connector} Chrome window: {error}")
 
     def sync_players(self, outputs: list[Output], targets: dict[str, str]) -> None:
@@ -704,6 +727,10 @@ class Controller:
             player = self.players.get(output.output_key)
             if player is not None:
                 self.place_player(output, player)
+                # Finish one monitor before opening the next Chrome window.
+                # This keeps competing startup/fullscreen requests out of GNOME.
+                if not player.placed and player.placement_attempts < 20:
+                    break
 
     @staticmethod
     def profile_process_ids(profile: Path, proc_root: Path = Path("/proc")) -> set[int]:
@@ -798,7 +825,8 @@ class Controller:
                     if consecutive_errors >= 12:
                         self.log("Continuing recovery without rebooting the computer")
                         consecutive_errors = 0
-                time.sleep(DISPLAY_REFRESH_SECONDS)
+                placing = any(not player.placed and player.placement_attempts < 20 for player in self.players.values())
+                time.sleep(1 if placing else DISPLAY_REFRESH_SECONDS)
         finally:
             self.stop_players()
             self.set_cursor_hidden(False)

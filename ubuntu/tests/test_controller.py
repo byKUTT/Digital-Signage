@@ -148,6 +148,39 @@ class AssignmentTests(unittest.TestCase):
 
 
 class ChromeCommandTests(unittest.TestCase):
+    def test_next_monitor_waits_until_first_window_is_placed(self):
+        controller = CONTROLLER.Controller.__new__(CONTROLLER.Controller)
+        controller.players = {}
+        controller.screens_paused = False
+        outputs = CONTROLLER.parse_xrandr(
+            "HDMI-1 connected primary 1920x1080+0+0\n"
+            "VGA-1 connected 1280x1024+1920+0\n"
+        )
+        targets = {"hdmi-1": "https://example.test/hdmi", "vga-1": "https://example.test/vga"}
+        controller.launch_player = mock.Mock(side_effect=lambda output, url: CONTROLLER.Player(
+            object(), url, (output.x, output.y, output.width, output.height)
+        ))
+        controller.place_player = mock.Mock()
+        controller.sync_players(outputs, targets)
+        self.assertEqual(["hdmi-1"], list(controller.players))
+        controller.sync_players(outputs, targets)
+        self.assertEqual(1, controller.launch_player.call_count)
+        controller.players["hdmi-1"].placed = True
+        controller.sync_players(outputs, targets)
+        self.assertEqual(["hdmi-1", "vga-1"], list(controller.players))
+        self.assertEqual(2, controller.launch_player.call_count)
+
+    def test_failed_first_placement_does_not_block_other_displays_forever(self):
+        controller = CONTROLLER.Controller.__new__(CONTROLLER.Controller)
+        controller.screens_paused = False
+        outputs = CONTROLLER.parse_xrandr("HDMI-1 connected primary 1920x1080+0+0\nVGA-1 connected 1280x1024+1920+0\n")
+        first = CONTROLLER.Player(object(), "https://example.test/hdmi", (0, 0, 1920, 1080), placement_attempts=20)
+        controller.players = {"hdmi-1": first}
+        controller.place_player = mock.Mock()
+        controller.launch_player = mock.Mock(return_value=CONTROLLER.Player(object(), "https://example.test/vga", (1920, 0, 1280, 1024)))
+        controller.sync_players(outputs, {"hdmi-1": first.url, "vga-1": "https://example.test/vga"})
+        controller.launch_player.assert_called_once()
+
     def test_each_output_gets_isolated_profile_and_exact_geometry(self):
         output = CONTROLLER.Output("hdmi-1", "HDMI-1", 1920, 0, 1080, 1920)
         command = CONTROLLER.chrome_command(
@@ -159,12 +192,13 @@ class ChromeCommandTests(unittest.TestCase):
         self.assertIn("--user-data-dir=/profiles/hdmi-1", command)
         self.assertIn("--window-position=1920,0", command)
         self.assertIn("--window-size=1080,1920", command)
-        self.assertIn("--kiosk", command)
+        self.assertNotIn("--kiosk", command)
+        self.assertIn("--app=https://example.test/play/two/", command)
         self.assertIn("--new-window", command)
         self.assertIn("--ozone-platform=x11", command)
         self.assertIn("--disable-sync", command)
         self.assertIn("--password-store=basic", command)
-        self.assertEqual("https://example.test/play/two/", command[-1])
+        self.assertEqual("--app=https://example.test/play/two/", command[-1])
 
     def test_negative_desktop_coordinates_are_preserved(self):
         output = CONTROLLER.Output("dp-2", "DP-2", -1280, -100, 1280, 1024)
@@ -180,30 +214,51 @@ class WindowPlacementTests(unittest.TestCase):
         self.controller.log = mock.Mock()
         self.output = CONTROLLER.Output("vga-1", "VGA-1", -1280, 0, 1280, 1024)
         self.player = CONTROLLER.Player(object(), "https://example.test/vga", (-1280, 0, 1280, 1024))
+        self.wrong = "0x002 0 0 0 1280 1024 bykutt-signage-vga-1.Google-chrome host VGA"
+        self.correct = "0x002 0 -1280 0 1280 1024 bykutt-signage-vga-1.Google-chrome host VGA"
 
-    def test_moves_only_the_vga_window_then_restores_fullscreen(self):
-        windows = (
-            "0x001 0 bykutt-signage-hdmi-1.Google-chrome host HDMI\n"
-            "0x002 0 bykutt-signage-vga-1.Google-chrome host VGA\n"
-            "0x003 0 bykutt-signage-vga-10.Google-chrome host Other\n"
-        )
-        with mock.patch.object(CONTROLLER.subprocess, "run", return_value=mock.Mock(stdout=windows)) as run:
+    def test_waits_for_move_before_fullscreen_and_verifies_afterwards(self):
+        other = "0x001 0 0 0 1920 1080 bykutt-signage-hdmi-1.Google-chrome host HDMI\n"
+        with mock.patch.object(CONTROLLER.subprocess, "run", return_value=mock.Mock(stdout=other + self.wrong)) as run:
             self.controller.place_player(self.output, self.player)
-        self.assertTrue(self.player.placed)
+            self.assertFalse(self.player.placed)
+            self.controller.place_player(self.output, self.player)
+            self.assertFalse(any("add,fullscreen" in call.args[0] for call in run.call_args_list))
+            run.return_value.stdout = other + self.correct
+            self.controller.place_player(self.output, self.player)
+            self.assertFalse(self.player.placed)
+            self.controller.place_player(self.output, self.player)
+            self.assertTrue(self.player.placed)
+            mutations = [call.args[0] for call in run.call_args_list if "-ir" in call.args[0]]
         self.assertEqual([
-            ["wmctrl", "-lx"],
             ["wmctrl", "-ir", "0x002", "-b", "remove,fullscreen"],
             ["wmctrl", "-ir", "0x002", "-b", "remove,maximized_vert,maximized_horz"],
             ["wmctrl", "-ir", "0x002", "-e", "0,-1280,0,1280,1024"],
             ["wmctrl", "-ir", "0x002", "-b", "add,fullscreen"],
-        ], [call.args[0] for call in run.call_args_list])
+        ], mutations)
 
-    def test_late_window_is_retried_without_launching_another_browser(self):
+    def test_wrong_monitor_never_marked_success_or_fullscreened(self):
+        with mock.patch.object(CONTROLLER.subprocess, "run", return_value=mock.Mock(stdout=self.wrong)) as run:
+            for _ in range(3):
+                self.controller.place_player(self.output, self.player)
+            self.assertFalse(self.player.placed)
+            self.assertEqual(0, self.player.placement_phase)
+            self.assertFalse(any("add,fullscreen" in call.args[0] for call in run.call_args_list))
+
+    def test_fullscreen_on_wrong_monitor_retries_placement(self):
+        self.player.placement_phase = 3
+        with mock.patch.object(CONTROLLER.subprocess, "run", return_value=mock.Mock(stdout=self.wrong)):
+            self.controller.place_player(self.output, self.player)
+        self.assertFalse(self.player.placed)
+        self.assertEqual(0, self.player.placement_phase)
+
+    def test_late_window_and_finished_player_do_not_spawn_more_windows(self):
         with mock.patch.object(CONTROLLER.subprocess, "run", return_value=mock.Mock(stdout="")) as run:
             self.controller.place_player(self.output, self.player)
-            self.assertFalse(self.player.placed)
-            run.return_value.stdout = "0x002 0 bykutt-signage-vga-1.Google-chrome host VGA"
-            self.controller.place_player(self.output, self.player)
+            self.assertEqual(0, self.player.placement_phase)
+            run.return_value.stdout = self.correct
+            for _ in range(4):
+                self.controller.place_player(self.output, self.player)
             self.assertTrue(self.player.placed)
             count = run.call_count
             self.controller.place_player(self.output, self.player)
@@ -211,19 +266,20 @@ class WindowPlacementTests(unittest.TestCase):
 
     def test_missing_helper_is_bounded_and_reported(self):
         with mock.patch.object(CONTROLLER.subprocess, "run", side_effect=FileNotFoundError("wmctrl")) as run:
-            for _ in range(10):
+            for _ in range(25):
                 self.controller.place_player(self.output, self.player)
-        self.assertEqual(6, run.call_count)
+        self.assertEqual(20, run.call_count)
         self.assertFalse(self.player.placed)
         self.controller.log.assert_called_once()
 
-    def test_failed_move_does_not_mark_window_placed(self):
+    def test_failed_request_does_not_advance_phase(self):
         with mock.patch.object(CONTROLLER.subprocess, "run", side_effect=[
-            mock.Mock(stdout="0x002 0 bykutt-signage-vga-1.Google-chrome host VGA"),
+            mock.Mock(stdout=self.wrong),
             CONTROLLER.subprocess.CalledProcessError(1, "wmctrl"),
         ]):
             self.controller.place_player(self.output, self.player)
         self.assertFalse(self.player.placed)
+        self.assertEqual(0, self.player.placement_phase)
 
 
 class ValidationTests(unittest.TestCase):

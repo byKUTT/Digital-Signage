@@ -273,7 +273,7 @@ if [ "$mode" = "--upgrade" ] && [ "${DS_SKIP_SERVICE_RESTART:-0}" != "1" ]; then
 fi
 
 echo
-echo "Screens byKUTT Ubuntu controller 4.8.1 is installed."
+echo "Screens byKUTT Ubuntu controller 4.8.2 is installed."
 echo "No automatic reboot timer or reboot watchdog was installed."
 echo "Reboot once to activate Xorg autologin: sudo reboot"
 echo "Future updates: sudo digital-signage-update"
